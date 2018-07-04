@@ -1,8 +1,8 @@
-
 project( edge_detect )
 
-add_definitions(-std=c++17)
+# add_definitions(-std=c++17)
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=c++17> $<$<COMPILE_LANGUAGE:C>:-std=c99>)
 
 cmake_minimum_required(VERSION 2.6.2)
 if("${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}" VERSION_GREATER 2.6)
@@ -46,15 +46,9 @@ set(CMAKE_BUILD_TYPE "RELEASE")
 # include helper file
 include( ${CGAL_USE_FILE} )
 
-include_directories( src thirdparty ${CGAL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${GDAL_INCLUDE_DIR} /usr/local/include/LASlib /usr/local/include/LASzip)
+include_directories( point-based raster-based thirdparty ${CGAL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${GDAL_INCLUDE_DIR} /usr/local/include/LASlib /usr/local/include/LASzip)
 
 # Creating entries for target
-# FILE(GLOB SRC_FILES src/*.cpp)
-add_executable(raster_edge src/raster_edge.cpp src/Raster.cpp thirdparty/lsd/lsd.c)
-target_link_libraries( raster_edge ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} ${GDAL_LIBRARY} /usr/local/lib/liblas.dylib )
 
-add_executable(point_edge src/point_edge.cpp src/region_growing.cpp)
-target_link_libraries( point_edge ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} ${GDAL_LIBRARY} /usr/local/lib/liblas.dylib )
-
-add_executable(rg_test src/region_growing.cpp src/test_regiongrower.cpp)
-target_link_libraries( rg_test ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES})
+add_subdirectory(point-based)
+add_subdirectory(raster-based)

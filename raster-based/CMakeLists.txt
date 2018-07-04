@@ -1,0 +1,2 @@
+add_executable(raster_edge raster_edge.cpp Raster.cpp ../thirdparty/lsd/lsd.c)
+target_link_libraries( raster_edge ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} ${GDAL_LIBRARY} /usr/local/lib/liblas.dylib )
