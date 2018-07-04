@@ -2,7 +2,7 @@
 project( edge_detect )
 
 add_definitions(-std=c++17)
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
 cmake_minimum_required(VERSION 2.6.2)
 if("${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}" VERSION_GREATER 2.6)
@@ -39,6 +39,7 @@ if ( NOT CGAL_FOUND )
   message(SEND_ERROR "3dfier requires the CGAL library")
   return()  
 endif()
+set(CMAKE_BUILD_TYPE "RELEASE")
 
 #find_package(PROJ)
 

@@ -27,6 +27,8 @@
 #include <CGAL/linear_least_squares_fitting_3.h>
 #include <CGAL/Arr_linear_traits_2.h>
 #include <CGAL/Arrangement_2.h>
+#include <CGAL/Arr_extended_dcel.h>
+#include <CGAL/Arr_observer.h>
 #include <CGAL/Cartesian.h>
 #include <CGAL/Exact_rational.h>
 #include <CGAL/Cartesian_converter.h>
@@ -97,15 +99,47 @@ typedef Traits_2::Segment_2                           Segment_2;
 typedef Traits_2::Ray_2                               Ray_2;
 typedef Traits_2::Line_2                              Line_2;
 typedef Traits_2::X_monotone_curve_2                  X_monotone_curve_2;
-typedef CGAL::Arrangement_2<Traits_2>                 Arrangement_2;
+typedef CGAL::Arr_face_extended_dcel<Traits_2, int>   Dcel;
+typedef CGAL::Arrangement_2<Traits_2, Dcel>           Arrangement_2;
 typedef Arrangement_2::Vertex_handle                  Vertex_handle;
 typedef Arrangement_2::Halfedge_handle                Halfedge_handle;
 typedef CGAL::Arr_accessor<Arrangement_2>             Arr_accessor;
 typedef Arr_accessor::Dcel_vertex                     DVertex;
+typedef Arrangement_2::Face                           Face;
 // typedef CGAL::Cartesian_converter<IK,EK>                         IK_to_EK;
 // typedef CGAL::Cartesian_converter<Number_type,SCK>          ToInexact;
 
 // inline Number_type arr_s(double v){return static_cast<Number_type>(100*v);}
+
+// An arrangement observer, used to receive notifications of face splits and
+// to update the indices of the newly created faces.
+class Face_index_observer : public CGAL::Arr_observer<Arrangement_2>
+{
+private:
+  int     n_faces;          // The current number of faces.
+public:
+  Face_index_observer (Arrangement_2& arr) :
+    CGAL::Arr_observer<Arrangement_2> (arr),
+    n_faces (0)
+  {
+    CGAL_precondition (arr.is_empty());
+    arr.unbounded_face()->set_data (0);
+    n_faces++;
+  }
+  virtual void after_split_face (Face_handle old_face,
+                                 Face_handle new_face, bool )
+  {
+    // Assign index to the new face.
+    if(n_faces == 1)
+      new_face->set_data(1);
+    else if(old_face->data()==1)
+      // new_face->set_data (n_faces);
+      new_face->set_data (1);
+    else
+      new_face->set_data (0);
+    n_faces++;
+  }
+};
 
 namespace bg = boost::geometry;
 typedef bg::model::d2::point_xy<double> point_type;
@@ -293,7 +327,7 @@ void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &
   }
 }
 
-void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points) {
+void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, std::vector<int> &edges_index_map) {
   // line fitting in set of candidate edgepoints
   auto LD = linedect::LineDetector(edge_points);
   LD.dist_thres = 0.5 * 0.5;
@@ -302,7 +336,6 @@ void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vect
   LD.detect();
 
   std::cout << LD.segment_shapes.size() << " lines detected." << std::endl;
-  std::vector<int> edges_index_map(edge_points.size(),-1); // property map that stores the line index for each point
   
   int line_id=0;
   for(auto seg: LD.segment_shapes){
@@ -334,6 +367,38 @@ void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vect
   }
 }
 
+void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<std::pair<Point,Point>> & edge_segments, Arrangement_2 &arr){
+  Face_index_observer obs (arr);
+  // const double s = 100;
+
+  // insert footprint segments
+  std::vector<Point_2> footprint_pts;
+  for (auto p : footprint.outer()) {
+    footprint_pts.push_back(Point_2(bg::get<0>(p), bg::get<1>(p)));
+  }
+  Polygon_2 cgal_footprint(footprint_pts.begin(), footprint_pts.end());
+  insert_non_intersecting_curves(arr, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
+
+  // std::cout << arr.number_of_faces() <<std::endl;
+  // for (auto face: arr.face_handles()){
+  //   if(face->is_unbounded())
+  //     std::cout << "unbounded face, id: " << face->data() << std::endl;
+  //   else
+  //     std::cout << "Bounded face, id: " << face->data() << std::endl;
+  // }
+
+  // insert step-edge lines
+  std::vector<std::pair<Plane,bool>> wall_planes;
+  std::vector<X_monotone_curve_2> lines;
+  for (auto s : edge_segments){
+    wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
+    const Point_2 a(s.first.x(),s.first.y());
+    const Point_2 b(s.second.x(),s.second.y());
+    lines.push_back(Line_2(a, b));
+  }
+  insert(arr, lines.begin(), lines.end());
+}
+
 int main(int argc, char *argv[])
 {
   // read las pointcloud
@@ -352,7 +417,7 @@ int main(int argc, char *argv[])
   bg::envelope(footprint, bbox);
 
   PNL_vector points;
-  pc_in_footprint("/Users/ravi/git/heightjump-detect/build/ahn3.las", footprint, points);
+  pc_in_footprint("/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las", footprint, points);
   
   compute_metrics(points);
 
@@ -364,26 +429,38 @@ int main(int argc, char *argv[])
   classify_edgepoints(edge_points, points);
 
   std::vector<std::pair<Point,Point>> edge_segments;
-  detect_lines(edge_segments, edge_points);
-
-  
+  std::vector<int> edges_index_map(edge_points.size(),-1); // property map that stores the line index for each point
+  detect_lines(edge_segments, edge_points, edges_index_map);
   
   // regularisation of lines
-  std::vector<std::pair<Plane,bool>> wall_planes;
-  for (auto s : edge_segments){
-    wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
-  }
+  // std::vector<std::pair<Plane,bool>> wall_planes;
+  // for (auto s : edge_segments){
+  //   wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
+  // }
   // CGAL::regularize_planes(edge_points,
-                          //  Point_map(),
-                          //  wall_planes,
-                          //  CGAL::First_of_pair_property_map<std::pair<Plane,bool>>(),
-                          //  Index_map(edges_index_map),
-                          //  true, // Regularize parallelism
-                          //  true, // Regularize orthogonality
-                          //  true, // Do not regularize coplanarity
-                          //  false, // Regularize Z-symmetry (default)
-                          //  40, // 10 degrees of tolerance for parallelism/orthogonality
-                          //  0.8); //tolerance_coplanarity
+  //                          Point_map(),
+  //                          wall_planes,
+  //                          CGAL::First_of_pair_property_map<std::pair<Plane,bool>>(),
+  //                          Index_map(edges_index_map),
+  //                          true, // Regularize parallelism
+  //                          true, // Regularize orthogonality
+  //                          true, // Do not regularize coplanarity
+  //                          false, // Regularize Z-symmetry (default)
+  //                          40, // 10 degrees of tolerance for parallelism/orthogonality
+  //                          0.8); //tolerance_coplanarity
+  // std::vector<X_monotone_curve_2> lines;
+  // Plane horizontal_plane(Point(0,0,-100), Vector(0,0,1));
+  // for (auto wp: wall_planes){
+  //   auto result = CGAL::intersection(horizontal_plane, wp.first);
+  //   if (const Line* line = boost::get<Line>(&*result)){
+  //     auto p0 = line->point(0);
+  //     auto p1 = line->point(1);
+  //     const Point_2 a(p0.x(),p0.y());
+  //     const Point_2 b(p1.x(),p1.y());
+  //     lines.push_back(Line_2(a, b));
+  //   }
+  // }
+  // insert(arr, lines.begin(), lines.end());
   
 
   std::ofstream f_obj("edges.obj");
@@ -423,46 +500,43 @@ int main(int argc, char *argv[])
   // remaining edges are the step edges and original footprint edges
 
   Arrangement_2 arr;
-  // const double s = 100;
+  build_arrangement(footprint, edge_segments, arr);
 
-  // add footprint outline
-  std::vector<Point_2> footprint_pts;
-  for (auto p : footprint.outer()) {
-    footprint_pts.push_back(Point_2(bg::get<0>(p), bg::get<1>(p)));
-  }
-  Polygon_2 cgal_footprint(footprint_pts.begin(), footprint_pts.end());
-  insert(arr, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
+  // std::cout << arr.number_of_faces() <<std::endl;
+  // for (auto face: arr.face_handles()){
+  //   if(face->is_unbounded())
+  //     std::cout << "unbounded face, id: " << face->data() << std::endl;
+  //   else
+  //     std::cout << "Bounded face, id: " << face->data() << std::endl;
+  // }
 
-  // prepare step-edge lines
-  std::vector<X_monotone_curve_2> lines;
-  Plane horizontal_plane(Point(0,0,-100), Vector(0,0,1));
-  for (auto wp: wall_planes){
-    auto result = CGAL::intersection(horizontal_plane, wp.first);
-    if (const Line* line = boost::get<Line>(&*result)){
-      auto p0 = line->point(0);
-      auto p1 = line->point(1);
-      const Point_2 a(p0.x(),p0.y());
-      const Point_2 b(p1.x(),p1.y());
-      lines.push_back(Line_2(a, b));
-    }
-  }
-  insert(arr, lines.begin(), lines.end());
-
-  // for (auto s: edge_segments)
-  //   lines.push_back(Line_2(Point_2(s.first.x(), s.first.y()), Point_2(s.second.x(), s.second.y())));
-  // insert(arr, lines.begin(), lines.end());
+  // std::cout << arr.number_of_faces() <<std::endl;
 
   // write to wkt
   std::ofstream f_arr("arr.wkt");
 
   f_arr << std::fixed << std::setprecision(2);
-  for (auto he: arr.edge_handles()){
-    const DVertex* sv = &(*he->source());
-    const DVertex* tv = &(*he->target());
-    // std::cout << he->curve() << std::endl;
-    if (!(sv->has_null_point() || tv->has_null_point()))
-      f_arr << "LINESTRING(" << he->source()->point().x() << " " << he->source()->point().y() << "," << he->target()->point().x() << " " << he->target()->point().y() << ")" << std::endl;
+  for (auto face: arr.face_handles()){
+    if(face->data()==1){
+      auto he = face->outer_ccb();
+      auto first = he;
+
+      f_arr << "POLYGON((";
+      while(true){
+        f_arr << he->source()->point().x() << " " << he->source()->point().y() << ",";
+        he = he->next();
+        if (he==first) break;
+      }
+      f_arr << he->source()->point().x() << " " << he->source()->point().y() << "))" << std::endl;
+    }
   }
+  // for (auto he: arr.edge_handles()){
+  //   const DVertex* sv = &(*he->source());
+  //   const DVertex* tv = &(*he->target());
+  //   // std::cout << he->curve() << std::endl;
+  //   if (!(sv->has_null_point() || tv->has_null_point()))
+  //     f_arr << "LINESTRING(" << he->source()->point().x() << " " << he->source()->point().y() << "," << he->target()->point().x() << " " << he->target()->point().y() << ")" << std::endl;
+  // }
   f_arr.close();
 
 
