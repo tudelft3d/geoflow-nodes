@@ -177,9 +177,27 @@ typedef bg::model::d2::point_xy<double> point_type;
 typedef bg::model::point<double, 3, bg::cs::cartesian> point_type_3d;
 typedef bg::model::segment<point_type> segment;
 
+struct config {
+  public:
+  int metrics_plane_min_points = 40;
+  float metrics_plane_epsilon = 0.2;
+  float metrics_plane_normal_threshold = 0.95;
+  float metrics_is_wall_threshold = 0.1;
+  int metrics_k_linefit = 30;
+  int metrics_k_jumpcnt_elediff = 10;
+
+  int classify_jump_count_min = 1;
+  int classify_jump_count_max = 5;
+  float classify_line_dist = 0.01;
+  float classify_jump_ele =1.0;
+
+  float linedetect_dist_threshold = 0.5;
+  int linedetect_min_segment_count = 20;
+  int linedetect_k = 17;
+};
 
 void pc_in_footprint(std::string las_filename, bg::model::polygon<point_type> &footprint, PNL_vector &points) ;
-void compute_metrics(PNL_vector &points) ;
-void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &points) ;
-void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, std::vector<int> &edges_index_map) ;
+void compute_metrics(PNL_vector &points, config = config()) ;
+void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &points, config = config()) ;
+void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, config = config()) ;
 void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<std::pair<Point,Point>> & edge_segments, Arrangement_2 &arr);

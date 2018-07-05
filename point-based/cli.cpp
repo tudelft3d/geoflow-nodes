@@ -31,8 +31,8 @@ int main(int argc, char *argv[])
   classify_edgepoints(edge_points, points);
 
   std::vector<std::pair<Point,Point>> edge_segments;
-  std::vector<int> edges_index_map(edge_points.size(),-1); // property map that stores the line index for each point
-  detect_lines(edge_segments, edge_points, edges_index_map);
+  // std::vector<int> edges_index_map(edge_points.size(),-1); // property map that stores the line index for each point
+  detect_lines(edge_segments, edge_points);
   
   // regularisation of lines
   // std::vector<std::pair<Plane,bool>> wall_planes;

@@ -53,7 +53,7 @@ void pc_in_footprint(std::string las_filename, bg::model::polygon<point_type> &f
 
 }
 
-void compute_metrics(PNL_vector &points) {
+void compute_metrics(PNL_vector &points, config c) {
 
   // Instantiates shape detection engine.
   Region_growing shape_detection;
@@ -63,14 +63,14 @@ void compute_metrics(PNL_vector &points) {
   // Sets probability to miss the largest primitive at each iteration.
   // parameters.probability = 0.05;
   // Detect shapes with at least 500 points.
-  parameters.min_points = 40;
+  parameters.min_points = c.metrics_plane_min_points;
   // Sets maximum Euclidean distance between a point and a shape.
-  parameters.epsilon = 0.2;
+  parameters.epsilon = c.metrics_plane_epsilon;
   // Sets maximum Euclidean distance between points to be clustered.
   // parameters.cluster_epsilon = 0.01;
   // Sets maximum normal deviation.
   // 0.9 < dot(surface_normal, point_normal); 
-  parameters.normal_threshold = 0.95; 
+  parameters.normal_threshold = c.metrics_plane_normal_threshold;
 
   // Provides the input data.
   shape_detection.set_input(points);
@@ -88,7 +88,7 @@ void compute_metrics(PNL_vector &points) {
     std::cout << shape->info() << std::endl;
     Vector n = plane->plane_normal();
     std::cout << n*Vector(0,0,1) << std::endl;
-    bool is_wall = CGAL::abs(n*Vector(0,0,1)) < 0.1;
+    bool is_wall = CGAL::abs(n*Vector(0,0,1)) < c.metrics_is_wall_threshold;
     
     // store cluster id's and is_wall as point attributes
     int label = i++;
@@ -99,7 +99,7 @@ void compute_metrics(PNL_vector &points) {
     }
 
     if(!is_wall){
-      const unsigned int N = 30;
+      const unsigned int N = c.metrics_k_linefit;
       PNL_vector cluster_points;
       for(auto ind : shape->indices_of_assigned_points()){
         cluster_points.push_back(points[ind]);
@@ -134,7 +134,7 @@ void compute_metrics(PNL_vector &points) {
     }
   }
   Tree tree(roof_points.begin(), roof_points.end());
-  const unsigned int N = 10;
+  const unsigned int N = c.metrics_k_jumpcnt_elediff;
   for (auto q : points){
     bool is_wall = q.get<3>();
     bool is_on_plane = q.get<2>() != 0;
@@ -159,13 +159,13 @@ void compute_metrics(PNL_vector &points) {
   }
 }
 
-void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &points) {
+void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &points, config c) {
   for (auto &p : points){
     double line_dist = p.get<4>();
     double jump_count = p.get<5>();
     double jump_ele = p.get<7>();
     // if (line_dist > 0.01){// ie we assume the point to be on an edge of this cluster
-    bool is_step = (jump_count >= 1 && jump_count <= 5) && (line_dist > 0.01) && (jump_ele > 1);
+    bool is_step = (jump_count >= c.classify_jump_count_min && jump_count <= c.classify_jump_count_max) && (line_dist > c.classify_line_dist) && (jump_ele > c.classify_jump_ele);
     // bool is_step = (jump_count >= 1 && jump_count <= 5) && line_dist > 0.01;
     // bool is_step = (jump_count >= 1) && line_dist > 0.01;
     // bool is_step = line_dist > 0.01;
@@ -181,15 +181,16 @@ void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &
   }
 }
 
-void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, std::vector<int> &edges_index_map) {
+void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, config c) {
   // line fitting in set of candidate edgepoints
   auto LD = linedect::LineDetector(edge_points);
-  LD.dist_thres = 0.5 * 0.5;
-  LD.min_segment_count = 20;
-  LD.N = 17;
+  LD.dist_thres = c.linedetect_dist_threshold * c.linedetect_dist_threshold;
+  LD.min_segment_count = c.linedetect_min_segment_count;
+  LD.N = c.linedetect_k;
   LD.detect();
 
   std::cout << LD.segment_shapes.size() << " lines detected." << std::endl;
+  //  std::vector<int> &edges_index_map,
   
   int line_id=0;
   for(auto seg: LD.segment_shapes){
@@ -201,7 +202,7 @@ void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vect
     size_t j=0;
     auto l_normal = l.to_vector()/CGAL::sqrt(l.to_vector().squared_length());
     for(auto lind : l_idx){
-      edges_index_map[lind] = line_id;
+      // edges_index_map[lind] = line_id;
       // project this_p on l
       linedect::Point this_p(edge_points[lind]);
       const Vector a(l.point(0), this_p);
