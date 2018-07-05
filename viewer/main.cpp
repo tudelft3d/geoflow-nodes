@@ -91,18 +91,9 @@ int main(void)
         point_array[i++] = 1.0;
     }
     auto pc_painter = std::make_shared<Painter>();
-    auto pc_buffer = std::make_unique<Buffer>();
-    pc_buffer->set_data(&point_array[0], point_array.size());
-    pc_buffer->add_field(3);
-    pc_buffer->add_field(3);
-
-    // Shader pc_shader;
-    auto pc_shader = std::make_unique<Shader>();
-    pc_shader->attach("basic.vert");
-    pc_shader->attach("basic.frag");
-    
-    pc_painter->set_buffer(std::move(pc_buffer));
-    pc_painter->set_program(std::move(pc_shader));
+    pc_painter->set_data(&point_array[0], point_array.size(), {3,3});
+    pc_painter->attach_shader("basic.vert");
+    pc_painter->attach_shader("basic.frag");
     pc_painter->set_drawmode(GL_POINTS);
 
     // prepare footprint painter
@@ -118,21 +109,11 @@ int main(void)
         footprint_array[i++] = 0.0;
     }
     auto fp_painter = std::make_shared<Painter>();
-    auto fp_buffer = std::make_unique<Buffer>();
-    fp_buffer->set_data(&footprint_array[0], footprint_array.size());
-    fp_buffer->add_field(3);
-    fp_buffer->add_field(3);
-
-    // Shader fp_shader;
-    auto fp_shader = std::make_unique<Shader>();
-    fp_shader->attach("basic.vert");
-    fp_shader->attach("basic.frag");
-    
-    fp_painter->set_buffer(std::move(fp_buffer));
-    fp_painter->set_program(std::move(fp_shader));
+    fp_painter->set_data(&footprint_array[0], footprint_array.size(), {3,3});
+    fp_painter->attach_shader("basic.vert");
+    fp_painter->attach_shader("basic.frag");
     fp_painter->set_drawmode(GL_LINE_STRIP);
 
-    
     a.draw_that(on_draw);
 
     a.add_painter(std::move(pc_painter), "point cloud");
