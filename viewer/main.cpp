@@ -18,8 +18,9 @@ static double center_x;
 static double center_y;
 static std::vector<GLfloat> segment_array;
 static std::vector<GLfloat> polygon_array;
-static std::weak_ptr<Painter> sp_handle, pp_handle;
+static std::weak_ptr<Painter> sp_handle, pp_handle, pc_handle, pce_handle;
 static std::vector<GLfloat> point_array;
+static std::vector<GLfloat> edge_point_array;
 
 static poviApp a(1280, 800, "Step edge detector");
 
@@ -29,6 +30,20 @@ void compute_metrics(){
 void classify_edgepoints(){
     edge_points.clear();
     classify_edgepoints(edge_points, points, c);
+    edge_point_array.clear();
+    edge_point_array.resize(edge_points.size()*3*2);
+    int i=0;
+    for(auto p:edge_points){
+        edge_point_array[i++] = p.x()-center_x;
+        edge_point_array[i++] = p.y()-center_y;
+        edge_point_array[i++] = p.z();
+        edge_point_array[i++] = 0.57;
+        edge_point_array[i++] = 0.81;
+        edge_point_array[i++] = 0.94;
+    }
+    if (auto painter = pce_handle.lock()) {
+        painter->set_data(&edge_point_array[0], edge_point_array.size(), {3,3});
+    }
 }
 void detect_lines(){
     edge_segments.clear();
@@ -99,9 +114,10 @@ void build_arrangement(){
         painter->set_data(&polygon_array[0], polygon_array.size(), {3,3});
     }
 }
-
+static float pointsize=1;
 void on_draw() {
     ImGui::Begin("Step edge parameters");
+        ImGui::PushItemWidth(100);
     // if (ImGui::CollapsingHeader("Compute metrics")){
         // ImGui::Indent();
         ImGui::InputInt("Plane min points", &c.metrics_plane_min_points);
@@ -134,6 +150,7 @@ void on_draw() {
         // ImGui::Unindent();
         if (ImGui::Button("Build Arrangement"))
             build_arrangement();
+        ImGui::PopItemWidth();
     // }
     ImGui::End();
 }
@@ -164,15 +181,16 @@ int main(void)
         point_array[i++] = p.get<0>().x() - center_x;
         point_array[i++] = p.get<0>().y() - center_y;
         point_array[i++] = p.get<0>().z();
-        point_array[i++] = 1.0;
-        point_array[i++] = 1.0;
-        point_array[i++] = 1.0;
+        point_array[i++] = 0.6;
+        point_array[i++] = 0.6;
+        point_array[i++] = 0.6;
     }
     auto pc_painter = std::make_shared<Painter>();
     pc_painter->set_data(&point_array[0], point_array.size(), {3,3});
     pc_painter->attach_shader("basic.vert");
     pc_painter->attach_shader("basic.frag");
     pc_painter->set_drawmode(GL_POINTS);
+    
 
     // prepare footprint painter
     std::vector<GLfloat> footprint_array;
@@ -192,6 +210,12 @@ int main(void)
     fp_painter->attach_shader("basic.frag");
     fp_painter->set_drawmode(GL_LINE_STRIP);
 
+    // prepare step edge point painter
+    auto steppoint_painter = std::make_shared<Painter>();
+    steppoint_painter->set_data(&edge_point_array[0], edge_point_array.size(), {3,3});
+    steppoint_painter->attach_shader("basic.vert");
+    steppoint_painter->attach_shader("basic.frag");
+    steppoint_painter->set_drawmode(GL_POINTS);
     // prepare step edge segment painter
     auto segment_painter = std::make_shared<Painter>();
     segment_painter->set_data(&segment_array[0], segment_array.size(), {3,3});
@@ -207,8 +231,9 @@ int main(void)
 
     a.draw_that(on_draw);
 
-    a.add_painter(std::move(pc_painter), "Point cloud");
+    pc_handle = a.add_painter(std::move(pc_painter), "Point cloud");
     a.add_painter(std::move(fp_painter), "Footprint");
+    pce_handle = a.add_painter(std::move(steppoint_painter), "Step points");
     sp_handle = a.add_painter(std::move(segment_painter), "Step edges");
     pp_handle = a.add_painter(std::move(polygon_painter), "Decomposition");
 
