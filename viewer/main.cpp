@@ -5,11 +5,20 @@
 #include "point_edge.h"
 #include <array>
 
+// point_edge stuff
 static config c;
 static bg::model::polygon<point_type> footprint;
 static PNL_vector points;
 static std::vector<linedect::Point> edge_points;
 static std::vector<std::pair<Point,Point>> edge_segments;
+
+// povi stuff
+static double center_x;
+static double center_y;
+static std::vector<GLfloat> segment_array;
+static std::weak_ptr<Painter> sp_handle;
+static std::vector<GLfloat> point_array;
+
 static poviApp a(1280, 800, "Step edge detector");
 
 void compute_metrics(){
@@ -22,6 +31,27 @@ void classify_edgepoints(){
 void detect_lines(){
     edge_segments.clear();
     detect_lines(edge_segments, edge_points, c);
+    segment_array.clear();
+    segment_array.resize(edge_segments.size()*2*2*3);
+    int i=0;
+    for (auto s : edge_segments){
+        segment_array[i++] = s.first.x()-center_x;
+        segment_array[i++] = s.first.y()-center_y;
+        segment_array[i++] = s.first.z();
+        segment_array[i++] = 1.0;
+        segment_array[i++] = 0.0;
+        segment_array[i++] = 0.0;
+        segment_array[i++] = s.second.x()-center_x;
+        segment_array[i++] = s.second.y()-center_y;
+        segment_array[i++] = s.second.z();
+        segment_array[i++] = 1.0;
+        segment_array[i++] = 0.0;
+        segment_array[i++] = 0.0;
+    }
+    if (auto painter = sp_handle.lock()) {
+        painter->set_data(&segment_array[0], segment_array.size(), {3,3});
+    }
+  
 }
 
 void on_draw() {
@@ -42,15 +72,15 @@ void on_draw() {
         // ImGui::Indent();
         ImGui::InputInt("Jump cnt min", &c.classify_jump_count_min);
         ImGui::InputInt("Jump cnt max", &c.classify_jump_count_max);
-        ImGui::InputFloat("input float", &c.classify_line_dist, 0.01, 1);
-        ImGui::InputFloat("input float", &c.classify_jump_ele, 0.01, 1);
+        ImGui::InputFloat("Line dist", &c.classify_line_dist, 0.01, 1);
+        ImGui::InputFloat("Elevation jump", &c.classify_jump_ele, 0.01, 1);
         if (ImGui::Button("Classify"))
             classify_edgepoints();
         // ImGui::Unindent();
     // }
     // if (ImGui::CollapsingHeader("Detect lines")){
         // ImGui::Indent();
-        ImGui::InputFloat("input float", &c.linedetect_dist_threshold, 0.01, 1);
+        ImGui::InputFloat("Dist thres", &c.linedetect_dist_threshold, 0.01, 1);
         ImGui::InputInt("Segment cnt min", &c.linedetect_min_segment_count);
         ImGui::InputInt("K", &c.linedetect_k);
         if (ImGui::Button("Detect"))
@@ -72,14 +102,12 @@ int main(void)
     double min_y = bg::get<bg::min_corner, 1>(bbox);
     double max_x = bbox.max_corner().get<0>();
     double max_y = bbox.max_corner().get<1>();
-    double center_x = (min_x+max_x)/2;
-    double center_y = (min_y+max_y)/2;
+    center_x = (min_x+max_x)/2;
+    center_y = (min_y+max_y)/2;
 
-    
     pc_in_footprint("/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las", footprint, points);
 
     // prepare pointcloud painter
-    std::vector<GLfloat> point_array;
     point_array.resize(2*3*points.size());
     int i=0;
     for (auto &p : points) {
@@ -114,10 +142,18 @@ int main(void)
     fp_painter->attach_shader("basic.frag");
     fp_painter->set_drawmode(GL_LINE_STRIP);
 
+    // prepare step edge segment painter
+    auto segment_painter = std::make_shared<Painter>();
+    segment_painter->set_data(&segment_array[0], segment_array.size(), {3,3});
+    segment_painter->attach_shader("basic.vert");
+    segment_painter->attach_shader("basic.frag");
+    segment_painter->set_drawmode(GL_LINES);
+
     a.draw_that(on_draw);
 
-    a.add_painter(std::move(pc_painter), "point cloud");
-    a.add_painter(std::move(fp_painter), "footprint");
+    a.add_painter(std::move(pc_painter), "Point cloud");
+    a.add_painter(std::move(fp_painter), "Footprint");
+    sp_handle = a.add_painter(std::move(segment_painter), "Step edges");
 
     a.run();
 }
