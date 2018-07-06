@@ -188,12 +188,12 @@ struct config {
 
   int classify_jump_count_min = 1;
   int classify_jump_count_max = 5;
-  float classify_line_dist = 0.01;
-  float classify_jump_ele =1.0;
+  float classify_line_dist = 0.005;
+  float classify_jump_ele = 1.0;
 
-  float linedetect_dist_threshold = 0.5;
+  float linedetect_dist_threshold = 0.3;
   int linedetect_min_segment_count = 20;
-  int linedetect_k = 17;
+  int linedetect_k = 20;
 };
 
 void pc_in_footprint(std::string las_filename, bg::model::polygon<point_type> &footprint, PNL_vector &points) ;

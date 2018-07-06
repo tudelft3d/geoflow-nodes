@@ -11,12 +11,14 @@ static bg::model::polygon<point_type> footprint;
 static PNL_vector points;
 static std::vector<linedect::Point> edge_points;
 static std::vector<std::pair<Point,Point>> edge_segments;
+static Arrangement_2 arr;
 
 // povi stuff
 static double center_x;
 static double center_y;
 static std::vector<GLfloat> segment_array;
-static std::weak_ptr<Painter> sp_handle;
+static std::vector<GLfloat> polygon_array;
+static std::weak_ptr<Painter> sp_handle, pp_handle;
 static std::vector<GLfloat> point_array;
 
 static poviApp a(1280, 800, "Step edge detector");
@@ -54,6 +56,50 @@ void detect_lines(){
   
 }
 
+void build_arrangement(){
+    arr.clear();
+    build_arrangement(footprint, edge_segments, arr);
+    polygon_array.clear();
+    for (auto face: arr.face_handles()){
+        if(face->data()==1){
+            auto he = face->outer_ccb();
+            auto first = he;
+
+            while(true){
+                polygon_array.push_back(CGAL::to_double(he->source()->point().x())-center_x);
+                polygon_array.push_back(CGAL::to_double(he->source()->point().y())-center_y);
+                polygon_array.push_back(0);
+                polygon_array.push_back(1);
+                polygon_array.push_back(1);
+                polygon_array.push_back(0);
+                polygon_array.push_back(CGAL::to_double(he->target()->point().x())-center_x);
+                polygon_array.push_back(CGAL::to_double(he->target()->point().y())-center_y);
+                polygon_array.push_back(0);
+                polygon_array.push_back(1);
+                polygon_array.push_back(1);
+                polygon_array.push_back(0);
+                he = he->next();
+                if (he==first) break;
+            }
+            polygon_array.push_back(CGAL::to_double(he->source()->point().x())-center_x);
+            polygon_array.push_back(CGAL::to_double(he->source()->point().y())-center_y);
+            polygon_array.push_back(0);
+            polygon_array.push_back(1);
+            polygon_array.push_back(1);
+            polygon_array.push_back(0);
+            polygon_array.push_back(CGAL::to_double(he->target()->point().x())-center_x);
+            polygon_array.push_back(CGAL::to_double(he->target()->point().y())-center_y);
+            polygon_array.push_back(0);
+            polygon_array.push_back(1);
+            polygon_array.push_back(1);
+            polygon_array.push_back(0);
+        }
+    }
+    if (auto painter = pp_handle.lock()) {
+        painter->set_data(&polygon_array[0], polygon_array.size(), {3,3});
+    }
+}
+
 void on_draw() {
     ImGui::Begin("Step edge parameters");
     // if (ImGui::CollapsingHeader("Compute metrics")){
@@ -86,6 +132,8 @@ void on_draw() {
         if (ImGui::Button("Detect"))
             detect_lines();
         // ImGui::Unindent();
+        if (ImGui::Button("Build Arrangement"))
+            build_arrangement();
     // }
     ImGui::End();
 }
@@ -93,11 +141,12 @@ void on_draw() {
 int main(void)
 {
     std::cout << std::fixed << std::setprecision(2);
-  
-    bg::read_wkt("Polygon ((91716.13000000000465661 438312.07000000000698492, 91716.77199999999720603 438312.76799999998183921, 91717.66099999999278225 438313.73499999998603016, 91729.11999999999534339 438326.19000000000232831, 91729.2559999999939464 438326.0659999999916181, 91738.30999999999767169 438317.84000000002561137, 91739.07000000000698492 438318.66999999998370185, 91743.60000000000582077 438314.53999999997904524, 91749.55000000000291038 438321.03000000002793968, 91736.07000000000698492 438333.34000000002561137, 91731.43499999999767169 438337.55499999999301508, 91728.17699999999604188 438340.51799999998183921, 91727.96300000000337604 438340.71299999998882413, 91726.35000000000582077 438342.17999999999301508, 91730.4419999999954598 438346.66800000000512227, 91731.20600000000558794 438347.50500000000465661, 91743.52000000000407454 438361.01000000000931323, 91739.02800000000570435 438365.08699999999953434, 91736.75800000000162981 438367.14699999999720603, 91736.58999999999650754 438367.29999999998835847, 91722.71600000000034925 438352.11300000001210719, 91721.10899999999674037 438353.64000000001396984, 91711.05000000000291038 438342.59999999997671694, 91712.69500000000698492 438341.14600000000791624, 91709.50999999999476131 438337.65999999997438863, 91716.41400000000430737 438331.41300000000046566, 91717.96199999999953434 438330.01099999999860302, 91719.08000000000174623 438329, 91710.89999999999417923 438320.01000000000931323, 91707.22999999999592546 438323.28999999997904524, 91706.2559999999939464 438322.22399999998742715, 91704.65200000000186265 438320.46799999999348074, 91703.85000000000582077 438319.59000000002561137, 91703.91199999999662396 438319.53299999999580905, 91706.33999999999650754 438317.30999999999767169, 91693.41999999999825377 438303.19000000000232831, 91691 438305.40000000002328306, 91687.58999999999650754 438301.70000000001164153, 91697.96899999999732245 438292.19599999999627471, 91702.67799999999988358 438297.37099999998463318, 91707.28299999999580905 438302.4469999999855645, 91711.53299999999580905 438307.13299999997252598, 91711.66000000000349246 438307.28999999997904524, 91713.7470000000030268 438309.60700000001816079, 91716.13000000000465661 438312.07000000000698492))", footprint);
+    
+    static bg::model::polygon<point_type> bag_polygon;
+    bg::read_wkt("Polygon ((91716.13000000000465661 438312.07000000000698492, 91716.77199999999720603 438312.76799999998183921, 91717.66099999999278225 438313.73499999998603016, 91729.11999999999534339 438326.19000000000232831, 91729.2559999999939464 438326.0659999999916181, 91738.30999999999767169 438317.84000000002561137, 91739.07000000000698492 438318.66999999998370185, 91743.60000000000582077 438314.53999999997904524, 91749.55000000000291038 438321.03000000002793968, 91736.07000000000698492 438333.34000000002561137, 91731.43499999999767169 438337.55499999999301508, 91728.17699999999604188 438340.51799999998183921, 91727.96300000000337604 438340.71299999998882413, 91726.35000000000582077 438342.17999999999301508, 91730.4419999999954598 438346.66800000000512227, 91731.20600000000558794 438347.50500000000465661, 91743.52000000000407454 438361.01000000000931323, 91739.02800000000570435 438365.08699999999953434, 91736.75800000000162981 438367.14699999999720603, 91736.58999999999650754 438367.29999999998835847, 91722.71600000000034925 438352.11300000001210719, 91721.10899999999674037 438353.64000000001396984, 91711.05000000000291038 438342.59999999997671694, 91712.69500000000698492 438341.14600000000791624, 91709.50999999999476131 438337.65999999997438863, 91716.41400000000430737 438331.41300000000046566, 91717.96199999999953434 438330.01099999999860302, 91719.08000000000174623 438329, 91710.89999999999417923 438320.01000000000931323, 91707.22999999999592546 438323.28999999997904524, 91706.2559999999939464 438322.22399999998742715, 91704.65200000000186265 438320.46799999999348074, 91703.85000000000582077 438319.59000000002561137, 91703.91199999999662396 438319.53299999999580905, 91706.33999999999650754 438317.30999999999767169, 91693.41999999999825377 438303.19000000000232831, 91691 438305.40000000002328306, 91687.58999999999650754 438301.70000000001164153, 91697.96899999999732245 438292.19599999999627471, 91702.67799999999988358 438297.37099999998463318, 91707.28299999999580905 438302.4469999999855645, 91711.53299999999580905 438307.13299999997252598, 91711.66000000000349246 438307.28999999997904524, 91713.7470000000030268 438309.60700000001816079, 91716.13000000000465661 438312.07000000000698492))", bag_polygon);
     
     bg::model::box<point_type> bbox;
-    bg::envelope(footprint, bbox);
+    bg::envelope(bag_polygon, bbox);
     double min_x = bg::get<bg::min_corner, 0>(bbox);
     double min_y = bg::get<bg::min_corner, 1>(bbox);
     double max_x = bbox.max_corner().get<0>();
@@ -105,6 +154,7 @@ int main(void)
     center_x = (min_x+max_x)/2;
     center_y = (min_y+max_y)/2;
 
+    bg::simplify(bag_polygon, footprint, 0.5);
     pc_in_footprint("/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las", footprint, points);
 
     // prepare pointcloud painter
@@ -148,12 +198,19 @@ int main(void)
     segment_painter->attach_shader("basic.vert");
     segment_painter->attach_shader("basic.frag");
     segment_painter->set_drawmode(GL_LINES);
+    // prepare arrangement polygon painter
+    auto polygon_painter = std::make_shared<Painter>();
+    polygon_painter->set_data(&segment_array[0], segment_array.size(), {3,3});
+    polygon_painter->attach_shader("basic.vert");
+    polygon_painter->attach_shader("basic.frag");
+    polygon_painter->set_drawmode(GL_LINES);
 
     a.draw_that(on_draw);
 
     a.add_painter(std::move(pc_painter), "Point cloud");
     a.add_painter(std::move(fp_painter), "Footprint");
     sp_handle = a.add_painter(std::move(segment_painter), "Step edges");
+    pp_handle = a.add_painter(std::move(polygon_painter), "Decomposition");
 
     a.run();
 }

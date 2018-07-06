@@ -200,24 +200,27 @@ void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vect
     //find the two extreme points on this line
     double minpl=1, maxpl=0;
     size_t j=0;
+    auto point_on_line = l.point(0);
     auto l_normal = l.to_vector()/CGAL::sqrt(l.to_vector().squared_length());
     for(auto lind : l_idx){
       // edges_index_map[lind] = line_id;
       // project this_p on l
       linedect::Point this_p(edge_points[lind]);
-      const Vector a(l.point(0), this_p);
+      const Vector a(point_on_line, this_p);
       double pl = a*l_normal;
 
       if (j++==0){
         minpl = maxpl = pl;
       } else {
-        if (pl < minpl) minpl=pl;
-        else maxpl=pl;
+        if (pl < minpl) 
+          minpl=pl;
+        else if (pl > maxpl) 
+          maxpl=pl;
       }
     }
     line_id++;
-    Point p0 = (l.point(0) + minpl*l_normal);
-    Point p1 = (l.point(0) + maxpl*l_normal);
+    Point p0 = (point_on_line + minpl*l_normal);
+    Point p1 = (point_on_line + maxpl*l_normal);
     edge_segments.push_back(std::make_pair(p0,p1));
   }
 }
