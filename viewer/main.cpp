@@ -334,9 +334,9 @@ int main(int ac, const char * av[])
 
     a.draw_that(on_draw);
 
-    pc_handle = a.add_painter(std::move(pc_painter), "Point cloud");
+    pc_handle = a.add_painter(std::move(pc_painter), "All pts");
     fp_handle = a.add_painter(std::move(fp_painter), "Footprint");
-    pce_handle = a.add_painter(std::move(steppoint_painter), "Step points");
+    pce_handle = a.add_painter(std::move(steppoint_painter), "Step pts");
     sp_handle = a.add_painter(std::move(segment_painter), "Step edges");
     pp_handle = a.add_painter(std::move(polygon_painter), "Decomposition");
 
