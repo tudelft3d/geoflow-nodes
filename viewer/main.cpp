@@ -125,10 +125,10 @@ void detect_lines(){
     }
   
 }
-
 void build_arrangement(){
-    polygon_array.clear();
     if(edge_segments.size()==0) return;
+    polygon_array.clear();
+    arr.clear();
     build_arrangement(footprint, edge_segments, arr);
     for (auto face: arr.face_handles()){
         if(face->data()==1){
@@ -168,6 +168,27 @@ void build_arrangement(){
     if (auto painter = pp_handle.lock()) {
         painter->set_data(&polygon_array[0], polygon_array.size(), {3,3});
     }
+}
+
+void write_arrangement(){
+  std::ofstream f_arr("decomposed.wkt", std::ios::app);
+
+  f_arr << std::fixed << std::setprecision(2);
+  for (auto face: arr.face_handles()){
+    if(face->data()==1){
+      auto he = face->outer_ccb();
+      auto first = he;
+
+      f_arr << "POLYGON((";
+      while(true){
+        f_arr << he->source()->point().x() << " " << he->source()->point().y() << ",";
+        he = he->next();
+        if (he==first) break;
+      }
+      f_arr << he->source()->point().x() << " " << he->source()->point().y() << "))" << std::endl;
+    }
+  }
+  f_arr.close();
 }
 
 void on_draw() {
@@ -219,6 +240,9 @@ void on_draw() {
         // ImGui::Unindent();
         if (ImGui::Button("Build Arrangement"))
             build_arrangement();
+        ImGui::SameLine();
+        if (ImGui::Button("Write Arrangement"))
+            write_arrangement();
         ImGui::PopItemWidth();
     // }
     ImGui::End();
@@ -229,12 +253,14 @@ int main(int ac, const char * av[])
 {
     std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
     std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+    std::string decomposed_path = "decomposed.wkt";
     
     po::options_description desc("Allowed options");
     desc.add_options()
     ("help", "produce help message")
     ("las", po::value<std::string>(&las_path), "Point cloud ")
     ("csv", po::value<std::string>(&csv_path), "Footprints ")
+    // ("out", po::value<std::string>(&csv_path), "Decomposed footprints output")
     ;
     po::variables_map vm;
     po::store(po::parse_command_line(ac, av, desc), vm);
@@ -270,7 +296,6 @@ int main(int ac, const char * av[])
         bg::centroid(footprint, p);
         centroids.push_back(p);
     }
-    
     pc_in_footprint(las_path, footprints, points_vec);
     // pc_in_footprint("/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ", footprints, points_vec);
     
@@ -280,6 +305,7 @@ int main(int ac, const char * av[])
     pc_painter->attach_shader("basic.vert");
     pc_painter->attach_shader("basic.frag");
     pc_painter->set_drawmode(GL_POINTS);
+    pc_painter->set_uniform("u_pointsize", 3.0);
     // prepare footprint painter
     auto fp_painter = std::make_shared<Painter>();
     fp_painter->set_data(&footprint_array[0], footprint_array.size(), {3,3});
@@ -292,6 +318,7 @@ int main(int ac, const char * av[])
     steppoint_painter->attach_shader("basic.vert");
     steppoint_painter->attach_shader("basic.frag");
     steppoint_painter->set_drawmode(GL_POINTS);
+    steppoint_painter->set_uniform("u_pointsize", 8.0);
     // prepare step edge segment painter
     auto segment_painter = std::make_shared<Painter>();
     segment_painter->set_data(&segment_array[0], segment_array.size(), {3,3});
@@ -314,6 +341,9 @@ int main(int ac, const char * av[])
     pp_handle = a.add_painter(std::move(polygon_painter), "Decomposition");
 
     set_footprint(0);
+
+    std::ofstream f_arr("decomposed.wkt");
+    f_arr.close();
 
     a.run();
 }
