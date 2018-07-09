@@ -1,14 +1,12 @@
 #include "point_edge.h"
 
-void pc_in_footprint(std::string las_filename, bg::model::polygon<point_type> &footprint, PNL_vector &points) {
+void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<point_type>> &footprints, std::vector<PNL_vector> &points_vec) {
   LASreadOpener lasreadopener;
   lasreadopener.set_file_name(las_filename.c_str());
-  // lasreadopener.set_file_name("/Users/ravi/SyncCode/bkt.las");
   LASreader* lasreader = lasreadopener.open();
 
-  // LASwriteOpener laswriteopener;
-  // laswriteopener.set_file_name("compressed.laz");
-  // LASwriter* laswriter = laswriteopener.open(&lasreader->header);
+  for (auto footprint:footprints)
+    points_vec.push_back(PNL_vector());
 
   while (lasreader->read_point()) {
     if (lasreader->point.get_classification() == 6){
@@ -16,41 +14,50 @@ void pc_in_footprint(std::string las_filename, bg::model::polygon<point_type> &f
       p.set<0>(lasreader->point.get_x());
       p.set<1>(lasreader->point.get_y());
       // p.set<2>(lasreader->point.get_z());
-      if (bg::within(p,footprint)){
-        PNL pv;
-        CGAL::cpp11::get<0>(pv) = Point(lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z());
-        points.push_back(pv);
-        // laswriter->write_point(&lasreader->point);
+      int i=0;
+      for (auto footprint:footprints) {
+        if (bg::within(p,footprint)){
+          PNL pv;
+          CGAL::cpp11::get<0>(pv) = Point(lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z());
+          points_vec[i].push_back(pv);
+          break;
+          // laswriter->write_point(&lasreader->point);
+        }
+        i++;
       }
     }
   }
   lasreader->close();
   delete lasreader;
 
-  // Estimates normals direction.
-  // Note: pca_estimate_normals() requiresa range of points
-  // as well as property maps to access each point's position and normal.
-  const int nb_neighbors = 5; // K-nearest neighbors = 3 rings
-  CGAL::pca_estimate_normals<Concurrency_tag>
-    (points, nb_neighbors,
-    CGAL::parameters::point_map(Point_map()).
-    normal_map(Normal_map()));
-  // Orients normals.
-  // Note: mst_orient_normals() requires a range of points
-  // as well as property maps to access each point's position and normal.
-  PNL_vector::iterator unoriented_points_begin =
-    CGAL::mst_orient_normals(points, nb_neighbors,
-                              CGAL::parameters::point_map(Point_map()).
-                              normal_map(Normal_map()));
-  // Optional: delete points with an unoriented normal
-  // if you plan to call a reconstruction algorithm that expects oriented normals.
-  points.erase(unoriented_points_begin, points.end());
+  int j=0;
+  for (auto &points: points_vec){
+    std::cout << "Found " << points.size() << " points in footprint #" << j++ << std::endl;
+    if(points.size()==0) continue;
+    // Estimates normals direction.
+    // Note: pca_estimate_normals() requiresa range of points
+    // as well as property maps to access each point's position and normal.
+    const int nb_neighbors = 5; // K-nearest neighbors = 3 rings
+    CGAL::pca_estimate_normals<Concurrency_tag>
+      (points, nb_neighbors,
+      CGAL::parameters::point_map(Point_map()).
+      normal_map(Normal_map()));
+    // Orients normals.
+    // Note: mst_orient_normals() requires a range of points
+    // as well as property maps to access each point's position and normal.
+    PNL_vector::iterator unoriented_points_begin =
+      CGAL::mst_orient_normals(points, nb_neighbors,
+                                CGAL::parameters::point_map(Point_map()).
+                                normal_map(Normal_map()));
+    // Optional: delete points with an unoriented normal
+    // if you plan to call a reconstruction algorithm that expects oriented normals.
+    points.erase(unoriented_points_begin, points.end());
 
-  int i=0;
-  for (auto &p : points) {
-    p.get<8>() = i++;
+    int i=0;
+    for (auto &p : points) {
+      p.get<8>() = i++;
+    }
   }
-
 }
 
 void compute_metrics(PNL_vector &points, config c) {
@@ -164,6 +171,7 @@ void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &
     double line_dist = p.get<4>();
     double jump_count = p.get<5>();
     double jump_ele = p.get<7>();
+    // std::cout << line_dist << " " << jump_count << " " << jump_ele << " " << p.get<8>() << " " << p.get<3>() << " " << p.get<2>() << std::endl;
     // if (line_dist > 0.01){// ie we assume the point to be on an edge of this cluster
     bool is_step = (jump_count >= c.classify_jump_count_min && jump_count <= c.classify_jump_count_max) && (line_dist > c.classify_line_dist) && (jump_ele > c.classify_jump_ele);
     // bool is_step = (jump_count >= 1 && jump_count <= 5) && line_dist > 0.01;
@@ -234,6 +242,7 @@ void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<st
   for (auto p : footprint.outer()) {
     footprint_pts.push_back(Point_2(bg::get<0>(p), bg::get<1>(p)));
   }
+  footprint_pts.pop_back(); // get rid of repeated vertex in boost polygon
   Polygon_2 cgal_footprint(footprint_pts.begin(), footprint_pts.end());
   insert_non_intersecting_curves(arr, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
 

@@ -20,9 +20,9 @@ if ( COMMAND cmake_policy )
 endif()
 
 # Boost
-find_package( Boost )
+find_package( Boost REQUIRED COMPONENTS program_options)
 if ( NOT Boost_FOUND )
-  message(SEND_ERROR "3dfier requires the Boost library")
+  message(SEND_ERROR "edge_detect requires the Boost library")
   return()  
 endif()
 INCLUDE_DIRECTORIES( ${Boost_INCLUDE_DIR} )
@@ -30,16 +30,16 @@ INCLUDE_DIRECTORIES( ${Boost_INCLUDE_DIR} )
 # GDAL
 find_package( GDAL )
 if ( NOT GDAL_FOUND )
-  message(SEND_ERROR "3dfier requires the GDAL library")
+  message(SEND_ERROR "edge_detect requires the GDAL library")
 endif()
 
 # CGAL
 find_package( CGAL QUIET COMPONENTS  )
 if ( NOT CGAL_FOUND )
-  message(SEND_ERROR "3dfier requires the CGAL library")
+  message(SEND_ERROR "edge_detect requires the CGAL library")
   return()  
 endif()
-set(CMAKE_BUILD_TYPE "RELEASE")
+set(CMAKE_BUILD_TYPE "DEBUG")
 
 #find_package(PROJ)
 

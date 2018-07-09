@@ -196,7 +196,7 @@ struct config {
   int linedetect_k = 20;
 };
 
-void pc_in_footprint(std::string las_filename, bg::model::polygon<point_type> &footprint, PNL_vector &points) ;
+void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<point_type>> &footprint, std::vector<PNL_vector> &points_vec) ;
 void compute_metrics(PNL_vector &points, config = config()) ;
 void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &points, config = config()) ;
 void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, config = config()) ;
