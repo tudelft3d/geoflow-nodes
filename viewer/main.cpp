@@ -29,6 +29,7 @@ static std::vector<GLfloat> point_array;
 static std::vector<GLfloat> footprint_array;
 static std::vector<GLfloat> edge_point_array;
 static int footprint_id=0;
+static float footprint_simp_thres=0;
 
 static poviApp a(1280, 800, "Step edge detector");
 
@@ -125,11 +126,14 @@ void detect_lines(){
     }
   
 }
-void build_arrangement(){
+void build_arrangement(float simplification_thres){
+    
     if(edge_segments.size()==0) return;
     polygon_array.clear();
     arr.clear();
-    build_arrangement(footprint, edge_segments, arr);
+    bg::model::polygon<point_type> bag_polygon, fp;
+    bg::simplify(footprint, fp, simplification_thres);
+    build_arrangement(fp, edge_segments, arr);
     for (auto face: arr.face_handles()){
         if(face->data()==1){
             auto he = face->outer_ccb();
@@ -238,8 +242,9 @@ void on_draw() {
         if (ImGui::Button("Detect"))
             detect_lines();
         // ImGui::Unindent();
+        ImGui::InputFloat("Footprint simp", &footprint_simp_thres, 0.01, 1);
         if (ImGui::Button("Build Arrangement"))
-            build_arrangement();
+            build_arrangement(footprint_simp_thres);
         ImGui::SameLine();
         if (ImGui::Button("Write Arrangement"))
             write_arrangement();
@@ -277,11 +282,10 @@ int main(int ac, const char * av[])
     std::string column_names, row;
     std::getline(csv_footprints, column_names);
     while (std::getline(csv_footprints, row)) {
-        bg::model::polygon<point_type> bag_polygon, fp;
+        bg::model::polygon<point_type> bag_polygon;
         bg::read_wkt(row, bag_polygon);
         bg::unique(bag_polygon);
-        bg::simplify(bag_polygon, fp, 0.5);
-        footprints.push_back(fp);
+        footprints.push_back(bag_polygon);
     } csv_footprints.close();
     
     // bg::model::box<point_type> bbox;

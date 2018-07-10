@@ -51,7 +51,7 @@ void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<po
                                 normal_map(Normal_map()));
     // Optional: delete points with an unoriented normal
     // if you plan to call a reconstruction algorithm that expects oriented normals.
-    points.erase(unoriented_points_begin, points.end());
+    // points.erase(unoriented_points_begin, points.end());
 
     int i=0;
     for (auto &p : points) {
