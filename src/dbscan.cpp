@@ -28,18 +28,18 @@ vector<size_t> dbscanClusterer::get_point_indices(size_t shape_id) {
 
 void dbscanClusterer::detect(){
   // seed generation
-  typedef pair<size_t,double> index_dist_pair;
-  auto cmp = [](index_dist_pair left, index_dist_pair right) {return left.second < right.second;};
+  // typedef pair<size_t,double> index_dist_pair;
+  // auto cmp = [](index_dist_pair left, index_dist_pair right) {return left.second < right.second;};
   priority_queue<index_dist_pair, vector<index_dist_pair>, decltype(cmp)> pq(cmp);
 
-  size_t i=0;
-  for(auto pi : indexed_points){
-    auto p = pi.first;
-    Neighbor_search search(tree, p, N);
-    auto line = fit_line(search);
-    auto line_dist = CGAL::squared_distance(line, p);
-    pq.push(index_dist_pair(i++, line_dist));
-  }
+  // size_t i=0;
+  // for(auto pi : indexed_points){
+  //   auto p = pi.first;
+  //   Neighbor_search search(tree, p, N);
+  //   auto line = fit_line(search);
+  //   auto line_dist = CGAL::squared_distance(line, p);
+  //   pq.push(index_dist_pair(i++, line_dist));
+  // }
 
   // region growing from seed points
   while(pq.size()>0){
@@ -88,9 +88,9 @@ void dbscanClusterer::grow_region(size_t seed_idx){
     }
   }
   // undo region if it doesn't satisfy quality criteria
-  if (points_in_region.size()<min_segment_count){
-    segment_shapes.erase(region_counter);
-    for (auto idx: idx_in_region)
-      point_segment_idx[idx] = 0;
-  }
+  // if (points_in_region.size()<min_segment_count){
+  //   segment_shapes.erase(region_counter);
+  //   for (auto idx: idx_in_region)
+  //     point_segment_idx[idx] = 0;
+  // }
 }
