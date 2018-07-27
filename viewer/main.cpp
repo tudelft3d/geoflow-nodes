@@ -24,7 +24,12 @@ static double center_y;
 static std::vector<point_type> centroids;
 static std::vector<GLfloat> segment_array;
 static std::vector<GLfloat> polygon_array;
-static std::weak_ptr<Painter> sp_handle, pp_handle, pc_handle, pce_handle, fp_handle;
+static auto pc_painter = std::make_shared<Painter>();
+static auto fp_painter = std::make_shared<Painter>();
+static auto steppoint_painter = std::make_shared<Painter>();
+static auto segment_painter = std::make_shared<Painter>();
+static auto polygon_painter = std::make_shared<Painter>();
+// static std::weak_ptr<Painter> sp_handle, pp_handle, pc_handle, pce_handle, fp_handle;
 static std::vector<GLfloat> point_array;
 static std::vector<GLfloat> footprint_array;
 static std::vector<GLfloat> edge_point_array;
@@ -50,9 +55,8 @@ void set_footprint(int index){
         point_array[i++] = 0.6;
         point_array[i++] = 0.6;
     }
-    if (auto painter = pc_handle.lock()) {
-        painter->set_data(&point_array[0], point_array.size(), {3,3});
-    }
+
+    pc_painter->set_data(&point_array[0], point_array.size(), {3,3});
     footprint_array.clear();
     for (auto p : footprint.outer()) {
         footprint_array.push_back(bg::get<0>(p) - center_x);
@@ -62,21 +66,17 @@ void set_footprint(int index){
         footprint_array.push_back(1.0);
         footprint_array.push_back(0.0);
     }
-    if (auto painter = fp_handle.lock()) {
-        painter->set_data(&footprint_array[0], footprint_array.size(), {3,3});
-    }
+
+    fp_painter->set_data(&footprint_array[0], footprint_array.size(), {3,3});
     edge_point_array.clear();
-    if (auto painter = pce_handle.lock()) {
-        painter->set_data(&edge_point_array[0], edge_point_array.size(), {3,3});
-    }
+
+    steppoint_painter->set_data(&edge_point_array[0], edge_point_array.size(), {3,3});
     segment_array.clear();
-    if (auto painter = sp_handle.lock()) {
-        painter->set_data(&segment_array[0], segment_array.size(), {3,3});
-    }
+
+    segment_painter->set_data(&segment_array[0], segment_array.size(), {3,3});
     polygon_array.clear();
-    if (auto painter = pp_handle.lock()) {
-        painter->set_data(&polygon_array[0], polygon_array.size(), {3,3});
-    }
+
+    polygon_painter->set_data(&polygon_array[0], polygon_array.size(), {3,3});
     // a.center(bg::get<0>(centroids[index])-center_x, bg::get<1>(centroids[index])-center_y);
 }
 void compute_metrics(){
@@ -97,9 +97,8 @@ void classify_edgepoints(){
         edge_point_array[i++] = 0.94;
     }
     std::cout << "Found " << edge_points.size() << " edge points" << std::endl;
-    if (auto painter = pce_handle.lock()) {
-        painter->set_data(&edge_point_array[0], edge_point_array.size(), {3,3});
-    }
+
+    steppoint_painter->set_data(&edge_point_array[0], edge_point_array.size(), {3,3});
 }
 void detect_lines(){
     edge_segments.clear();
@@ -121,9 +120,8 @@ void detect_lines(){
         segment_array[i++] = 0.0;
         segment_array[i++] = 0.0;
     }
-    if (auto painter = sp_handle.lock()) {
-        painter->set_data(&segment_array[0], segment_array.size(), {3,3});
-    }
+
+    segment_painter->set_data(&segment_array[0], segment_array.size(), {3,3});
   
 }
 void build_arrangement(float simplification_thres){
@@ -169,9 +167,8 @@ void build_arrangement(float simplification_thres){
             polygon_array.push_back(0);
         }
     }
-    if (auto painter = pp_handle.lock()) {
-        painter->set_data(&polygon_array[0], polygon_array.size(), {3,3});
-    }
+
+    polygon_painter->set_data(&polygon_array[0], polygon_array.size(), {3,3});
 }
 
 void write_arrangement(){
@@ -304,33 +301,28 @@ int main(int ac, const char * av[])
     // pc_in_footprint("/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ", footprints, points_vec);
     
     // prepare pointcloud painter
-    auto pc_painter = std::make_shared<Painter>();
     pc_painter->set_data(&point_array[0], point_array.size(), {3,3});
     pc_painter->attach_shader("basic.vert");
     pc_painter->attach_shader("basic.frag");
     pc_painter->set_drawmode(GL_POINTS);
     pc_painter->set_uniform("u_pointsize", 2.0);
     // prepare footprint painter
-    auto fp_painter = std::make_shared<Painter>();
     fp_painter->set_data(&footprint_array[0], footprint_array.size(), {3,3});
     fp_painter->attach_shader("basic.vert");
     fp_painter->attach_shader("basic.frag");
     fp_painter->set_drawmode(GL_LINE_STRIP);
     // prepare step edge point painter
-    auto steppoint_painter = std::make_shared<Painter>();
     steppoint_painter->set_data(&edge_point_array[0], edge_point_array.size(), {3,3});
     steppoint_painter->attach_shader("basic.vert");
     steppoint_painter->attach_shader("basic.frag");
     steppoint_painter->set_drawmode(GL_POINTS);
     steppoint_painter->set_uniform("u_pointsize", 4.0);
     // prepare step edge segment painter
-    auto segment_painter = std::make_shared<Painter>();
     segment_painter->set_data(&segment_array[0], segment_array.size(), {3,3});
     segment_painter->attach_shader("basic.vert");
     segment_painter->attach_shader("basic.frag");
     segment_painter->set_drawmode(GL_LINES);
     // prepare arrangement polygon painter
-    auto polygon_painter = std::make_shared<Painter>();
     polygon_painter->set_data(&segment_array[0], segment_array.size(), {3,3});
     polygon_painter->attach_shader("basic.vert");
     polygon_painter->attach_shader("basic.frag");
@@ -338,11 +330,11 @@ int main(int ac, const char * av[])
 
     a.draw_that(on_draw);
 
-    pc_handle = a.add_painter(std::move(pc_painter), "All pts");
-    fp_handle = a.add_painter(std::move(fp_painter), "Footprint");
-    pce_handle = a.add_painter(std::move(steppoint_painter), "Step pts");
-    sp_handle = a.add_painter(std::move(segment_painter), "Step edges");
-    pp_handle = a.add_painter(std::move(polygon_painter), "Decomposition");
+    a.add_painter(pc_painter, "All pts");
+    a.add_painter(fp_painter, "Footprint");
+    a.add_painter(steppoint_painter, "Step pts");
+    a.add_painter(segment_painter, "Step edges");
+    a.add_painter(polygon_painter, "Decomposition");
 
     set_footprint(0);
 

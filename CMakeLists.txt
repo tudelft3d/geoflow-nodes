@@ -1,3 +1,6 @@
+set(CMAKE_C_COMPILER "/usr/local/opt/llvm/bin/clang")
+set(CMAKE_CXX_COMPILER "/usr/local/opt/llvm/bin/clang++")
+
 project( edge_detect )
 
 # add_definitions(-std=c++17)
@@ -52,9 +55,11 @@ add_library(point_edge_lib STATIC src/point_edge.cpp src/region_growing.cpp)
 target_link_libraries(point_edge_lib ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} /usr/local/lib/liblas.dylib)
 # Creating entries for target
 
+add_subdirectory(thirdparty/geoflow)
+
 add_subdirectory(point-based)
 add_subdirectory(raster-based)
 
-add_subdirectory(thirdparty/povi)
+
 add_subdirectory(viewer)
 # add_subdirectory(test)

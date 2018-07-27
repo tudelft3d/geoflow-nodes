@@ -18,9 +18,10 @@ int main(int argc, char *argv[])
   bg::model::box<point_type> bbox;
   bg::envelope(footprint, bbox);
 
-  PNL_vector points;
-  pc_in_footprint("/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las", footprint, points);
-  
+  std::vector<PNL_vector> points_vec;
+  std::vector<bg::model::polygon<point_type>> footprints = {footprint};
+  pc_in_footprint("/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las", footprints, points_vec);
+  auto points = points_vec[0];
   compute_metrics(points);
 
   //add wall points to candidate edge points? => then we would need to set z=0 on all points, ie 2D line detection...
