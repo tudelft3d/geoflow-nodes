@@ -305,7 +305,7 @@ int main(int ac, const char * av[])
     pc_painter->attach_shader("basic.vert");
     pc_painter->attach_shader("basic.frag");
     pc_painter->set_drawmode(GL_POINTS);
-    pc_painter->set_uniform("u_pointsize", 2.0);
+    // pc_painter->set_uniform("u_pointsize", 2.0);
     // prepare footprint painter
     fp_painter->set_data(&footprint_array[0], footprint_array.size(), {3,3});
     fp_painter->attach_shader("basic.vert");
@@ -316,7 +316,7 @@ int main(int ac, const char * av[])
     steppoint_painter->attach_shader("basic.vert");
     steppoint_painter->attach_shader("basic.frag");
     steppoint_painter->set_drawmode(GL_POINTS);
-    steppoint_painter->set_uniform("u_pointsize", 4.0);
+    // steppoint_painter->set_uniform("u_pointsize", 4.0);
     // prepare step edge segment painter
     segment_painter->set_data(&segment_array[0], segment_array.size(), {3,3});
     segment_painter->attach_shader("basic.vert");

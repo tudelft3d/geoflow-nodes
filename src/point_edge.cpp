@@ -52,16 +52,14 @@ void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<po
     // Optional: delete points with an unoriented normal
     // if you plan to call a reconstruction algorithm that expects oriented normals.
     // points.erase(unoriented_points_begin, points.end());
-
-    int i=0;
-    for (auto &p : points) {
-      p.get<8>() = i++;
-    }
   }
 }
 
 void compute_metrics(PNL_vector &points, config c) {
-
+  size_t i=0;
+  for (auto &p : points) {
+    p.get<8>() = i++;
+  }
   // Instantiates shape detection engine.
   Region_growing shape_detection;
 
@@ -88,7 +86,7 @@ void compute_metrics(PNL_vector &points, config c) {
   // Prints number of detected shapes.
   std::cout << shape_detection.shapes().end() - shape_detection.shapes().begin() << " shapes detected." << std::endl;
 
-  int i=1;
+  i=1;
   for(auto shape: shape_detection.shapes()){
     // this dot product is close to 0 for vertical planes
     SCPlane* plane = dynamic_cast<SCPlane*>(shape.get());
