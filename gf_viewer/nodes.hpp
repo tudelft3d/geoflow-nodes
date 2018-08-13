@@ -3,8 +3,6 @@
 #include "geoflow.hpp"
 #include "point_edge.h"
 
-typedef std::vector<std::array<float,3>> vec3f;
-
 class BuildArrangementNode:public Node {
   float footprint_simp_thres=0;
 
