@@ -83,6 +83,20 @@ class DetectLinesNode:public Node {
     std::vector<std::pair<Point,Point>> edge_segments;
     detect_lines(edge_segments, edge_points, c);
     set_value("edge_segments", edge_segments);
+    vec3f edge_segments_vec3f;
+    for (auto s : edge_segments){
+      edge_segments_vec3f.push_back({
+        float(s.first.x()),
+        float(s.first.y()),
+        float(s.first.z())
+      });
+      edge_segments_vec3f.push_back({
+        float(s.second.x()),
+        float(s.second.y()),
+        float(s.second.z())
+      });
+    }
+    set_value("edge_segments_vec3f", edge_segments_vec3f);
   }
 };
 
