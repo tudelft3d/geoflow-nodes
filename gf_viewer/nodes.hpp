@@ -123,6 +123,17 @@ class ClassifyEdgePointsNode:public Node {
     std::vector<linedect::Point> edge_points;
     classify_edgepoints(edge_points, points, c);
     set_value("edge_points", edge_points);
+
+    vec3f edge_points_vec3f;
+    for(auto& p : edge_points) {
+        std::array<float,3> a = {{
+          float(p.x()), 
+          float(p.y()), 
+          float(p.z())
+        }};
+        edge_points_vec3f.push_back(a);
+      }
+    set_value("edge_points_vec3f", edge_points_vec3f);
   }
 };
 
@@ -156,6 +167,7 @@ class ComputeMetricsNode:public Node {
 class PointsInFootprintNode:public Node {
   config c;
   int footprint_id=0;
+  bool isInitialised = false;
   std::vector<bg::model::polygon<point_type>> footprints;
   std::vector<PNL_vector> points_vec;
   std::vector<vec3f> points_vec3f;
@@ -168,45 +180,55 @@ class PointsInFootprintNode:public Node {
   }
 
   void gui(){
-    if (ImGui::SliderInt("#", &footprint_id, 0, footprints.size()-1))
+    if (ImGui::SliderInt("#", &footprint_id, 0, footprints.size()-1)) {
+      // manager.run(*this);
+      notify_children();
       set_value("points", points_vec[footprint_id]);
       set_value("points_vec3f", points_vec3f[footprint_id]);
+      // outputTerminals["points_vec3f"]->propagate();
       set_value("footprint", footprints[footprint_id]);
+      propagate_outputs();
+    }
   }
 
   void process(){
-    std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
-    std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
-    
-    // Set up vertex data (and buffer(s)) and attribute pointers
-    auto csv_footprints = std::ifstream(csv_path);
-    // auto csv_footprints = std::ifstream("/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv");
-    std::string column_names, row;
-    std::getline(csv_footprints, column_names);
-    while (std::getline(csv_footprints, row)) {
-        bg::model::polygon<point_type> bag_polygon;
-        bg::read_wkt(row, bag_polygon);
-        bg::unique(bag_polygon);
-        footprints.push_back(bag_polygon);
-    } csv_footprints.close();
+    if(!isInitialised) {
+      // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+      std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+      // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+      std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
+      
+      // Set up vertex data (and buffer(s)) and attribute pointers
+      auto csv_footprints = std::ifstream(csv_path);
+      
+      std::string column_names, row;
+      std::getline(csv_footprints, column_names);
+      while (std::getline(csv_footprints, row)) {
+          bg::model::polygon<point_type> bag_polygon;
+          bg::read_wkt(row, bag_polygon);
+          bg::unique(bag_polygon);
+          footprints.push_back(bag_polygon);
+      } csv_footprints.close();
 
-    pc_in_footprint(las_path, footprints, points_vec);
-    set_value("points", points_vec[footprint_id]);
-    
-    for(auto& pc : points_vec) {
-      vec3f v;
-      for(auto& p : pc) {
-        std::array<float,3> a = {{
-          float(p.get<0>().x()), 
-          float(p.get<0>().y()), 
-          float(p.get<0>().z())
-        }};
-        v.push_back(a);
+      pc_in_footprint(las_path, footprints, points_vec);
+      
+      for(auto& pc : points_vec) {
+        vec3f v;
+        for(auto& p : pc) {
+          std::array<float,3> a = {{
+            float(p.get<0>().x()), 
+            float(p.get<0>().y()), 
+            float(p.get<0>().z())
+          }};
+          v.push_back(a);
+        }
+        points_vec3f.push_back(v);
       }
-      points_vec3f.push_back(v);
+      std::cout << footprints.size() << "\n";
+      isInitialised = true;
     }
+    set_value("points", points_vec[footprint_id]);
     set_value("points_vec3f", points_vec3f[footprint_id]);
     set_value("footprint", footprints[footprint_id]);
-    std::cout << footprints.size() << "\n";
   }
 };

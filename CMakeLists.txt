@@ -52,7 +52,7 @@ include( ${CGAL_USE_FILE} )
 include_directories( src thirdparty ${CGAL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${GDAL_INCLUDE_DIR} /usr/local/include/LASlib /usr/local/include/LASzip)
 
 add_library(point_edge_lib STATIC src/point_edge.cpp src/region_growing.cpp)
-target_link_libraries(point_edge_lib ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} /usr/local/lib/liblas.dylib)
+target_link_libraries(point_edge_lib ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} /usr/local/lib/liblascgal.dylib)
 # Creating entries for target
 
 add_subdirectory(thirdparty/geoflow)
