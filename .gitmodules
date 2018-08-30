@@ -1,0 +1,3 @@
+[submodule "thirdparty/geoflow"]
+	path = thirdparty/geoflow
+	url = git@github.com:tudelft3d/geoflow.git
