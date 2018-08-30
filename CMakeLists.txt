@@ -1,3 +1,6 @@
+set(CMAKE_C_COMPILER "/usr/local/opt/llvm/bin/clang")
+set(CMAKE_CXX_COMPILER "/usr/local/opt/llvm/bin/clang++")
+
 project( edge_detect )
 
 # add_definitions(-std=c++17)
@@ -49,12 +52,15 @@ include( ${CGAL_USE_FILE} )
 include_directories( src thirdparty ${CGAL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${GDAL_INCLUDE_DIR} /usr/local/include/LASlib /usr/local/include/LASzip)
 
 add_library(point_edge_lib STATIC src/point_edge.cpp src/region_growing.cpp)
-target_link_libraries(point_edge_lib ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} /usr/local/lib/liblas.dylib)
+target_link_libraries(point_edge_lib ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} /usr/local/lib/LASlib/liblas.a)
 # Creating entries for target
+
+add_subdirectory(thirdparty/geoflow)
 
 add_subdirectory(point-based)
 add_subdirectory(raster-based)
 
-add_subdirectory(thirdparty/povi)
+
 add_subdirectory(viewer)
+add_subdirectory(gf_viewer)
 # add_subdirectory(test)
