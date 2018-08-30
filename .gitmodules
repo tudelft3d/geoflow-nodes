@@ -1,3 +1,0 @@
-[submodule "thirdparty/geoflow"]
-	path = thirdparty/geoflow
-	url = git@github.com:Ylannl/geoflow.git
