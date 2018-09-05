@@ -103,6 +103,9 @@ typedef CGAL::Arr_face_extended_dcel<Traits_2, int>   Dcel;
 typedef CGAL::Arrangement_2<Traits_2, Dcel>           Arrangement_2;
 typedef Arrangement_2::Vertex_handle                  Vertex_handle;
 typedef Arrangement_2::Halfedge_handle                Halfedge_handle;
+typedef Arrangement_2::Vertex_const_handle            Vertex_const_handle;
+typedef Arrangement_2::Halfedge_const_handle          Halfedge_const_handle;
+typedef Arrangement_2::Face_const_handle              Face_const_handle;
 typedef CGAL::Arr_accessor<Arrangement_2>             Arr_accessor;
 typedef Arr_accessor::Dcel_vertex                     DVertex;
 typedef Arrangement_2::Face                           Face;
@@ -196,8 +199,11 @@ struct config {
   int linedetect_k = 20;
 };
 
+typedef std::vector<std::array<float,2>> vec2f;
+
 void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<point_type>> &footprint, std::vector<PNL_vector> &points_vec) ;
 void compute_metrics(PNL_vector &points, config = config()) ;
 void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &points, config = config()) ;
 void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, config = config()) ;
 void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<std::pair<Point,Point>> & edge_segments, Arrangement_2 &arr);
+void process_arrangement(PNL_vector& points, Arrangement_2& arr, std::vector<vec2f>& polygons, std::vector<float>& elevations);

@@ -2,6 +2,70 @@
 #include "gloo.h"
 #include "geoflow.hpp"
 #include "point_edge.h"
+#include "earcut.hpp"
+
+class ExtruderNode:public Node {
+
+  public:
+  ExtruderNode(NodeManager& manager):Node(manager, "Extruder") {
+    add_input("polygons", TT_vec2f);
+    add_input("elevations", TT_any);
+    add_output("triangles_vec3f", TT_vec3f);
+  }
+
+  void process(){
+    // Set up vertex data (and buffer(s)) and attribute pointers
+    auto polygons = std::any_cast<std::vector<vec2f>>(get_value("polygons"));
+    auto elevations = std::any_cast<std::vector<float>>(get_value("elevations"));
+
+    vec3f triangles;
+    using N = uint32_t;
+
+    for(auto& polygon : polygons){
+      std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
+      for(auto i : indices) {
+        triangles.push_back({polygon[i][0], polygon[i][1], 0});
+      }
+    }
+
+    int i=0;
+    float h;
+    for(auto& polygon : polygons){
+      std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
+      h = elevations[i++];
+      std::cout << h << "\n";
+      for(auto i : indices) {
+        triangles.push_back({polygon[i][0], polygon[i][1], h});
+      }
+    }
+
+    set_value("triangles_vec3f", triangles);
+  }
+};
+
+class ProcessArrangementNode:public Node {
+
+  public:
+  ProcessArrangementNode(NodeManager& manager):Node(manager, "ProcessArrangement") {
+    add_input("arrangement", TT_any);
+    add_input("points", TT_any);
+    add_output("polygons", TT_vec2f);
+    add_output("elevations", TT_any);
+  }
+
+  void process(){
+    // Set up vertex data (and buffer(s)) and attribute pointers
+    auto points = std::any_cast<PNL_vector>(get_value("points"));
+    auto arr = std::any_cast<Arrangement_2>(get_value("arrangement"));
+
+    std::vector<vec2f> polygons;
+    std::vector<float> elevations;
+    process_arrangement(points, arr, polygons, elevations);
+    
+    set_value("polygons", polygons);
+    set_value("elevations", elevations);
+  }
+};
 
 class BuildArrangementNode:public Node {
   float footprint_simp_thres=0;
@@ -10,6 +74,7 @@ class BuildArrangementNode:public Node {
   BuildArrangementNode(NodeManager& manager):Node(manager, "BuildArrangement") {
     add_input("edge_segments", TT_any);
     add_input("footprint", TT_any);
+    add_output("arrangement", TT_any);
     add_output("arr_segments_vec3f", TT_vec3f);
   }
 
@@ -58,6 +123,7 @@ class BuildArrangementNode:public Node {
         }
     }
     set_value("arr_segments_vec3f", polygons);
+    set_value("arrangement", arr);
   }
 };
 
