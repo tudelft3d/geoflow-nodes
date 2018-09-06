@@ -9,7 +9,7 @@ class ExtruderNode:public Node {
   public:
   ExtruderNode(NodeManager& manager):Node(manager, "Extruder") {
     add_input("polygons", TT_vec2f);
-    add_input("elevations", TT_any);
+    add_input("elevations", TT_vec1f);
     add_output("triangles_vec3f", TT_vec3f);
   }
 
@@ -50,7 +50,7 @@ class ProcessArrangementNode:public Node {
     add_input("arrangement", TT_any);
     add_input("points", TT_any);
     add_output("polygons", TT_vec2f);
-    add_output("elevations", TT_any);
+    add_output("elevations", TT_vec1f);
   }
 
   void process(){
@@ -59,7 +59,7 @@ class ProcessArrangementNode:public Node {
     auto arr = std::any_cast<Arrangement_2>(get_value("arrangement"));
 
     std::vector<vec2f> polygons;
-    std::vector<float> elevations;
+    vec1f elevations;
     process_arrangement(points, arr, polygons, elevations);
     
     set_value("polygons", polygons);
@@ -210,6 +210,11 @@ class ComputeMetricsNode:public Node {
   ComputeMetricsNode(NodeManager& manager):Node(manager, "ComputeMetrics") {
     add_output("points", TT_any);
     add_input("points", TT_any);
+    add_output("plane_id", TT_vec1i);
+    add_output("is_wall", TT_vec1i);
+    add_output("line_dist", TT_vec1f);
+    add_output("jump_count", TT_vec1f);
+    add_output("jump_ele", TT_vec1f);
   }
 
   void gui(){
@@ -225,7 +230,21 @@ class ComputeMetricsNode:public Node {
     // Set up vertex data (and buffer(s)) and attribute pointers
     auto points = std::any_cast<PNL_vector>(get_value("points"));
     compute_metrics(points, c);
+    vec1f line_dist, jump_count, jump_ele;
+    vec1i plane_id, is_wall;
+    for(auto& p : points){
+      plane_id.push_back(p.get<2>());
+      is_wall.push_back(p.get<3>());
+      line_dist.push_back(p.get<4>());
+      jump_count.push_back(p.get<5>());
+      jump_ele.push_back(p.get<7>());
+    }
     set_value("points", points);
+    set_value("plane_id", plane_id);
+    set_value("is_wall", is_wall);
+    set_value("line_dist", line_dist);
+    set_value("jump_count", jump_count);
+    set_value("jump_ele", jump_ele);
 
   }
 };
@@ -259,10 +278,10 @@ class PointsInFootprintNode:public Node {
 
   void process(){
     if(!isInitialised) {
-      // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
-      std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-      // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
-      std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
+      std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+      // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+      std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+      // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
       
       // Set up vertex data (and buffer(s)) and attribute pointers
       auto csv_footprints = std::ifstream(csv_path);
