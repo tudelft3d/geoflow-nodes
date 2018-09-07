@@ -334,33 +334,54 @@ class PointsInFootprintNode:public Node {
 
   void process(){
     if(!isInitialised) {
-      std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
-      // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-      std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
-      // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
+      // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+      std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+      // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+      std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
       
       // Set up vertex data (and buffer(s)) and attribute pointers
       auto csv_footprints = std::ifstream(csv_path);
       
       std::string column_names, row;
       std::getline(csv_footprints, column_names);
+      point_type centroid; // we'll set the origin to the centroid of the first footprint
+      bool read_first=false;
       while (std::getline(csv_footprints, row)) {
           bg::model::polygon<point_type> bag_polygon;
           bg::read_wkt(row, bag_polygon);
           bg::unique(bag_polygon);
+
+          if(!read_first) {
+            bg::centroid(bag_polygon, centroid);
+            read_first=true;
+          }
           footprints.push_back(bag_polygon);
       } csv_footprints.close();
 
       pc_in_footprint(las_path, footprints, points_vec);
-      
+
+      for (auto& fp : footprints) {
+        for (auto& p : fp.outer())
+            bg::subtract_point(p, centroid);
+      }
+
+      for(auto& pc : points_vec) {
+        for(auto& p : pc) {
+          p.get<0>() = Point(
+            p.get<0>().x()-bg::get<0>(centroid), 
+            p.get<0>().y()-bg::get<1>(centroid),
+            p.get<0>().z());
+        }
+      }
+
       for(auto& pc : points_vec) {
         vec3f v;
         for(auto& p : pc) {
-          std::array<float,3> a = {{
+          std::array<float,3> a = {
             float(p.get<0>().x()), 
             float(p.get<0>().y()), 
             float(p.get<0>().z())
-          }};
+          };
           v.push_back(a);
         }
         points_vec3f.push_back(v);
