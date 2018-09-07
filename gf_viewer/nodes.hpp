@@ -8,38 +8,98 @@ class ExtruderNode:public Node {
 
   public:
   ExtruderNode(NodeManager& manager):Node(manager, "Extruder") {
-    add_input("polygons", TT_vec2f);
-    add_input("elevations", TT_vec1f);
+    add_input("arrangement", TT_any);
     add_output("triangles_vec3f", TT_vec3f);
+    add_output("labels_vec1i", TT_vec1i); // 0==ground, 1==roof, 2==outerwall, 3==innerwall
   }
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto polygons = std::any_cast<std::vector<vec2f>>(get_value("polygons"));
-    auto elevations = std::any_cast<std::vector<float>>(get_value("elevations"));
+    // auto polygons = std::any_cast<std::vector<vec2f>>(get_value("polygons"));
+    // auto elevations = std::any_cast<std::vector<float>>(get_value("elevations"));
+    auto arr = std::any_cast<Arrangement_2>(get_value("arrangement"));
 
     vec3f triangles;
+    vec1i labels;
     using N = uint32_t;
 
-    for(auto& polygon : polygons){
-      std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
-      for(auto i : indices) {
-        triangles.push_back({polygon[i][0], polygon[i][1], 0});
+    for (auto face: arr.face_handles()){
+      if(face->data().is_finite) {
+        vec2f polygon, face_triangles;
+        arrangementface_to_polygon(face, polygon);
+        std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
+        for(auto i : indices) {
+          face_triangles.push_back({polygon[i]});
+        }
+        for (auto& vertex : face_triangles) {
+          //add to ground face
+          triangles.push_back({vertex[0], vertex[1], 0});
+          labels.push_back(0);
+        } 
+        for (auto& vertex : face_triangles) {
+          //add to elevated (roof) face
+          triangles.push_back({vertex[0], vertex[1], face->data().elevation_avg});
+          labels.push_back(1);
+        } 
       }
     }
 
-    int i=0;
-    float h;
-    for(auto& polygon : polygons){
-      std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
-      h = elevations[i++];
-      std::cout << h << "\n";
-      for(auto i : indices) {
-        triangles.push_back({polygon[i][0], polygon[i][1], h});
+    for (auto edge : arr.edge_handles()) {
+      // skip if faces on both sides of this edge are not finite
+      bool left_finite = edge->twin()->face()->data().is_finite;
+      bool right_finite = edge->face()->data().is_finite;
+      if (left_finite || right_finite) {
+        int wall_label = 2;
+        if (left_finite && right_finite)
+          wall_label = 3;
+
+        auto h1 = edge->face()->data().elevation_avg;
+        auto h2 = edge->twin()->face()->data().elevation_avg;
+        // push 2 triangles to form the quad between lower and upper edges
+        // notice that this is not always topologically correct, but fine for visualisation
+        
+        // define four points of the quad between upper and lower edge
+        std::array<float,3> l1,l2,u1,u2;
+        l1 = {
+          float(CGAL::to_double(edge->source()->point().x())),
+          float(CGAL::to_double(edge->source()->point().y())),
+          h1
+        };
+        l2 = {
+          float(CGAL::to_double(edge->target()->point().x())),
+          float(CGAL::to_double(edge->target()->point().y())),
+          h1
+        };
+        u1 = {
+          float(CGAL::to_double(edge->source()->point().x())),
+          float(CGAL::to_double(edge->source()->point().y())),
+          h2
+        };
+        u2 = {
+          float(CGAL::to_double(edge->target()->point().x())),
+          float(CGAL::to_double(edge->target()->point().y())),
+          h2
+        };
+
+        // 1st triangle
+        triangles.push_back(l1);
+        labels.push_back(wall_label);
+        triangles.push_back(l2);
+        labels.push_back(wall_label);
+        triangles.push_back(u1);
+        labels.push_back(wall_label);
+        // 2nd triangle
+        triangles.push_back(u1);
+        labels.push_back(wall_label);
+        triangles.push_back(u2);
+        labels.push_back(wall_label);
+        triangles.push_back(l2);
+        labels.push_back(wall_label);
       }
     }
 
     set_value("triangles_vec3f", triangles);
+    set_value("labels_vec1i", labels);
   }
 };
 
@@ -49,8 +109,7 @@ class ProcessArrangementNode:public Node {
   ProcessArrangementNode(NodeManager& manager):Node(manager, "ProcessArrangement") {
     add_input("arrangement", TT_any);
     add_input("points", TT_any);
-    add_output("polygons", TT_vec2f);
-    add_output("elevations", TT_vec1f);
+    add_output("arrangement", TT_any);
   }
 
   void process(){
@@ -58,12 +117,9 @@ class ProcessArrangementNode:public Node {
     auto points = std::any_cast<PNL_vector>(get_value("points"));
     auto arr = std::any_cast<Arrangement_2>(get_value("arrangement"));
 
-    std::vector<vec2f> polygons;
-    vec1f elevations;
-    process_arrangement(points, arr, polygons, elevations);
+    process_arrangement(points, arr);
     
-    set_value("polygons", polygons);
-    set_value("elevations", elevations);
+    set_value("arrangement", arr);
   }
 };
 
@@ -91,7 +147,7 @@ class BuildArrangementNode:public Node {
     build_arrangement(fp, edge_segments, arr);
     vec3f polygons;
     for (auto face: arr.face_handles()){
-        if(face->data()==1){
+        if(face->data().is_finite){
             auto he = face->outer_ccb();
             auto first = he;
 

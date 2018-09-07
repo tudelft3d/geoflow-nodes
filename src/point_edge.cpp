@@ -266,8 +266,8 @@ void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<st
   insert(arr, lines.begin(), lines.end());
 }
 
-void arrangementface_to_polygon(Face_const_handle face, vec2f& polygons){
-  if(face->data()==1){ // ie it is a face on the interior of the footprint
+void arrangementface_to_polygon(Face_handle face, vec2f& polygons){
+  if(face->data().is_finite){ // ie it is a face on the interior of the footprint
     auto he = face->outer_ccb();
     auto first = he;
 
@@ -284,20 +284,20 @@ void arrangementface_to_polygon(Face_const_handle face, vec2f& polygons){
 }
 
 // convert each face to polygon and compute an average elevation
-void process_arrangement(PNL_vector& points, Arrangement_2& arr, std::vector<vec2f>& polygons, std::vector<float>& elevations) {
+void process_arrangement(PNL_vector& points, Arrangement_2& arr) {
   typedef CGAL::Arr_walk_along_line_point_location<Arrangement_2> Point_location;
   
 
   Point_location   pl(arr);
-  std::unordered_map<Face_const_handle, std::vector<PNL>> points_per_face;
+  std::unordered_map<Face_handle, std::vector<PNL>> points_per_face;
 
-  for (auto p : points){
+  for (auto& p : points){
     bool is_wall = p.get<3>();
     bool is_on_plane = p.get<2>() != 0;
-    if (is_on_plane) {
+    if ((!is_wall) && is_on_plane){
       auto obj = pl.locate( Point_2(p.get<0>().x(), p.get<0>().y()) );
       if (auto f = boost::get<Face_const_handle>(&obj)) {
-        points_per_face[*f].push_back(p);
+        points_per_face[arr.non_const_handle(*f)].push_back(p);
       }
     }
   }
@@ -305,16 +305,11 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr, std::vector<vec
   for(auto face_points : points_per_face) {
     auto fh = face_points.first;
     auto fpoints = face_points.second;
-    vec2f polygon;
-    arrangementface_to_polygon(fh, polygon);
-    polygons.push_back(polygon);
 
     float sum = 0;
-    std::cout << "pip: " << fpoints.size() << "\n";
     for (auto& p : fpoints) {
       sum = sum + p.get<0>().z();
-      std::cout << "sum: " << sum << "\n";
     }
-    elevations.push_back(sum/fpoints.size());
+    fh->data().elevation_avg = sum/fpoints.size();
   }
 }

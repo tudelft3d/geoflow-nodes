@@ -99,10 +99,15 @@ typedef Traits_2::Segment_2                           Segment_2;
 typedef Traits_2::Ray_2                               Ray_2;
 typedef Traits_2::Line_2                              Line_2;
 typedef Traits_2::X_monotone_curve_2                  X_monotone_curve_2;
-typedef CGAL::Arr_face_extended_dcel<Traits_2, int>   Dcel;
+struct FaceInfo {
+  bool is_finite=false;
+  float elevation_avg=0;
+};
+typedef CGAL::Arr_face_extended_dcel<Traits_2, FaceInfo>   Dcel;
 typedef CGAL::Arrangement_2<Traits_2, Dcel>           Arrangement_2;
 typedef Arrangement_2::Vertex_handle                  Vertex_handle;
 typedef Arrangement_2::Halfedge_handle                Halfedge_handle;
+typedef Arrangement_2::Face_handle                    Face_handle;
 typedef Arrangement_2::Vertex_const_handle            Vertex_const_handle;
 typedef Arrangement_2::Halfedge_const_handle          Halfedge_const_handle;
 typedef Arrangement_2::Face_const_handle              Face_const_handle;
@@ -126,7 +131,7 @@ public:
     n_faces (0)
   {
     CGAL_precondition (arr.is_empty());
-    arr.unbounded_face()->set_data (0);
+    arr.unbounded_face()->data().is_finite=false;
     n_faces++;
   }
   virtual void after_split_face (Face_handle old_face,
@@ -134,12 +139,11 @@ public:
   {
     // Assign index to the new face.
     if(n_faces == 1)
-      new_face->set_data(1);
-    else if(old_face->data()==1)
-      // new_face->set_data (n_faces);
-      new_face->set_data (1);
+      new_face->data().is_finite = true;
+    else if(old_face->data().is_finite)
+      new_face->data().is_finite = true;
     else
-      new_face->set_data (0);
+      new_face->data().is_finite = false;
     n_faces++;
   }
 };
@@ -206,4 +210,5 @@ void compute_metrics(PNL_vector &points, config = config()) ;
 void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &points, config = config()) ;
 void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, config = config()) ;
 void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<std::pair<Point,Point>> & edge_segments, Arrangement_2 &arr);
-void process_arrangement(PNL_vector& points, Arrangement_2& arr, std::vector<vec2f>& polygons, std::vector<float>& elevations);
+void process_arrangement(PNL_vector& points, Arrangement_2& arr);
+void arrangementface_to_polygon(Face_handle face, vec2f& polygons);

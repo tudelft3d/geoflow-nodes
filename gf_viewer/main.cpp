@@ -35,5 +35,16 @@ int main(int ac, const char * av[])
     N.register_node<ComputeMetricsNode>("ComputeMetrics");
     N.register_node<PointsInFootprintNode>("PointsInFootprint");
     a->draw_that(on_draw);
+
+    ImGui::NodeStore ns;
+    ns.push_back(std::make_pair("PointsInFootprint", ImVec2(75,75)));
+    ns.push_back(std::make_pair("ComputeMetrics", ImVec2(300,75)));
+    ns.push_back(std::make_pair("ClassifyEdgePoints", ImVec2(600,75)));
+    ns.push_back(std::make_pair("DetectLines", ImVec2(900,75)));
+    ns.push_back(std::make_pair("BuildArrangement", ImVec2(1200,75)));
+    ns.push_back(std::make_pair("ProcessArrangement", ImVec2(1500,75)));
+    ns.push_back(std::make_pair("Extruder", ImVec2(1800,75)));
+    nodes_.PreloadNodes(ns);
+
     a->run();
 }
