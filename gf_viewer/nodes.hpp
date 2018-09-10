@@ -3,6 +3,18 @@
 #include "geoflow.hpp"
 #include "point_edge.h"
 #include "earcut.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+typedef std::array<float,3> vertex;
+vertex get_normal(vertex v0, vertex v1, vertex v2) {
+    // assuming ccw winding order
+    auto a = glm::make_vec3(v0.data());
+    auto b = glm::make_vec3(v1.data());
+    auto c = glm::make_vec3(v2.data());
+    auto n = glm::cross(b-a, c-b);
+    return {n.x,n.y,n.z};
+}
 
 class ExtruderNode:public Node {
 
@@ -10,6 +22,7 @@ class ExtruderNode:public Node {
   ExtruderNode(NodeManager& manager):Node(manager, "Extruder") {
     add_input("arrangement", TT_any);
     add_output("triangles_vec3f", TT_vec3f);
+    add_output("normals_vec3f", TT_vec3f);
     add_output("labels_vec1i", TT_vec1i); // 0==ground, 1==roof, 2==outerwall, 3==innerwall
   }
 
@@ -19,7 +32,7 @@ class ExtruderNode:public Node {
     // auto elevations = std::any_cast<std::vector<float>>(get_value("elevations"));
     auto arr = std::any_cast<Arrangement_2>(get_value("arrangement"));
 
-    vec3f triangles;
+    vec3f triangles, normals;
     vec1i labels;
     using N = uint32_t;
 
@@ -35,15 +48,18 @@ class ExtruderNode:public Node {
           //add to ground face
           triangles.push_back({vertex[0], vertex[1], 0});
           labels.push_back(0);
+          normals.push_back({0,0,-1});
         } 
         for (auto& vertex : face_triangles) {
           //add to elevated (roof) face
           triangles.push_back({vertex[0], vertex[1], face->data().elevation_avg});
           labels.push_back(1);
+          normals.push_back({0,0,1});
         } 
       }
     }
 
+    vertex n;
     for (auto edge : arr.edge_handles()) {
       // skip if faces on both sides of this edge are not finite
       bool left_finite = edge->twin()->face()->data().is_finite;
@@ -82,12 +98,18 @@ class ExtruderNode:public Node {
         };
 
         // 1st triangle
-        triangles.push_back(l1);
+        triangles.push_back(u1);
         labels.push_back(wall_label);
         triangles.push_back(l2);
         labels.push_back(wall_label);
-        triangles.push_back(u1);
+        triangles.push_back(l1);
         labels.push_back(wall_label);
+
+        n = get_normal(u1,l2,l1);
+        normals.push_back(n);
+        normals.push_back(n);
+        normals.push_back(n);
+
         // 2nd triangle
         triangles.push_back(u1);
         labels.push_back(wall_label);
@@ -95,9 +117,15 @@ class ExtruderNode:public Node {
         labels.push_back(wall_label);
         triangles.push_back(l2);
         labels.push_back(wall_label);
+
+        n = get_normal(u1,u2,l2);
+        normals.push_back(n);
+        normals.push_back(n);
+        normals.push_back(n);
       }
     }
 
+    set_value("normals_vec3f", normals);
     set_value("triangles_vec3f", triangles);
     set_value("labels_vec1i", labels);
   }
