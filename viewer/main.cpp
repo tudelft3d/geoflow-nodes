@@ -53,7 +53,7 @@ void set_footprint(int index){
         point_array[i++] = p.get<0>().z();
     }
 
-    pc_painter->set_attribute("position", &point_array[0], point_array.size(), {3});
+    if(pc_painter->is_initialised()) pc_painter->set_attribute("position", &point_array[0], point_array.size(), {3});
     footprint_array.clear();
     for (auto p : footprint.outer()) {
         footprint_array.push_back(bg::get<0>(p) - center_x);
@@ -61,16 +61,16 @@ void set_footprint(int index){
         footprint_array.push_back(0.0);
     }
 
-    fp_painter->set_attribute("position", &footprint_array[0], footprint_array.size(), {3});
+    if(fp_painter->is_initialised()) fp_painter->set_attribute("position", &footprint_array[0], footprint_array.size(), {3});
     edge_point_array.clear();
 
-    steppoint_painter->set_attribute("position", &edge_point_array[0], edge_point_array.size(), {3});
+    if(steppoint_painter->is_initialised()) steppoint_painter->set_attribute("position", &edge_point_array[0], edge_point_array.size(), {3});
     segment_array.clear();
 
-    segment_painter->set_attribute("position", &segment_array[0], segment_array.size(), {3});
+    if(segment_painter->is_initialised()) segment_painter->set_attribute("position", &segment_array[0], segment_array.size(), {3});
     polygon_array.clear();
 
-    polygon_painter->set_attribute("position", &polygon_array[0], polygon_array.size(), {3});
+    if(polygon_painter->is_initialised()) polygon_painter->set_attribute("position", &polygon_array[0], polygon_array.size(), {3});
     // a.center(bg::get<0>(centroids[index])-center_x, bg::get<1>(centroids[index])-center_y);
 }
 void compute_metrics(){
@@ -89,7 +89,7 @@ void classify_edgepoints(){
     }
     std::cout << "Found " << edge_points.size() << " edge points" << std::endl;
 
-    steppoint_painter->set_attribute("position", &edge_point_array[0], edge_point_array.size(), {3});
+    if(steppoint_painter->is_initialised()) steppoint_painter->set_attribute("position", &edge_point_array[0], edge_point_array.size(), {3});
 }
 void detect_lines(){
     edge_segments.clear();
@@ -106,7 +106,7 @@ void detect_lines(){
         segment_array[i++] = s.second.z();
     }
 
-    segment_painter->set_attribute("position", &segment_array[0], segment_array.size(), {3});
+    if(segment_painter->is_initialised()) segment_painter->set_attribute("position", &segment_array[0], segment_array.size(), {3});
   
 }
 void build_arrangement(float simplification_thres){
@@ -118,7 +118,7 @@ void build_arrangement(float simplification_thres){
     bg::simplify(footprint, fp, simplification_thres);
     build_arrangement(fp, edge_segments, arr);
     for (auto face: arr.face_handles()){
-        if(face->data()==1){
+        if(face->data().is_finite){
             auto he = face->outer_ccb();
             auto first = he;
 
@@ -141,7 +141,7 @@ void build_arrangement(float simplification_thres){
         }
     }
 
-    polygon_painter->set_attribute("position", &polygon_array[0], polygon_array.size(), {3});
+    if(polygon_painter->is_initialised()) polygon_painter->set_attribute("position", &polygon_array[0], polygon_array.size(), {3});
 }
 
 void write_arrangement(){
@@ -149,7 +149,7 @@ void write_arrangement(){
 
   f_arr << std::fixed << std::setprecision(2);
   for (auto face: arr.face_handles()){
-    if(face->data()==1){
+    if(face->data().is_finite){
       auto he = face->outer_ccb();
       auto first = he;
 
@@ -274,29 +274,29 @@ int main(int ac, const char * av[])
     // pc_in_footprint("/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ", footprints, points_vec);
     
     // prepare pointcloud painter
-    pc_painter->set_attribute("position", &point_array[0], point_array.size(), {3});
+    if(pc_painter->is_initialised()) pc_painter->set_attribute("position", &point_array[0], point_array.size(), {3});
     pc_painter->attach_shader("basic.vert");
     pc_painter->attach_shader("basic.frag");
     pc_painter->set_drawmode(GL_POINTS);
     // pc_painter->set_uniform("u_pointsize", 2.0);
     // prepare footprint painter
-    fp_painter->set_attribute("position", &footprint_array[0], footprint_array.size(), {3});
+    if(fp_painter->is_initialised()) fp_painter->set_attribute("position", &footprint_array[0], footprint_array.size(), {3});
     fp_painter->attach_shader("basic.vert");
     fp_painter->attach_shader("basic.frag");
     fp_painter->set_drawmode(GL_LINE_STRIP);
     // prepare step edge point painter
-    steppoint_painter->set_attribute("position", &edge_point_array[0], edge_point_array.size(), {3});
+    if(steppoint_painter->is_initialised()) steppoint_painter->set_attribute("position", &edge_point_array[0], edge_point_array.size(), {3});
     steppoint_painter->attach_shader("basic.vert");
     steppoint_painter->attach_shader("basic.frag");
     steppoint_painter->set_drawmode(GL_POINTS);
     // steppoint_painter->set_uniform("u_pointsize", 4.0);
     // prepare step edge segment painter
-    segment_painter->set_attribute("position", &segment_array[0], segment_array.size(), {3});
+    if(segment_painter->is_initialised()) segment_painter->set_attribute("position", &segment_array[0], segment_array.size(), {3});
     segment_painter->attach_shader("basic.vert");
     segment_painter->attach_shader("basic.frag");
     segment_painter->set_drawmode(GL_LINES);
     // prepare arrangement polygon painter
-    polygon_painter->set_attribute("position", &segment_array[0], segment_array.size(), {3});
+    if(polygon_painter->is_initialised()) polygon_painter->set_attribute("position", &segment_array[0], segment_array.size(), {3});
     polygon_painter->attach_shader("basic.vert");
     polygon_painter->attach_shader("basic.frag");
     polygon_painter->set_drawmode(GL_LINES);

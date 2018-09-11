@@ -24,6 +24,7 @@ int main(int ac, const char * av[])
     //viewer nodes
     N.register_node<TriangleNode>("Triangle");
     N.register_node<ColorMapperNode>("ColorMapper");
+    N.register_node<Vec3SplitterNode>("Vec3Splitter");
     N.register_node<GradientMapperNode>("GradientMapper");
 
     //processing nodes
