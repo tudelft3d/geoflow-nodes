@@ -131,6 +131,56 @@ class ExtruderNode:public Node {
   }
 };
 
+class SimplifyFootprinttNode:public Node {
+
+  float threshold_stop_cost=0.1;
+
+  public:
+  SimplifyFootprinttNode(NodeManager& manager):Node(manager, "SimplifyFootprintt") {
+    add_input("footprint", TT_any);
+    add_output("footprint", TT_any);
+    add_output("footprint_vec3f", TT_vec3f);
+  }
+
+  void gui(){
+    if(ImGui::DragFloat("stop cost", &threshold_stop_cost,0.01)) {
+      manager.run(*this);
+    }
+  }
+
+  void process(){
+    // Set up vertex data (and buffer(s)) and attribute pointers
+    auto footprint = std::any_cast<bg::model::polygon<point_type>>(get_value("footprint"));
+
+    namespace PS = CGAL::Polyline_simplification_2;
+    typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+    typedef K::Point_2 Point_2;
+    typedef CGAL::Polygon_2<K>                   Polygon_2;
+    typedef PS::Stop_below_count_ratio_threshold Stop_count_ratio;
+    typedef PS::Stop_above_cost_threshold        Stop_cost;
+    typedef PS::Squared_distance_cost            Cost;
+
+    Polygon_2 polygon;
+    Cost cost;
+
+    for (auto p : footprint.outer()) {
+      polygon.push_back(Point_2(bg::get<0>(p), bg::get<1>(p)));
+    }
+    
+    // polygon = PS::simplify(polygon, cost, Stop_count_ratio(0.5));
+
+    polygon = PS::simplify(polygon, cost, Stop_cost(threshold_stop_cost));
+    
+    vec3f footprint_vec3f;
+    footprint.outer().clear();
+    for (auto v = polygon.vertices_begin(); v!=polygon.vertices_end(); v++){
+      footprint_vec3f.push_back({float(v->x()),float(v->y()),0});
+      footprint.outer().push_back(point_type(v->x(),v->y()));
+    }
+    set_value("footprint_vec3f", footprint_vec3f);
+    set_value("footprint", footprint);
+  }
+};
 class ProcessArrangementNode:public Node {
 
   public:
@@ -336,27 +386,34 @@ class ComputeMetricsNode:public Node {
 class PointsInFootprintNode:public Node {
   config c;
   int footprint_id=0;
+  bool run_on_change=false;
   bool isInitialised = false;
   std::vector<bg::model::polygon<point_type>> footprints;
   std::vector<PNL_vector> points_vec;
   std::vector<vec3f> points_vec3f;
+  std::vector<vec3f> footprints_vec3f;
 
   public:
   PointsInFootprintNode(NodeManager& manager):Node(manager, "PointsInFootprint") {
     add_output("points", TT_any);
     add_output("points_vec3f", TT_vec3f);
     add_output("footprint", TT_any);
+    add_output("footprint_vec3f", TT_vec3f);
   }
 
   void gui(){
+    ImGui::Checkbox("Run on change", &run_on_change);
     if (ImGui::SliderInt("#", &footprint_id, 0, footprints.size()-1)) {
-      // manager.run(*this);
-      notify_children();
-      set_value("points", points_vec[footprint_id]);
-      set_value("points_vec3f", points_vec3f[footprint_id]);
-      // outputTerminals["points_vec3f"]->propagate();
-      set_value("footprint", footprints[footprint_id]);
-      propagate_outputs();
+      if(run_on_change) {
+        manager.run(*this);
+      } else {
+        notify_children();
+        set_value("points", points_vec[footprint_id]);
+        set_value("points_vec3f", points_vec3f[footprint_id]);
+        set_value("footprint", footprints[footprint_id]);
+        set_value("footprint_vec3f", footprints_vec3f[footprint_id]);
+        propagate_outputs();
+      }
     }
   }
 
@@ -389,8 +446,12 @@ class PointsInFootprintNode:public Node {
       pc_in_footprint(las_path, footprints, points_vec);
 
       for (auto& fp : footprints) {
-        for (auto& p : fp.outer())
+        vec3f fp_vec3f;
+        for (auto& p : fp.outer()){
             bg::subtract_point(p, centroid);
+            fp_vec3f.push_back({float(bg::get<0>(p)), float(bg::get<1>(p)), 0});
+        }
+        footprints_vec3f.push_back(fp_vec3f);
       }
 
       for(auto& pc : points_vec) {
@@ -420,5 +481,6 @@ class PointsInFootprintNode:public Node {
     set_value("points", points_vec[footprint_id]);
     set_value("points_vec3f", points_vec3f[footprint_id]);
     set_value("footprint", footprints[footprint_id]);
+    set_value("footprint_vec3f", footprints_vec3f[footprint_id]);
   }
 };

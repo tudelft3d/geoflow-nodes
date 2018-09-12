@@ -28,6 +28,7 @@ int main(int ac, const char * av[])
     N.register_node<GradientMapperNode>("GradientMapper");
 
     //processing nodes
+    N.register_node<SimplifyFootprinttNode>("SimplifyFootprintt");
     N.register_node<ExtruderNode>("Extruder");
     N.register_node<ProcessArrangementNode>("ProcessArrangement");
     N.register_node<BuildArrangementNode>("BuildArrangement");

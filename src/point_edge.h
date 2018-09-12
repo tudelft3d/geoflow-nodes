@@ -35,6 +35,9 @@
 #include <CGAL/Cartesian_converter.h>
 #include <utility> // defines std::pair
 
+// line simplification
+#include <CGAL/Polyline_simplification_2/simplify.h>
+
 // #include "line_shape.cpp"
 #include "region_growing.h"
 // Types
