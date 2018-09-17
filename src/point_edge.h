@@ -44,6 +44,7 @@
 typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
 typedef Kernel::Point_3 Point;
 typedef Kernel::Vector_3 Vector;
+typedef Kernel::Vector_2 Vector_2;
 typedef Kernel::Plane_3 Plane;
 typedef Kernel::Line_3 Line;
 // Point with normal vector stored in a std::pair.

@@ -10,4 +10,5 @@ target_link_libraries( gf_viewer
   point_edge_lib 
   flowchart 
   Boost::program_options
+  ${GDAL_LIBRARY}
 )

@@ -254,11 +254,14 @@ void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<st
   //     std::cout << "Bounded face, id: " << face->data() << std::endl;
   // }
 
+  // line regularisation
+
+
   // insert step-edge lines
-  std::vector<std::pair<Plane,bool>> wall_planes;
+  // std::vector<std::pair<Plane,bool>> wall_planes;
   std::vector<X_monotone_curve_2> lines;
   for (auto s : edge_segments){
-    wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
+    // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
     const Point_2 a(s.first.x(),s.first.y());
     const Point_2 b(s.second.x(),s.second.y());
     lines.push_back(Line_2(a, b));

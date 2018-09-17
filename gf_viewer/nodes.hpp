@@ -5,6 +5,7 @@
 #include "earcut.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <cmath>
 
 typedef std::array<float,3> vertex;
 vertex get_normal(vertex v0, vertex v1, vertex v2) {
@@ -21,6 +22,7 @@ class ExtruderNode:public Node {
   public:
   ExtruderNode(NodeManager& manager):Node(manager, "Extruder") {
     add_input("arrangement", TT_any);
+    add_output("cell_id_vec1i", TT_vec1i);
     add_output("triangles_vec3f", TT_vec3f);
     add_output("normals_vec3f", TT_vec3f);
     add_output("labels_vec1i", TT_vec1i); // 0==ground, 1==roof, 2==outerwall, 3==innerwall
@@ -33,11 +35,14 @@ class ExtruderNode:public Node {
     auto arr = std::any_cast<Arrangement_2>(get_value("arrangement"));
 
     vec3f triangles, normals;
+    vec1i cell_id_vec1i;
     vec1i labels;
     using N = uint32_t;
 
+    size_t cell_id=0;
     for (auto face: arr.face_handles()){
       if(face->data().is_finite) {
+        cell_id++;
         vec2f polygon, face_triangles;
         arrangementface_to_polygon(face, polygon);
         std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
@@ -49,12 +54,14 @@ class ExtruderNode:public Node {
           triangles.push_back({vertex[0], vertex[1], 0});
           labels.push_back(0);
           normals.push_back({0,0,-1});
+          cell_id_vec1i.push_back(cell_id);
         } 
         for (auto& vertex : face_triangles) {
           //add to elevated (roof) face
           triangles.push_back({vertex[0], vertex[1], face->data().elevation_avg});
           labels.push_back(1);
           normals.push_back({0,0,1});
+          cell_id_vec1i.push_back(cell_id);
         } 
       }
     }
@@ -110,6 +117,10 @@ class ExtruderNode:public Node {
         normals.push_back(n);
         normals.push_back(n);
 
+        cell_id_vec1i.push_back(0);
+        cell_id_vec1i.push_back(0);
+        cell_id_vec1i.push_back(0);
+
         // 2nd triangle
         triangles.push_back(u1);
         labels.push_back(wall_label);
@@ -122,21 +133,26 @@ class ExtruderNode:public Node {
         normals.push_back(n);
         normals.push_back(n);
         normals.push_back(n);
+
+        cell_id_vec1i.push_back(0);
+        cell_id_vec1i.push_back(0);
+        cell_id_vec1i.push_back(0);
       }
     }
 
     set_value("normals_vec3f", normals);
+    set_value("cell_id_vec1i", cell_id_vec1i);
     set_value("triangles_vec3f", triangles);
     set_value("labels_vec1i", labels);
   }
 };
 
-class SimplifyFootprinttNode:public Node {
+class SimplifyFootprintNode:public Node {
 
   float threshold_stop_cost=0.1;
 
   public:
-  SimplifyFootprinttNode(NodeManager& manager):Node(manager, "SimplifyFootprintt") {
+  SimplifyFootprintNode(NodeManager& manager):Node(manager, "SimplifyFootprint") {
     add_input("footprint", TT_any);
     add_output("footprint", TT_any);
     add_output("footprint_vec3f", TT_vec3f);
@@ -166,19 +182,22 @@ class SimplifyFootprinttNode:public Node {
     for (auto p : footprint.outer()) {
       polygon.push_back(Point_2(bg::get<0>(p), bg::get<1>(p)));
     }
+    polygon.erase(polygon.vertices_end()-1); // remove repeated point from the boost polygon
     
     // polygon = PS::simplify(polygon, cost, Stop_count_ratio(0.5));
 
     polygon = PS::simplify(polygon, cost, Stop_cost(threshold_stop_cost));
     
     vec3f footprint_vec3f;
+    bg::model::polygon<point_type> footprint_out;
     footprint.outer().clear();
     for (auto v = polygon.vertices_begin(); v!=polygon.vertices_end(); v++){
       footprint_vec3f.push_back({float(v->x()),float(v->y()),0});
-      footprint.outer().push_back(point_type(v->x(),v->y()));
+      footprint_out.outer().push_back(point_type(v->x(),v->y()));
     }
+    footprint_out.outer().push_back(point_type(polygon.vertices_begin()->x(),polygon.vertices_begin()->y()));
     set_value("footprint_vec3f", footprint_vec3f);
-    set_value("footprint", footprint);
+    set_value("footprint", footprint_out);
   }
 };
 class ProcessArrangementNode:public Node {
@@ -419,10 +438,10 @@ class PointsInFootprintNode:public Node {
 
   void process(){
     if(!isInitialised) {
-      // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
-      std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-      // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
-      std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
+      std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+      // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+      std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+      // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
       
       // Set up vertex data (and buffer(s)) and attribute pointers
       auto csv_footprints = std::ifstream(csv_path);
@@ -482,5 +501,160 @@ class PointsInFootprintNode:public Node {
     set_value("points_vec3f", points_vec3f[footprint_id]);
     set_value("footprint", footprints[footprint_id]);
     set_value("footprint_vec3f", footprints_vec3f[footprint_id]);
+  }
+};
+
+class RegulariseLinesNode:public Node {
+  static constexpr double pi = 3.14159265358979323846;
+  float dist_threshold = 2;
+  float angle_threshold = 10*(pi/180);
+
+  public:
+  RegulariseLinesNode(NodeManager& manager):Node(manager, "RegulariseLines") {
+    add_input("edge_segments", TT_any);
+    add_input("footprint_vec3f", TT_vec3f);
+    add_output("edges_out", TT_any);
+    add_output("edges_out_vec3f", TT_vec3f);
+  }
+
+  void gui(){
+    ImGui::DragFloat("Distance threshold", &dist_threshold, 0.1, 0);
+    ImGui::DragFloat("Angle threshold", &angle_threshold, 0.1, 0.1, pi);
+  }
+
+  void process(){
+    // Set up vertex data (and buffer(s)) and attribute pointers
+    auto edges = std::any_cast<std::vector<std::pair<Point,Point>>>(get_value("edge_segments"));
+    auto footprint_vec3f = std::any_cast<vec3f>(get_value("footprint_vec3f"));
+    typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_2 Point_2;
+
+    //compute midpoint and direction for each segment
+    typedef std::tuple<double, Point_2, double, double, bool> linetype; // angle, midpoint, distance in angle cluster, elevation, is_footprint
+    std::vector<linetype> lines;
+    // add non-footprint lines
+    for(auto edge : edges) {
+      auto v = edge.second-edge.first;
+      auto p_ = edge.first + v/2;
+      auto p = Point_2(p_.x(),p_.y());
+      auto angle = std::atan2(v.x(),v.y());
+      if (angle < 0) angle += pi;
+      lines.push_back(std::make_tuple(angle,p,0,p_.z(), false));
+    }
+    // add footprint edges
+    // footprint_vec3f.push_back(footprint_vec3f[0]); //repeat first point as last
+    // for(size_t i=0; i<footprint_vec3f.size()-1; i++) {
+    //   auto p_first = Point_2(footprint_vec3f[i+0][0], footprint_vec3f[i+0][1]);
+    //   auto p_second = Point_2(footprint_vec3f[i+1][0], footprint_vec3f[i+1][1]);
+    //   auto v = p_second - p_first;
+
+    //   auto p_ = p_first + v/2;
+    //   auto p = Point_2(p_.x(),p_.y());
+    //   auto angle = std::atan2(v.x(),v.y());
+
+    //   lines.push_back(std::make_tuple(angle,p,0,0, true));
+    // }
+
+    //sort by angle, smallest on top
+    std::sort(lines.begin(), lines.end(), [](linetype a, linetype b) {
+        return std::get<0>(a) < std::get<0>(b);   
+    });
+    //cluster by angle difference
+    std::vector<std::vector<linetype>> angle_clusters(1);
+    auto last_angle = std::get<0>(lines[0]);
+    for(auto line : lines ) {
+      if((std::get<0>(line) - last_angle) < angle_threshold)
+        angle_clusters.back().push_back(line);
+      else {
+        angle_clusters.resize(angle_clusters.size()+1);
+        angle_clusters.back().push_back(line);
+        }
+      last_angle=std::get<0>(line);
+    }
+
+    // snap to average angle in each cluster
+    vec3f directions_before, directions_after;
+    vec1i angles;
+    int cluster_id=0;
+    for(auto& cluster:angle_clusters) {
+      double sum=0;
+      for(auto& line : cluster) {
+        sum+=std::get<0>(line);
+      }
+      double average_angle = sum/cluster.size();
+      for(auto& line : cluster) {
+        auto angle = std::get<0>(line);
+        std::get<0>(line)=average_angle;
+      }
+      cluster_id++;
+    }
+
+    vec1f distances;
+    // snap nearby lines that are close
+    std::vector<std::vector<linetype>> dist_clusters;
+    for(auto& cluster:angle_clusters) {
+      // compute vec orthogonal to lines in this cluster
+      auto angle = std::get<0>(cluster[0]);
+      Vector_2 n(-1.0, std::tan(angle));
+      n = n/std::sqrt(n.squared_length()); // normalize
+      // compute distances along n wrt to first line in cluster
+      auto p = std::get<1>(cluster[0]);
+      for(auto& line : cluster) {
+        auto q = std::get<1>(line);
+        auto v = p-q;
+        std::get<2>(line) = v*n;
+        distances.push_back(v*n);
+      }
+      // sort by distance, ascending
+      std::sort(cluster.begin(), cluster.end(), [](linetype a, linetype b){
+          return std::get<2>(a) < std::get<2>(b);
+      });
+      // cluster nearby lines using separation threshold
+      double last_dist = std::get<2>(cluster[0]);
+      dist_clusters.resize(dist_clusters.size()+1);
+      for(auto& line : cluster) {
+        double dist_diff = std::get<2>(line) - last_dist;
+        if (dist_diff < dist_threshold) {
+          dist_clusters.back().push_back(line);
+        } else {
+          dist_clusters.resize(dist_clusters.size()+1);
+          dist_clusters.back().push_back(line);
+        }
+        last_dist = std::get<2>(line);
+      }
+    }
+
+    // compute one line per dist cluster => the one with the highest elevation
+    vec3f edges_out_vec3f;
+    std::vector<std::pair<Point,Point>> edges_out;
+    for(auto& cluster : dist_clusters) {
+      double max_z=0;
+      linetype high_line;
+      for(auto& line : cluster) {
+        auto z = std::get<3>(line);
+        if(z > max_z) {
+          max_z = z;
+          high_line = line;
+        }
+      }
+      // compute vec orthogonal to lines in this cluster
+      double angle = std::get<0>(high_line);
+      auto p0 = std::get<1>(high_line);
+      // Vector_2 n(-1.0, std::tan(angle));
+      // n = n/std::sqrt(n.squared_length()); // normalize
+      Vector_2 l(std::tan(angle),1.0);
+      l = l/std::sqrt(l.squared_length()); // normalize
+      auto p_center = p0;// + average_dist*n;
+      auto p_begin = p_center + 3*l;
+      auto p_end = p_center - 3*l;
+      edges_out_vec3f.push_back({float(p_begin.x()), float(p_begin.y()), 0});
+      edges_out_vec3f.push_back({float(p_end.x()), float(p_end.y()), 0});
+      edges_out.push_back(std::make_pair(
+        Point(float(p_begin.x()), float(p_begin.y()), 0),
+        Point(float(p_end.x()), float(p_end.y()), 0)
+      ));
+    }
+
+    set_value("edges_out", edges_out);
+    set_value("edges_out_vec3f", edges_out_vec3f);
   }
 };

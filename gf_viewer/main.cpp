@@ -5,6 +5,7 @@
 #include "app_povi.h"
 #include "nodes.h"
 #include "nodes.hpp"
+#include "gdal_nodes.hpp"
 #include <array>
 
 // #include <boost/program_options.hpp>
@@ -28,7 +29,7 @@ int main(int ac, const char * av[])
     N.register_node<GradientMapperNode>("GradientMapper");
 
     //processing nodes
-    N.register_node<SimplifyFootprinttNode>("SimplifyFootprintt");
+    N.register_node<SimplifyFootprintNode>("SimplifyFootprint");
     N.register_node<ExtruderNode>("Extruder");
     N.register_node<ProcessArrangementNode>("ProcessArrangement");
     N.register_node<BuildArrangementNode>("BuildArrangement");
@@ -36,6 +37,14 @@ int main(int ac, const char * av[])
     N.register_node<ClassifyEdgePointsNode>("ClassifyEdgePoints");
     N.register_node<ComputeMetricsNode>("ComputeMetrics");
     N.register_node<PointsInFootprintNode>("PointsInFootprint");
+    N.register_node<RegulariseLinesNode>("RegulariseLines");
+    
+    //gdal nodes
+    N.register_node<OGRLoaderNode>("OGRLoader");
+    N.register_node<CDTNode>("CDT");
+    N.register_node<PointDistanceNode>("PointDistance");
+    N.register_node<ComparePointDistanceNode>("ComparePointDistance");
+
     a->draw_that(on_draw);
 
     ImGui::NodeStore ns;
