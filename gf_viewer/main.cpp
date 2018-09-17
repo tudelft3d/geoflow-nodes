@@ -55,7 +55,7 @@ int main(int ac, const char * av[])
     ns.push_back(std::make_pair("BuildArrangement", ImVec2(1200,75)));
     ns.push_back(std::make_pair("ProcessArrangement", ImVec2(1500,75)));
     ns.push_back(std::make_pair("Extruder", ImVec2(1800,75)));
-    nodes_.PreloadNodes(ns);
+    // nodes_.PreloadNodes(ns);
 
     a->run();
 }
