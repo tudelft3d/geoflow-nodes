@@ -62,4 +62,5 @@ add_subdirectory(raster-based)
 
 add_subdirectory(viewer)
 add_subdirectory(gf_viewer)
+add_subdirectory(point_distance)
 # add_subdirectory(test)

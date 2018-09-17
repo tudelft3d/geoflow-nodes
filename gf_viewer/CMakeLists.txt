@@ -8,7 +8,7 @@ include_directories(
 add_executable(gf_viewer main.cpp)
 target_link_libraries( gf_viewer 
   point_edge_lib 
-  flowchart 
+  flowchart-gui
   Boost::program_options
   ${GDAL_LIBRARY}
 )

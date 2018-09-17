@@ -5,7 +5,7 @@
 #include "app_povi.h"
 #include "nodes.h"
 #include "nodes.hpp"
-#include "gdal_nodes.hpp"
+#include "../point_distance/gdal_nodes.hpp"
 #include <array>
 
 // #include <boost/program_options.hpp>

@@ -20,11 +20,11 @@
 using namespace geoflow;
 
 class OGRLoaderNode:public Node {
-  char filepath[256] = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_dgmr.gpkg";
+  public:
+  char filepath[256] = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_dgmr_.gpkg";
   // char filepath[256] = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_v01_simp_dp1m.gpkg";
   // char filepath[256] = "/Users/ravi/surfdrive/Projects/RWS-Basisbestand-3D-geluid/3D-basisbestand-geluid-v0.1/output/hoogtelijnen/hoogtelijnen_v2/hoogtelijnen_out";
 
-  public:
   OGRLoaderNode(NodeManager& manager):Node(manager, "OGRLoader") {
     add_output("lines", TT_any);
     add_output("lines_vec3f", TT_vec3f);
@@ -49,11 +49,15 @@ class OGRLoaderNode:public Node {
     }
 
     OGRLayer  *poLayer;
+    std::cout << "Layer count: " << poDS->GetLayerCount() << "\n";
     poLayer = poDS->GetLayer( 0 );
-    std::cout << poDS->GetLayerCount();
+    std::cout << "Layer 0 feature count: " << poLayer->GetFeatureCount() << "\n";
+    poLayer->ResetReading();
+    std::cout << "Layer geometry type: " << OGRGeometryTypeToName(poLayer->GetGeomType()) << "[" << poLayer->GetGeomType() << "]\n";
     
-    OGREnvelope *poExtent;
-    poLayer->GetExtent(poExtent);
+    poLayer->ResetReading();
+    // OGREnvelope *poExtent;
+    // poLayer->GetExtent(poExtent);
     auto center_x = 0;//poExtent->MaxX - poExtent->MinX;
     auto center_y = 0;//poExtent->MaxY - poExtent->MinY;
     poLayer->ResetReading();
@@ -85,9 +89,11 @@ class OGRLoaderNode:public Node {
       // read feature geometry
       OGRGeometry *poGeometry;
       poGeometry = poFeature->GetGeometryRef();
-      std::cout << poGeometry->getGeometryName() <<"\n";
+      // auto geom_name = poGeometry->getGeometryName();
+      // auto geom_type = poGeometry->getGeometryType();
+      // std::cout << poGeometry->getGeometryName() <<"\n";
       if( poGeometry != nullptr
-              && poGeometry->getGeometryType() == wkbLineString25D )
+              && (poGeometry->getGeometryType() == wkbLineString25D || poGeometry->getGeometryType() == wkbLineStringZM) )
       {
         vec3f line;
         OGRLineString *poLineString = poGeometry->toLineString();
@@ -106,13 +112,14 @@ class OGRLoaderNode:public Node {
       }
       else
       {
-        std::cout << "no point geometry\n";
+        // std::cout << "no point geometry\n";
       }
 
     }
     
     // poLayer = poDS->GetLayerByName( "point" );
 
+    std::cout << "pushed " << lines.size() << " lines...\n";
     set_value("lines", lines);
     set_value("lines_vec3f", lines_vec3f);
   }
@@ -219,7 +226,7 @@ class CDTNode:public Node {
   public:
   CDTNode(NodeManager& manager):Node(manager, "CDT") {
     // add_input("points", TT_any);
-    add_input("lines", TT_vec3f);
+    add_input("lines_vec3f", TT_vec3f);
     add_output("cgal_CDT", TT_any);
     add_output("normals_vec3f", TT_vec3f);
     add_output("triangles_vec3f", TT_vec3f);
@@ -236,7 +243,7 @@ class CDTNode:public Node {
     typedef CDT::Point													Point;
 
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto lines = std::any_cast<vec3f>(get_value("lines"));
+    auto lines = std::any_cast<vec3f>(get_value("lines_vec3f"));
    
     CDT cdt;
 
@@ -267,13 +274,14 @@ class CDTNode:public Node {
 };
 
 class ComparePointDistanceNode:public Node {
-  char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-  int thin_nth = 5;
-
   public:
+  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+  char log_filepath[256] = "ComparePointDistanceNode.out";
+  int thin_nth = 20;
+
   ComparePointDistanceNode(NodeManager& manager):Node(manager, "ComparePointDistance") {
-    add_input("triangles1", TT_vec3f);
-    add_input("triangles2", TT_vec3f);
+    add_input("triangles1_vec3f", TT_vec3f);
+    add_input("triangles2_vec3f", TT_vec3f);
     add_output("points", TT_vec3f);
     add_output("distances1", TT_vec1f);
     add_output("distances2", TT_vec1f);
@@ -281,7 +289,7 @@ class ComparePointDistanceNode:public Node {
   }
 
   void gui(){
-    ImGui::InputText("LAS file path", filepath, IM_ARRAYSIZE(filepath));
+    ImGui::InputText("LAS file path", las_filepath, IM_ARRAYSIZE(las_filepath));
     ImGui::SliderInt("Thin nth", &thin_nth, 0, 100);
   }
 
@@ -298,7 +306,7 @@ class ComparePointDistanceNode:public Node {
     typedef CGAL::AABB_tree<AABB_triangle_traits> Tree;
 
     // Triangles 1
-    auto trin1 = std::any_cast<vec3f>(get_value("triangles1"));
+    auto trin1 = std::any_cast<vec3f>(get_value("triangles1_vec3f"));
     std::list<Triangle> triangles1;
     for(size_t i=0; i< trin1.size()/3; i++){
       auto a = Point(trin1[i*3+0][0], trin1[i*3+0][1], trin1[i*3+0][2]);
@@ -310,19 +318,19 @@ class ComparePointDistanceNode:public Node {
     tree1.accelerate_distance_queries();
 
     // Triangles 2
-    auto trin2 = std::any_cast<vec3f>(get_value("triangles2"));
+    auto trin2 = std::any_cast<vec3f>(get_value("triangles2_vec3f"));
     std::list<Triangle> triangles2;
     for(size_t i=0; i< trin2.size()/3; i++){
       auto a = Point(trin2[i*3+0][0], trin2[i*3+0][1], trin2[i*3+0][2]);
       auto b = Point(trin2[i*3+1][0], trin2[i*3+1][1], trin2[i*3+1][2]);
       auto c = Point(trin2[i*3+2][0], trin2[i*3+2][1], trin2[i*3+2][2]);
-      triangles1.push_back(Triangle(a,b,c));
+      triangles2.push_back(Triangle(a,b,c));
     }
     Tree tree2(triangles2.begin(),triangles2.end());
     tree2.accelerate_distance_queries();
 
     LASreadOpener lasreadopener;
-    lasreadopener.set_file_name(filepath);
+    lasreadopener.set_file_name(las_filepath);
     LASreader* lasreader = lasreadopener.open();
 
     vec1f distances1, distances2, diff;
@@ -349,6 +357,15 @@ class ComparePointDistanceNode:public Node {
     }
     lasreader->close();
     delete lasreader;
+    
+    std::ofstream f_out(log_filepath);
+
+    f_out << std::fixed << std::setprecision(2);
+    for(int i=0; i<points.size(); i++) {
+      f_out << points[i][0] << " " << points[i][1] << " " << points[i][2] << " ";
+      f_out << std::sqrt(distances1[i]) << " " << std::sqrt(distances2[i]) << " " << diff[i] << "\n";
+    }
+    f_out.close();
 
     set_value("points", points);
     set_value("diff", diff);
@@ -358,12 +375,12 @@ class ComparePointDistanceNode:public Node {
 };
 
 class PointDistanceNode:public Node {
+  public:
   char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
   int thin_nth = 5;
 
-  public:
   PointDistanceNode(NodeManager& manager):Node(manager, "PointDistance") {
-    add_input("triangles", TT_vec3f);
+    add_input("triangles_vec3f", TT_vec3f);
     add_output("points", TT_vec3f);
     add_output("distances", TT_vec1f);
   }
