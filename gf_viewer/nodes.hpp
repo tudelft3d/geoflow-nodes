@@ -412,6 +412,9 @@ class PointsInFootprintNode:public Node {
   std::vector<vec3f> points_vec3f;
   std::vector<vec3f> footprints_vec3f;
 
+  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+  char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+
   public:
   PointsInFootprintNode(NodeManager& manager):Node(manager, "PointsInFootprint") {
     add_output("points", TT_any);
@@ -421,6 +424,8 @@ class PointsInFootprintNode:public Node {
   }
 
   void gui(){
+    ImGui::InputText("LAS file path", las_filepath, IM_ARRAYSIZE(las_filepath));
+    ImGui::InputText("CSV file path", csv_filepath, IM_ARRAYSIZE(csv_filepath));
     ImGui::Checkbox("Run on change", &run_on_change);
     if (ImGui::SliderInt("#", &footprint_id, 0, footprints.size()-1)) {
       if(run_on_change) {
@@ -438,13 +443,13 @@ class PointsInFootprintNode:public Node {
 
   void process(){
     if(!isInitialised) {
-      std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+      // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
       // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-      std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+      // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
       // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
       
       // Set up vertex data (and buffer(s)) and attribute pointers
-      auto csv_footprints = std::ifstream(csv_path);
+      auto csv_footprints = std::ifstream(csv_filepath);
       
       std::string column_names, row;
       std::getline(csv_footprints, column_names);
@@ -462,7 +467,7 @@ class PointsInFootprintNode:public Node {
           footprints.push_back(bag_polygon);
       } csv_footprints.close();
 
-      pc_in_footprint(las_path, footprints, points_vec);
+      pc_in_footprint(std::string(las_filepath), footprints, points_vec);
 
       for (auto& fp : footprints) {
         vec3f fp_vec3f;
