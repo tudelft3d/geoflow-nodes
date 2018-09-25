@@ -44,6 +44,7 @@ int main(int ac, const char * av[])
     N.register_node<CDTNode>("CDT");
     N.register_node<PointDistanceNode>("PointDistance");
     N.register_node<ComparePointDistanceNode>("ComparePointDistance");
+    N.register_node<CSVLoaderNode>("CSVLoader");
 
     a->draw_that(on_draw);
 
@@ -52,10 +53,11 @@ int main(int ac, const char * av[])
     ns.push_back(std::make_pair("ComputeMetrics", ImVec2(300,75)));
     ns.push_back(std::make_pair("ClassifyEdgePoints", ImVec2(600,75)));
     ns.push_back(std::make_pair("DetectLines", ImVec2(900,75)));
+    ns.push_back(std::make_pair("RegulariseLines", ImVec2(1200,175)));
     ns.push_back(std::make_pair("BuildArrangement", ImVec2(1200,75)));
     ns.push_back(std::make_pair("ProcessArrangement", ImVec2(1500,75)));
     ns.push_back(std::make_pair("Extruder", ImVec2(1800,75)));
-    // nodes_.PreloadNodes(ns);
+    nodes_.PreloadNodes(ns);
 
     a->run();
 }

@@ -15,9 +15,13 @@ static NodeManager N;
 
 int main(int ac, const char * av[])
 {
-    std::string path_lines_1 = "/Users/ravi/surfdrive/Data/step-edge-detector/small-test/3bg_v01_hoogtelijnen_.gpkg";
-    std::string path_lines_2 = "/Users/ravi/surfdrive/Data/step-edge-detector/small-test/dgmr_hoogtelijnen_.gpkg";
-    std::string path_las = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+    // std::string path_lines_1 = "/Users/ravi/surfdrive/Data/step-edge-detector/small-test/3bg_v01_hoogtelijnen_.gpkg";
+    // std::string path_lines_2 = "/Users/ravi/surfdrive/Data/step-edge-detector/small-test/dgmr_hoogtelijnen_.gpkg";
+    // std::string path_las = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+    // std::string path_out = "ComparePointDistanceNode.out";
+    std::string path_lines_1 = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_dgmr_.gpkg";
+    std::string path_lines_2 = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_v01_simp_dp1m.gpkg";
+    std::string path_las = "/Users/ravi/surfdrive/data/step-edge-detector/nieuwegein-center.laz";
     std::string path_out = "ComparePointDistanceNode.out";
     
     po::options_description desc("Allowed options");

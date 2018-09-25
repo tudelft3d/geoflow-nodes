@@ -515,6 +515,7 @@ class RegulariseLinesNode:public Node {
     add_input("footprint_vec3f", TT_vec3f);
     add_output("edges_out", TT_any);
     add_output("edges_out_vec3f", TT_vec3f);
+    add_output("tmp_vec3f", TT_vec3f);
   }
 
   void gui(){
@@ -542,17 +543,26 @@ class RegulariseLinesNode:public Node {
     }
     // add footprint edges
     // footprint_vec3f.push_back(footprint_vec3f[0]); //repeat first point as last
-    // for(size_t i=0; i<footprint_vec3f.size()-1; i++) {
-    //   auto p_first = Point_2(footprint_vec3f[i+0][0], footprint_vec3f[i+0][1]);
-    //   auto p_second = Point_2(footprint_vec3f[i+1][0], footprint_vec3f[i+1][1]);
-    //   auto v = p_second - p_first;
+    vec3f tmp_vec3f;
+    for(size_t i=0; i<footprint_vec3f.size()-1; i++) {
+      auto p_first = Point_2(footprint_vec3f[i+0][0], footprint_vec3f[i+0][1]);
+      auto p_second = Point_2(footprint_vec3f[i+1][0], footprint_vec3f[i+1][1]);
+      auto v = p_second - p_first;
 
-    //   auto p_ = p_first + v/2;
-    //   auto p = Point_2(p_.x(),p_.y());
-    //   auto angle = std::atan2(v.x(),v.y());
+      tmp_vec3f.push_back({float(p_first.x()), float(p_first.y()), 0});
+      tmp_vec3f.push_back({float(p_second.x()), float(p_second.y()), 0});
 
-    //   lines.push_back(std::make_tuple(angle,p,0,0, true));
-    // }
+      auto p_ = p_first + v/2;
+      auto p = Point_2(p_.x(),p_.y());
+      auto angle = std::atan2(v.x(),v.y());
+      if (angle < 0) angle += pi;
+      lines.push_back(std::make_tuple(angle,p,0,0, true));
+    }
+    set_value("tmp_vec3f", tmp_vec3f);
+
+    for (auto line: lines) {
+      std::cout << std::get<0>(line) << " " << std::get<4>(line) << "\n";
+    }
 
     //sort by angle, smallest on top
     std::sort(lines.begin(), lines.end(), [](linetype a, linetype b) {
@@ -571,6 +581,13 @@ class RegulariseLinesNode:public Node {
       last_angle=std::get<0>(line);
     }
 
+    for (auto cluster: angle_clusters) {
+      std::cout << "cluster ..\n";
+      for (auto line: cluster) {
+        std::cout << std::get<0>(line) << " " << std::get<4>(line) << "\n";
+      }
+    }
+
     // snap to average angle in each cluster
     vec3f directions_before, directions_after;
     vec1i angles;
@@ -586,6 +603,14 @@ class RegulariseLinesNode:public Node {
         std::get<0>(line)=average_angle;
       }
       cluster_id++;
+    }
+
+    std::cout << "\nafter angle snapping...:\n";
+    for (auto cluster: angle_clusters) {
+      std::cout << "cluster ..\n";
+      for (auto line: cluster) {
+        std::cout << std::get<0>(line) << " " << std::get<4>(line) << "\n";
+      }
     }
 
     vec1f distances;
@@ -623,22 +648,46 @@ class RegulariseLinesNode:public Node {
       }
     }
 
+    std::cout << "\nafter distance snapping...:\n";
+    for (auto cluster: dist_clusters) {
+      std::cout << "cluster ..\n";
+      for (auto line: cluster) {
+        std::cout << std::get<2>(line) << " " << std::get<4>(line) << "\n";
+      }
+    }
+
     // compute one line per dist cluster => the one with the highest elevation
     vec3f edges_out_vec3f;
     std::vector<std::pair<Point,Point>> edges_out;
     for(auto& cluster : dist_clusters) {
-      double max_z=0;
-      linetype high_line;
+      //try to find a footprint line
+      linetype best_line;
+      bool found_fp=false, found_non_fp=false;
       for(auto& line : cluster) {
-        auto z = std::get<3>(line);
-        if(z > max_z) {
-          max_z = z;
-          high_line = line;
+        if(std::get<4>(line)){
+          found_fp=true;
+          best_line = line;
+        } else {
+          found_non_fp = true;
+        }
+      }
+      // if there are no non-footprint lines, skip this cluster
+      if(!found_non_fp) continue;
+      // if we didn't find any footprint lines, pick the line with the highest elevation
+      if(!found_fp){
+        double max_z=0;
+        linetype high_line;
+        for(auto& line : cluster) {
+          auto z = std::get<3>(line);
+          if(z > max_z) {
+            max_z = z;
+            best_line = line;
+          }
         }
       }
       // compute vec orthogonal to lines in this cluster
-      double angle = std::get<0>(high_line);
-      auto p0 = std::get<1>(high_line);
+      double angle = std::get<0>(best_line);
+      auto p0 = std::get<1>(best_line);
       // Vector_2 n(-1.0, std::tan(angle));
       // n = n/std::sqrt(n.squared_length()); // normalize
       Vector_2 l(std::tan(angle),1.0);

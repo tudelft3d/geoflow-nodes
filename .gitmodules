@@ -1,3 +1,6 @@
 [submodule "thirdparty/geoflow"]
 	path = thirdparty/geoflow
 	url = git@github.com:tudelft3d/geoflow.git
+[submodule "thirdparty/msgpack-c"]
+	path = thirdparty/msgpack-c
+	url = https://github.com/msgpack/msgpack-c.git

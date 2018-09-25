@@ -254,6 +254,7 @@ class CDTNode:public Node {
       );
     }
     
+    std::cout << "Completed CDT with " << cdt.number_of_faces() << " triangles...\n";
     // assert(cdt.is_valid());
     vec3f triangles_vec3f;
     for (CDT::Finite_faces_iterator fit = cdt.finite_faces_begin();
@@ -335,37 +336,41 @@ class ComparePointDistanceNode:public Node {
 
     vec1f distances1, distances2, diff;
     vec3f points;
+    std::ofstream f_out(log_filepath);
+    f_out << std::fixed << std::setprecision(2);
     size_t i=0;
     while (lasreader->read_point()) {
       if (lasreader->point.get_classification() == 2){
 
         if (i++ % thin_nth == 0){
           auto q = Point(lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z());
-          float sqd1 = tree1.squared_distance(q);
-          distances1.push_back(sqd1);
-          float sqd2 = tree2.squared_distance(q);
-          distances2.push_back(sqd2);
-          diff.push_back(std::sqrt(sqd2)-std::sqrt(sqd1));
+          float d1 = std::sqrt(tree1.squared_distance(q));
+          distances1.push_back(d1);
+          float d2 = std::sqrt(tree2.squared_distance(q));
+          distances2.push_back(d2);
+          auto difference = d2-d1;
+          diff.push_back(difference);
           points.push_back({
             float(lasreader->point.get_x()), 
             float(lasreader->point.get_y()), 
             float(lasreader->point.get_z())}
           );
+          f_out << float(lasreader->point.get_x()) << " " << float(lasreader->point.get_y()) << " " << float(lasreader->point.get_z()) << " ";
+          f_out << std::sqrt(d1) << " " << std::sqrt(d2) << " " << difference << "\n";
         }
+        if(i%100000000==0) std::cout << "Read " << i << " points...\n";
         // laswriter->write_point(&lasreader->point);
       }
     }
     lasreader->close();
     delete lasreader;
+    f_out.close();
     
-    std::ofstream f_out(log_filepath);
-
-    f_out << std::fixed << std::setprecision(2);
     for(int i=0; i<points.size(); i++) {
       f_out << points[i][0] << " " << points[i][1] << " " << points[i][2] << " ";
       f_out << std::sqrt(distances1[i]) << " " << std::sqrt(distances2[i]) << " " << diff[i] << "\n";
     }
-    f_out.close();
+    
 
     set_value("points", points);
     set_value("diff", diff);
@@ -435,6 +440,7 @@ class PointDistanceNode:public Node {
             float(lasreader->point.get_z())}
           );
         }
+        if(i%10000==0) std::cout << "Read " << i << " points...\n";
         // laswriter->write_point(&lasreader->point);
       }
     }
@@ -443,6 +449,49 @@ class PointDistanceNode:public Node {
 
     set_value("points", points);
     set_value("distances", distances);
+  }
+};
+
+class CSVLoaderNode:public Node {
+  public:
+  char filepath[256] = "/Users/ravi/git/heightjump-detect/build/ComparePointDistanceNode.out";
+  int thin_nth = 5;
+
+  CSVLoaderNode(NodeManager& manager):Node(manager, "CSVLoader") {
+    add_output("points", TT_vec3f);
+    add_output("distances1", TT_vec1f);
+    add_output("distances2", TT_vec1f);
+    add_output("difference", TT_vec1f);
+  }
+
+  void gui(){
+    ImGui::InputText("CSV file path", filepath, IM_ARRAYSIZE(filepath));
+    ImGui::SliderInt("Thin nth", &thin_nth, 0, 100);
+  }
+
+  void process(){
+    vec3f points;
+    vec1f distances1;
+    vec1f distances2;
+    vec1f difference;
+    
+    std::ifstream f_in(filepath);
+    float px, py, pz, d1, d2, df;
+    size_t i=0;
+    while(f_in >> px >> py >> pz >> d1 >> d2 >> df) {
+      if(i++%thin_nth==0) {
+        points.push_back({px,py,pz});
+        distances1.push_back(d1);
+        distances2.push_back(d2);
+        difference.push_back(df);
+      }
+    }
+    f_in.close();
+
+    set_value("points", points);
+    set_value("distances1", distances1);
+    set_value("distances2", distances2);
+    set_value("difference", difference);
   }
 };
 
