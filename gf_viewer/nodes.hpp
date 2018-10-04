@@ -2,10 +2,18 @@
 #include "gloo.h"
 #include "geoflow.hpp"
 #include "point_edge.h"
+
 #include "earcut.hpp"
+
+#include "nlohmann/json.hpp"
+using json = nlohmann::json;
+
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <cmath>
+
+#include <filesystem>
+namespace fs=std::filesystem;
 
 typedef std::array<float,3> vertex;
 vertex get_normal(vertex v0, vertex v1, vertex v2) {
@@ -413,7 +421,15 @@ class PointsInFootprintNode:public Node {
   std::vector<vec3f> footprints_vec3f;
 
   char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+  // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
   char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+  // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
+  // char las_filepath[256] = "/Users/ravi/data/VOLTA-ICGC-BCN/VOLTA_LAS/LAS_ETOH/116102.LAS";
+  // char csv_filepath[256] = "/Users/ravi/data/VOLTA-ICGC-BCN/DGN-SHP/Footprints_MUC/tile_117102/footprints2d.csv";
+//   /Users/ravi/data/VOLTA-ICGC-BCN/VOLTA_LAS/LAS_ETOH/117102.LAS
+// /Users/ravi/data/VOLTA-ICGC-BCN/DGN-SHP/Footprints_MUC/tile_117102/footprints2d.csv
+  // char pc_cache_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/bcn116102_cache.cbor";
+  char pc_cache_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/cache.cbor";
 
   public:
   PointsInFootprintNode(NodeManager& manager):Node(manager, "PointsInFootprint") {
@@ -426,6 +442,7 @@ class PointsInFootprintNode:public Node {
   void gui(){
     ImGui::InputText("LAS file path", las_filepath, IM_ARRAYSIZE(las_filepath));
     ImGui::InputText("CSV file path", csv_filepath, IM_ARRAYSIZE(csv_filepath));
+    ImGui::InputText("cache path", pc_cache_filepath, IM_ARRAYSIZE(pc_cache_filepath));
     ImGui::Checkbox("Run on change", &run_on_change);
     if (ImGui::SliderInt("#", &footprint_id, 0, footprints.size()-1)) {
       if(run_on_change) {
@@ -439,68 +456,114 @@ class PointsInFootprintNode:public Node {
         propagate_outputs();
       }
     }
+    if(ImGui::Button("deinit")) {
+      isInitialised=false;
+    }
+    if(ImGui::Button("save to cache")) {
+      save();
+    }
+  }
+
+  void save() {
+    json j;
+    j["footprints_vec3f"] = footprints_vec3f;
+    j["points_vec3f"] = points_vec3f;
+    std::ofstream os(pc_cache_filepath);
+    json::to_cbor(j, os);
+    os.close();
+  }
+  void load() {
+    std::ifstream is(pc_cache_filepath);
+    json j = json::from_cbor(is);
+    is.close();
+    footprints_vec3f = (const std::vector<vec3f>) j["footprints_vec3f"];
+    footprints.clear();
+    for(auto& ring : footprints_vec3f){
+      bg::model::polygon<point_type> new_fp;
+      for(auto& p : ring) {
+        bg::append(new_fp.outer(), point_type(p[0], p[1]));
+      }
+      footprints.push_back(new_fp);
+    }
+    
+    points_vec3f = (const std::vector<vec3f>) j["points_vec3f"];
+    points_vec.clear();
+    for(auto& points : points_vec3f){
+      PNL_vector new_pc;
+      for (auto& p : points){
+        PNL pv;
+        CGAL::cpp11::get<0>(pv) = Point(p[0], p[1], p[2]);
+        new_pc.push_back(pv);
+      }
+      points_vec.push_back(new_pc);
+    }
   }
 
   void process(){
     if(!isInitialised) {
-      // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
-      // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-      // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
-      // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
-      
-      // Set up vertex data (and buffer(s)) and attribute pointers
-      auto csv_footprints = std::ifstream(csv_filepath);
-      
-      std::string column_names, row;
-      std::getline(csv_footprints, column_names);
-      point_type centroid; // we'll set the origin to the centroid of the first footprint
-      bool read_first=false;
-      while (std::getline(csv_footprints, row)) {
-          bg::model::polygon<point_type> bag_polygon;
-          bg::read_wkt(row, bag_polygon);
-          bg::unique(bag_polygon);
+      fs::path path(pc_cache_filepath);
+      if(fs::exists(path)) {
+        load();
+        isInitialised = true;
+      } else {        
+        footprints.clear();
+        footprints_vec3f.clear();
+        points_vec.clear();
+        points_vec3f.clear();
+        // Set up vertex data (and buffer(s)) and attribute pointers
+        auto csv_footprints = std::ifstream(csv_filepath);
+        
+        std::string column_names, row;
+        std::getline(csv_footprints, column_names);
+        point_type centroid; // we'll set the origin to the centroid of the first footprint
+        bool read_first=false;
+        while (std::getline(csv_footprints, row)) {
+            bg::model::polygon<point_type> bag_polygon;
+            bg::read_wkt(row, bag_polygon);
+            bg::unique(bag_polygon);
 
-          if(!read_first) {
-            bg::centroid(bag_polygon, centroid);
-            read_first=true;
+            if(!read_first) {
+              bg::centroid(bag_polygon, centroid);
+              read_first=true;
+            }
+            footprints.push_back(bag_polygon);
+        } csv_footprints.close();
+
+        pc_in_footprint(std::string(las_filepath), footprints, points_vec);
+
+        for (auto& fp : footprints) {
+          vec3f fp_vec3f;
+          for (auto& p : fp.outer()){
+              bg::subtract_point(p, centroid);
+              fp_vec3f.push_back({float(bg::get<0>(p)), float(bg::get<1>(p)), 0});
           }
-          footprints.push_back(bag_polygon);
-      } csv_footprints.close();
-
-      pc_in_footprint(std::string(las_filepath), footprints, points_vec);
-
-      for (auto& fp : footprints) {
-        vec3f fp_vec3f;
-        for (auto& p : fp.outer()){
-            bg::subtract_point(p, centroid);
-            fp_vec3f.push_back({float(bg::get<0>(p)), float(bg::get<1>(p)), 0});
+          footprints_vec3f.push_back(fp_vec3f);
         }
-        footprints_vec3f.push_back(fp_vec3f);
-      }
 
-      for(auto& pc : points_vec) {
-        for(auto& p : pc) {
-          p.get<0>() = Point(
-            p.get<0>().x()-bg::get<0>(centroid), 
-            p.get<0>().y()-bg::get<1>(centroid),
-            p.get<0>().z());
+        for(auto& pc : points_vec) {
+          for(auto& p : pc) {
+            p.get<0>() = Point(
+              p.get<0>().x()-bg::get<0>(centroid), 
+              p.get<0>().y()-bg::get<1>(centroid),
+              p.get<0>().z());
+          }
         }
-      }
 
-      for(auto& pc : points_vec) {
-        vec3f v;
-        for(auto& p : pc) {
-          std::array<float,3> a = {
-            float(p.get<0>().x()), 
-            float(p.get<0>().y()), 
-            float(p.get<0>().z())
-          };
-          v.push_back(a);
+        for(auto& pc : points_vec) {
+          vec3f v;
+          for(auto& p : pc) {
+            std::array<float,3> a = {
+              float(p.get<0>().x()), 
+              float(p.get<0>().y()), 
+              float(p.get<0>().z())
+            };
+            v.push_back(a);
+          }
+          points_vec3f.push_back(v);
         }
-        points_vec3f.push_back(v);
+        std::cout << footprints.size() << "\n";
+        isInitialised = true;
       }
-      std::cout << footprints.size() << "\n";
-      isInitialised = true;
     }
     set_value("points", points_vec[footprint_id]);
     set_value("points_vec3f", points_vec3f[footprint_id]);

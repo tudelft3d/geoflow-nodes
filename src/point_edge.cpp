@@ -294,6 +294,7 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr) {
   Point_location   pl(arr);
   std::unordered_map<Face_handle, std::vector<PNL>> points_per_face;
 
+  // collect for each face the points it contains
   for (auto& p : points){
     bool is_wall = p.get<3>();
     bool is_on_plane = p.get<2>() != 0;
@@ -305,14 +306,40 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr) {
     }
   }
   
+  // check for the points in each face what segment occurs most often
   for(auto face_points : points_per_face) {
     auto fh = face_points.first;
     auto fpoints = face_points.second;
 
+    std::unordered_map<size_t,size_t> segment_histogram;
+    for (auto& p : fpoints) {
+      segment_histogram[p.get<2>()]++;
+    }
+    size_t max_count = 0, max_segid;
+    for (auto& pair : segment_histogram) {
+      if (pair.second>max_count) {
+        max_count = pair.second;
+        max_segid = pair.first;
+      }
+    }
     float sum = 0;
     for (auto& p : fpoints) {
-      sum = sum + p.get<0>().z();
+      if (p.get<2>() == max_segid)
+        sum = sum + p.get<0>().z();
     }
-    fh->data().elevation_avg = sum/fpoints.size();
+    fh->data().segid = max_segid;
+    fh->data().segid_coverage = max_count/fpoints.size();
+    fh->data().elevation_avg = sum/max_count;
+  }
+
+  // merge faces with the same segment id
+  for (auto& edge : arr.edge_handles()) {
+    auto&& f1 = edge->face();
+    auto&& f2 = edge->twin()->face();
+    if(f1->data().is_finite && f2->data().is_finite) {
+      if(f1->data().segid == f2->data().segid){
+        arr.remove_edge(edge); // should add face merge call back in face observer class...
+      }
+    }
   }
 }

@@ -26,8 +26,8 @@ class OGRLoaderNode:public Node {
   // char filepath[256] = "/Users/ravi/surfdrive/Projects/RWS-Basisbestand-3D-geluid/3D-basisbestand-geluid-v0.1/output/hoogtelijnen/hoogtelijnen_v2/hoogtelijnen_out";
 
   OGRLoaderNode(NodeManager& manager):Node(manager, "OGRLoader") {
-    add_output("lines", TT_any);
-    add_output("lines_vec3f", TT_vec3f);
+    add_output("features", TT_any);
+    add_output("features_vec3f", TT_vec3f);
   }
 
   void gui(){
@@ -36,8 +36,8 @@ class OGRLoaderNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    std::vector<vec3f> lines;
-    vec3f lines_vec3f;
+    std::vector<vec3f> features;
+    vec3f features_vec3f;
 
     GDALAllRegister();
 
@@ -102,26 +102,29 @@ class OGRLoaderNode:public Node {
           line.push_back({float(poPoint.getX()-center_x), float(poPoint.getY()-center_y), float(poPoint.getZ())});
         }
         
-        lines_vec3f.push_back(line[0]);
+        features_vec3f.push_back(line[0]);
         for (size_t i=1; i<(line.size()-1); i++){
-          lines_vec3f.push_back(line[i]);
-          lines_vec3f.push_back(line[i]);
+          features_vec3f.push_back(line[i]);
+          features_vec3f.push_back(line[i]);
         }
-        lines_vec3f.push_back(line[line.size()-1]);
-        lines.push_back(line);
+        features_vec3f.push_back(line[line.size()-1]);
+        features.push_back(line);
       }
-      else
-      {
-        // std::cout << "no point geometry\n";
+      else if( poGeometry != nullptr
+              && (poGeometry->getGeometryType() == wkbPolygon25D || poGeometry->getGeometryType() == wkbPolygon || poGeometry->getGeometryType() == wkbPolygonZM || poGeometry->getGeometryType() == wkbPolygonM) ) {
+        vec3f ring;
+        
+      } else {
+        std::cout << "no supported geometry\n";
       }
 
     }
     
     // poLayer = poDS->GetLayerByName( "point" );
 
-    std::cout << "pushed " << lines.size() << " lines...\n";
-    set_value("lines", lines);
-    set_value("lines_vec3f", lines_vec3f);
+    std::cout << "pushed " << features.size() << " features...\n";
+    set_value("features", features);
+    set_value("features_vec3f", features_vec3f);
   }
 };
 // class OGRLoaderOldNode:public Node {

@@ -106,6 +106,8 @@ typedef Traits_2::X_monotone_curve_2                  X_monotone_curve_2;
 struct FaceInfo {
   bool is_finite=false;
   float elevation_avg=0;
+  size_t segid=0;
+  float segid_coverage;
 };
 typedef CGAL::Arr_face_extended_dcel<Traits_2, FaceInfo>   Dcel;
 typedef CGAL::Arrangement_2<Traits_2, Dcel>           Arrangement_2;

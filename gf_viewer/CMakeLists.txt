@@ -1,4 +1,5 @@
 include_directories(
+  ../thirdparty/json/include
   ../thirdparty/geoflow/src/flowchart
   ../thirdparty/geoflow/src/viewer
   ../thirdparty/geoflow/thirdparty/glad/include 
@@ -11,4 +12,5 @@ target_link_libraries( gf_viewer
   flowchart-gui
   Boost::program_options
   ${GDAL_LIBRARY}
+  c++fs
 )
