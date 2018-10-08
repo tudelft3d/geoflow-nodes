@@ -14,3 +14,7 @@ target_link_libraries( gf_viewer
   ${GDAL_LIBRARY}
   c++fs
 )
+set_target_properties(
+  gf_viewer
+  PROPERTIES CXX_STANDARD 17
+)

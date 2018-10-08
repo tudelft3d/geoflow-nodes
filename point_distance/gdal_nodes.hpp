@@ -15,7 +15,7 @@
 #include <CGAL/AABB_traits.h>
 #include <CGAL/AABB_triangle_primitive.h>
 
-#include <LASlib/lasreader.hpp>
+#include <lasreader.hpp>
 
 using namespace geoflow;
 

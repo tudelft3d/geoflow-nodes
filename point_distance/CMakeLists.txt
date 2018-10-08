@@ -9,3 +9,7 @@ target_link_libraries( point_distance
   Boost::program_options
   ${GDAL_LIBRARY}
 )
+set_target_properties(
+  point_distance
+  PROPERTIES CXX_STANDARD 17
+)

@@ -3,8 +3,8 @@
 #include <iostream>
 #include <fstream>
 
-#include <LASlib/lasreader.hpp>
-#include <LASlib/laswriter.hpp>
+#include <lasreader.hpp>
+#include <laswriter.hpp>
 
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/point_xy.hpp>
