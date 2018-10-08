@@ -11,6 +11,7 @@ using json = nlohmann::json;
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <cmath>
+#include <boost/tuple/tuple.hpp>
 
 #include <filesystem>
 namespace fs=std::filesystem;
@@ -394,11 +395,11 @@ class ComputeMetricsNode:public Node {
     vec1f line_dist, jump_count, jump_ele;
     vec1i plane_id, is_wall;
     for(auto& p : points){
-      plane_id.push_back(std::get<2>(p));
-      is_wall.push_back(std::get<3>(p));
-      line_dist.push_back(std::get<4>(p));
-      jump_count.push_back(std::get<5>(p));
-      jump_ele.push_back(std::get<7>(p));
+      plane_id.push_back(boost::get<2>(p));
+      is_wall.push_back(boost::get<3>(p));
+      line_dist.push_back(boost::get<4>(p));
+      jump_count.push_back(boost::get<5>(p));
+      jump_ele.push_back(boost::get<7>(p));
     }
     set_value("points", points);
     set_value("plane_id", plane_id);
@@ -542,10 +543,10 @@ class PointsInFootprintNode:public Node {
 
         for(auto& pc : points_vec) {
           for(auto& p : pc) {
-			std::get<0>(p) = Point(
-			  std::get<0>(p).x()-bg::get<0>(centroid),
-		      std::get<0>(p).y()-bg::get<1>(centroid),
-			  std::get<0>(p).z());
+            boost::get<0>(p) = Point(
+              boost::get<0>(p).x()-bg::get<0>(centroid),
+              boost::get<0>(p).y()-bg::get<1>(centroid),
+              boost::get<0>(p).z());
           }
         }
 
@@ -553,9 +554,9 @@ class PointsInFootprintNode:public Node {
           vec3f v;
           for(auto& p : pc) {
             std::array<float,3> a = {
-              float(std::get<0>(p).x()),
-              float(std::get<0>(p).y()),
-              float(std::get<0>(p).z())
+              float(boost::get<0>(p).x()),
+              float(boost::get<0>(p).y()),
+              float(boost::get<0>(p).z())
             };
             v.push_back(a);
           }

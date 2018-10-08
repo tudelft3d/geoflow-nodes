@@ -1,6 +1,7 @@
 #include "point_edge.h"
 #include <CGAL/Arr_walk_along_line_point_location.h>
 #include <unordered_map>
+#include <boost/tuple/tuple.hpp>
 
 void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<point_type>> &footprints, std::vector<PNL_vector> &points_vec) {
   LASreadOpener lasreadopener;
@@ -60,7 +61,7 @@ void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<po
 void compute_metrics(PNL_vector &points, config c) {
   size_t i=0;
   for (auto &p : points) {
-    std::get<8>(p) = i++;
+    boost::get<8>(p) = i++;
   }
   // Instantiates shape detection engine.
   Region_growing shape_detection;
@@ -100,8 +101,8 @@ void compute_metrics(PNL_vector &points, config c) {
     // store cluster id's and is_wall as point attributes
     int label = i++;
     for(auto ind : shape->indices_of_assigned_points()){
-      std::get<2>(points[ind])=label;
-      std::get<3>(points[ind])=is_wall;
+      boost::get<2>(points[ind])=label;
+      boost::get<3>(points[ind])=is_wall;
       // std::cout <<  << std::endl;
     }
 
@@ -115,15 +116,15 @@ void compute_metrics(PNL_vector &points, config c) {
       // Point_d query(0,0);
       // Select candidate edge point based on line fit through k-neighborhood
       for(auto ind : shape->indices_of_assigned_points()){
-        Point q(std::get<0>(points[ind]));
+        Point q(boost::get<0>(points[ind]));
         Neighbor_search search(tree, q, N);
         std::vector<Point_SCK> neighbor_points;
         for (auto neighbor: search)
-          neighbor_points.push_back(Point_SCK(std::get<0>(neighbor.first).x(), std::get<0>(neighbor.first).y(), std::get<0>(neighbor.first).z()));
+          neighbor_points.push_back(Point_SCK(boost::get<0>(neighbor.first).x(), boost::get<0>(neighbor.first).y(), boost::get<0>(neighbor.first).z()));
         Line_SCK line;
         linear_least_squares_fitting_3(neighbor_points.begin(),neighbor_points.end(),line,CGAL::Dimension_tag<0>());
         auto line_dist = CGAL::squared_distance(line, Point_SCK(q.x(), q.y(), q.z()));
-        std::get<4>(points[ind]) = line_dist;
+        boost::get<4>(points[ind]) = line_dist;
       }
       
     }
@@ -132,35 +133,35 @@ void compute_metrics(PNL_vector &points, config c) {
   // detect height jumps
   PNL_vector roof_points;
   for (auto p : points){
-    bool is_wall = std::get<3>(p);
-    bool is_on_plane = std::get<2>(p) != 0;
+    bool is_wall = boost::get<3>(p);
+    bool is_on_plane = boost::get<2>(p) != 0;
     if ((!is_wall) && is_on_plane){
       auto p_ = p;
-      std::get<0>(p_)= Point(std::get<0>(p).x(), std::get<0>(p).y(), 0);
+      boost::get<0>(p_)= Point(boost::get<0>(p).x(), boost::get<0>(p).y(), 0);
       roof_points.push_back(p_);
     }
   }
   Tree tree(roof_points.begin(), roof_points.end());
   const unsigned int N = c.metrics_k_jumpcnt_elediff;
   for (auto q : points){
-    bool is_wall = std::get<3>(q);
-    bool is_on_plane = std::get<2>(q) != 0;
+    bool is_wall = boost::get<3>(q);
+    bool is_on_plane = boost::get<2>(q) != 0;
     int jump_cnt = 0;
     double jump_ele=0;
     if ((!is_wall) && is_on_plane){
-      auto q_segment = std::get<2>(q);
-      auto q_ = Point(std::get<0>(q).x(), std::get<0>(q).y(), 0);
+      auto q_segment = boost::get<2>(q);
+      auto q_ = Point(boost::get<0>(q).x(), boost::get<0>(q).y(), 0);
       Neighbor_search search(tree, q_, N);
       for (auto neighbor: search){
         auto np = neighbor.first;
-        auto np_segment = std::get<2>(np);
+        auto np_segment = boost::get<2>(np);
         if (q_segment!=np_segment)
           jump_cnt++;
-        auto ele_diff = CGAL::abs(std::get<0>(points[std::get<8>(np)]).z()-std::get<0>(points[std::get<8>(q)]).z());
+        auto ele_diff = CGAL::abs(boost::get<0>(points[boost::get<8>(np)]).z()-boost::get<0>(points[boost::get<8>(q)]).z());
         jump_ele = std::max(ele_diff, jump_ele);
       }
-      std::get<5>(points[std::get<8>(q)]) = jump_cnt;
-      std::get<7>(points[std::get<8>(q)]) = jump_ele;
+      boost::get<5>(points[boost::get<8>(q)]) = jump_cnt;
+      boost::get<7>(points[boost::get<8>(q)]) = jump_ele;
     }
     
   }
@@ -168,22 +169,22 @@ void compute_metrics(PNL_vector &points, config c) {
 
 void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &points, config c) {
   for (auto &p : points){
-    double line_dist = std::get<4>(p);
-    double jump_count = std::get<5>(p);
-    double jump_ele = std::get<7>(p);
+    double line_dist = boost::get<4>(p);
+    double jump_count = boost::get<5>(p);
+    double jump_ele = boost::get<7>(p);
     // std::cout << line_dist << " " << jump_count << " " << jump_ele << " " << p.get<8>() << " " << p.get<3>() << " " << p.get<2>() << std::endl;
     // if (line_dist > 0.01){// ie we assume the point to be on an edge of this cluster
     bool is_step = (jump_count >= c.classify_jump_count_min && jump_count <= c.classify_jump_count_max) && (line_dist > c.classify_line_dist) && (jump_ele > c.classify_jump_ele);
     // bool is_step = (jump_count >= 1 && jump_count <= 5) && line_dist > 0.01;
     // bool is_step = (jump_count >= 1) && line_dist > 0.01;
     // bool is_step = line_dist > 0.01;
-    std::get<6>(p) = is_step;
+    boost::get<6>(p) = is_step;
     if (is_step){// ie we assume the point to be on an edge of this cluster
       // edge_points.push_back(p); // add this point to a new set of candidate points for region-growing line-fitting
       // project to z=0 - seems to yield more reliable line detection
       edge_points.push_back(
         // linedect::Point(p.get<0>().x(),p.get<0>().y(),0)
-        linedect::Point(std::get<0>(p).x(), std::get<0>(p).y(), std::get<0>(p).z())
+        linedect::Point(boost::get<0>(p).x(), boost::get<0>(p).y(), boost::get<0>(p).z())
       ); // add this point to a new set of candidate points for region-growing line-fitting
     }
   }
@@ -296,10 +297,10 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr) {
 
   // collect for each face the points it contains
   for (auto& p : points){
-    bool is_wall = std::get<3>(p);
-    bool is_on_plane = std::get<2>(p) != 0;
+    bool is_wall = boost::get<3>(p);
+    bool is_on_plane = boost::get<2>(p) != 0;
     if ((!is_wall) && is_on_plane){
-      auto obj = pl.locate( Point_2(std::get<0>(p).x(), get<0>(p).y()) );
+      auto obj = pl.locate( Point_2(boost::get<0>(p).x(), get<0>(p).y()) );
       if (auto f = boost::get<Face_const_handle>(&obj)) {
         points_per_face[arr.non_const_handle(*f)].push_back(p);
       }
@@ -313,7 +314,7 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr) {
 
     std::unordered_map<size_t,size_t> segment_histogram;
     for (auto& p : fpoints) {
-      segment_histogram[std::get<2>(p)]++;
+      segment_histogram[boost::get<2>(p)]++;
     }
     size_t max_count = 0, max_segid;
     for (auto& pair : segment_histogram) {
@@ -324,8 +325,8 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr) {
     }
     float sum = 0;
     for (auto& p : fpoints) {
-      if (std::get<2>(p) == max_segid)
-        sum = sum + std::get<0>(p).z();
+      if (boost::get<2>(p) == max_segid)
+        sum = sum + boost::get<0>(p).z();
     }
     fh->data().segid = max_segid;
     fh->data().segid_coverage = max_count/fpoints.size();

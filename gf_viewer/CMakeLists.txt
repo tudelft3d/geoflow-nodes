@@ -13,9 +13,10 @@ target_link_libraries( gf_viewer
   Boost::program_options
   ${GDAL_LIBRARY}
 )
-if(!MSVC)
+if(NOT MSVC)
   target_link_libraries(gf_viewer c++fs)
 endif()
+
 set_target_properties(
   gf_viewer
   PROPERTIES CXX_STANDARD 17
