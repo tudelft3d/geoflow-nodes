@@ -12,8 +12,10 @@ target_link_libraries( gf_viewer
   flowchart-gui
   Boost::program_options
   ${GDAL_LIBRARY}
-  c++fs
 )
+if(!MSVC)
+  target_link_libraries(gf_viewer c++fs)
+endif()
 set_target_properties(
   gf_viewer
   PROPERTIES CXX_STANDARD 17

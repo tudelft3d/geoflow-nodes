@@ -394,11 +394,11 @@ class ComputeMetricsNode:public Node {
     vec1f line_dist, jump_count, jump_ele;
     vec1i plane_id, is_wall;
     for(auto& p : points){
-      plane_id.push_back(p.get<2>());
-      is_wall.push_back(p.get<3>());
-      line_dist.push_back(p.get<4>());
-      jump_count.push_back(p.get<5>());
-      jump_ele.push_back(p.get<7>());
+      plane_id.push_back(std::get<2>(p));
+      is_wall.push_back(std::get<3>(p));
+      line_dist.push_back(std::get<4>(p));
+      jump_count.push_back(std::get<5>(p));
+      jump_ele.push_back(std::get<7>(p));
     }
     set_value("points", points);
     set_value("plane_id", plane_id);
@@ -465,38 +465,38 @@ class PointsInFootprintNode:public Node {
   }
 
   void save() {
-    json j;
-    j["footprints_vec3f"] = footprints_vec3f;
-    j["points_vec3f"] = points_vec3f;
-    std::ofstream os(pc_cache_filepath);
-    json::to_cbor(j, os);
-    os.close();
+    //json j;
+    //j["footprints_vec3f"] = footprints_vec3f;
+    //j["points_vec3f"] = points_vec3f;
+    //std::ofstream os(pc_cache_filepath);
+    //json::to_cbor(j, os);
+    //os.close();
   }
   void load() {
-    std::ifstream is(pc_cache_filepath);
-    json j = json::from_cbor(is);
-    is.close();
-    footprints_vec3f = (const std::vector<vec3f>) j["footprints_vec3f"];
-    footprints.clear();
-    for(auto& ring : footprints_vec3f){
-      bg::model::polygon<point_type> new_fp;
-      for(auto& p : ring) {
-        bg::append(new_fp.outer(), point_type(p[0], p[1]));
-      }
-      footprints.push_back(new_fp);
-    }
-    
-    points_vec3f = (const std::vector<vec3f>) j["points_vec3f"];
-    points_vec.clear();
-    for(auto& points : points_vec3f){
-      PNL_vector new_pc;
-      for (auto& p : points){
-        PNL pv;
-        CGAL::cpp11::get<0>(pv) = Point(p[0], p[1], p[2]);
-        new_pc.push_back(pv);
-      }
-      points_vec.push_back(new_pc);
-    }
+    //std::ifstream is(pc_cache_filepath);
+    //json j = json::from_cbor(is);
+    //is.close();
+    //footprints_vec3f = (const std::vector<vec3f>) j["footprints_vec3f"];
+    //footprints.clear();
+    //for(auto& ring : footprints_vec3f){
+    //  bg::model::polygon<point_type> new_fp;
+    //  for(auto& p : ring) {
+    //    bg::append(new_fp.outer(), point_type(p[0], p[1]));
+    //  }
+    //  footprints.push_back(new_fp);
+    //}
+    //
+    //points_vec3f = (const std::vector<vec3f>) j["points_vec3f"];
+    //points_vec.clear();
+    //for(auto& points : points_vec3f){
+    //  PNL_vector new_pc;
+    //  for (auto& p : points){
+    //    PNL pv;
+    //    CGAL::cpp11::get<0>(pv) = Point(p[0], p[1], p[2]);
+    //    new_pc.push_back(pv);
+    //  }
+    //  points_vec.push_back(new_pc);
+    //}
   }
 
   void process(){
@@ -542,10 +542,10 @@ class PointsInFootprintNode:public Node {
 
         for(auto& pc : points_vec) {
           for(auto& p : pc) {
-            p.get<0>() = Point(
-              p.get<0>().x()-bg::get<0>(centroid), 
-              p.get<0>().y()-bg::get<1>(centroid),
-              p.get<0>().z());
+			std::get<0>(p) = Point(
+			  std::get<0>(p).x()-bg::get<0>(centroid),
+		      std::get<0>(p).y()-bg::get<1>(centroid),
+			  std::get<0>(p).z());
           }
         }
 
@@ -553,9 +553,9 @@ class PointsInFootprintNode:public Node {
           vec3f v;
           for(auto& p : pc) {
             std::array<float,3> a = {
-              float(p.get<0>().x()), 
-              float(p.get<0>().y()), 
-              float(p.get<0>().z())
+              float(std::get<0>(p).x()),
+              float(std::get<0>(p).y()),
+              float(std::get<0>(p).z())
             };
             v.push_back(a);
           }
