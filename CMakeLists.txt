@@ -43,6 +43,9 @@ if (MSVC)
   add_definitions(-DNOMINMAX)
 endif()
 
+add_definitions(
+  -DGLM_FORCE_CTOR_INIT # FIXME: get rid of this (by doing proper initialisation of glm objects, especially the quaternions)
+)
 include_directories( src thirdparty ${CGAL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${GDAL_INCLUDE_DIR} thirdparty/LAStools/LASlib/inc thirdparty/LAStools/LASzip/inc thirdparty/LAStools/LASzip/src thirdparty/geoflow/thirdparty/glm)
 
 add_library(point_edge_lib STATIC src/point_edge.cpp src/region_growing.cpp)

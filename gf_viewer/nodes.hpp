@@ -412,19 +412,22 @@ class ComputeMetricsNode:public Node {
 };
 
 class PointsInFootprintNode:public Node {
-  config c;
-  int footprint_id=0;
-  bool run_on_change=false;
-  bool isInitialised = false;
+  private:
   std::vector<bg::model::polygon<point_type>> footprints;
   std::vector<PNL_vector> points_vec;
   std::vector<vec3f> points_vec3f;
   std::vector<vec3f> footprints_vec3f;
 
-  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
-  // std::string las_path = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-  char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
-  // std::string csv_path = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
+  public:
+  config c;
+  int footprint_id=0;
+  bool run_on_change=false;
+  bool isInitialised = false;
+
+  // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+  // char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+  char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
   // char las_filepath[256] = "/Users/ravi/data/VOLTA-ICGC-BCN/VOLTA_LAS/LAS_ETOH/116102.LAS";
   // char csv_filepath[256] = "/Users/ravi/data/VOLTA-ICGC-BCN/DGN-SHP/Footprints_MUC/tile_117102/footprints2d.csv";
 //   /Users/ravi/data/VOLTA-ICGC-BCN/VOLTA_LAS/LAS_ETOH/117102.LAS
@@ -432,7 +435,6 @@ class PointsInFootprintNode:public Node {
   // char pc_cache_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/bcn116102_cache.cbor";
   char pc_cache_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/cache.cbor";
 
-  public:
   PointsInFootprintNode(NodeManager& manager):Node(manager, "PointsInFootprint") {
     add_output("points", TT_any);
     add_output("points_vec3f", TT_vec3f);
@@ -575,7 +577,7 @@ class PointsInFootprintNode:public Node {
 
 class RegulariseLinesNode:public Node {
   static constexpr double pi = 3.14159265358979323846;
-  float dist_threshold = 2;
+  float dist_threshold = 1.0;
   float angle_threshold = 10*(pi/180);
 
   public:
