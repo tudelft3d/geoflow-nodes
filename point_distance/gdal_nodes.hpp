@@ -498,3 +498,20 @@ class CSVLoaderNode:public Node {
   }
 };
 
+class TriPointSimplifierNode:public Node {
+  public:
+  float thres_error = 2;
+
+  TriPointSimplifierNode(NodeManager& manager):Node(manager, "TriPointSimplifier") {
+    add_input("points", TT_vec3f);
+    add_output("triangles", TT_vec3f);
+  }
+
+  void gui(){
+    ImGui::SliderFloat("Error threshold", &thres_error, 0, 100);
+  }
+
+  void process(){
+
+  }
+};
