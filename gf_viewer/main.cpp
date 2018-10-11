@@ -41,6 +41,7 @@ int main(int ac, const char * av[])
     
     //gdal nodes
     N.register_node<OGRLoaderNode>("OGRLoader");
+    N.register_node<LASLoaderNode>("LASLoader");
     N.register_node<CDTNode>("CDT");
     N.register_node<PointDistanceNode>("PointDistance");
     N.register_node<ComparePointDistanceNode>("ComparePointDistance");
@@ -48,29 +49,29 @@ int main(int ac, const char * av[])
 
     a->draw_that(on_draw);
 
-    ImGui::NodeStore ns;
-    ns.push_back(std::make_tuple("PointsInFootprint", "ThePointsInFootprint", ImVec2(75,75)));
-    ns.push_back(std::make_tuple("ComputeMetrics", "TheComputeMetrics", ImVec2(300,75)));
-    ns.push_back(std::make_tuple("ClassifyEdgePoints", "TheClassifyEdgePoints", ImVec2(600,75)));
-    ns.push_back(std::make_tuple("DetectLines", "TheDetectLines", ImVec2(900,75)));
-    ns.push_back(std::make_tuple("RegulariseLines", "TheRegulariseLines", ImVec2(1200,175)));
-    ns.push_back(std::make_tuple("BuildArrangement", "TheBuildArrangement", ImVec2(1200,75)));
-    ns.push_back(std::make_tuple("ProcessArrangement", "TheProcessArrangement", ImVec2(1500,75)));
-    ns.push_back(std::make_tuple("Extruder", "TheExtruder", ImVec2(1800,75)));
-    nodes_.PreloadNodes(ns);
+    // ImGui::NodeStore ns;
+    // ns.push_back(std::make_tuple("PointsInFootprint", "ThePointsInFootprint", ImVec2(75,75)));
+    // ns.push_back(std::make_tuple("ComputeMetrics", "TheComputeMetrics", ImVec2(300,75)));
+    // ns.push_back(std::make_tuple("ClassifyEdgePoints", "TheClassifyEdgePoints", ImVec2(600,75)));
+    // ns.push_back(std::make_tuple("DetectLines", "TheDetectLines", ImVec2(900,75)));
+    // ns.push_back(std::make_tuple("RegulariseLines", "TheRegulariseLines", ImVec2(1200,175)));
+    // ns.push_back(std::make_tuple("BuildArrangement", "TheBuildArrangement", ImVec2(1200,75)));
+    // ns.push_back(std::make_tuple("ProcessArrangement", "TheProcessArrangement", ImVec2(1500,75)));
+    // ns.push_back(std::make_tuple("Extruder", "TheExtruder", ImVec2(1800,75)));
+    // nodes_.PreloadNodes(ns);
 
-    ImGui::LinkStore ls;
-    ls.push_back(std::make_tuple("ThePointsInFootprint", "TheComputeMetrics", "points", "points"));
-    ls.push_back(std::make_tuple("ThePointsInFootprint", "TheBuildArrangement", "footprint", "footprint"));
-    ls.push_back(std::make_tuple("ThePointsInFootprint", "TheRegulariseLines", "footprint_vec3f", "footprint_vec3f"));
-    ls.push_back(std::make_tuple("TheComputeMetrics", "TheClassifyEdgePoints", "points", "points"));
-    ls.push_back(std::make_tuple("TheComputeMetrics", "TheProcessArrangement", "points", "points"));
-    ls.push_back(std::make_tuple("TheClassifyEdgePoints", "TheDetectLines", "edge_points", "edge_points"));
-    ls.push_back(std::make_tuple("TheDetectLines", "TheRegulariseLines", "edge_segments", "edge_segments"));
-    ls.push_back(std::make_tuple("TheRegulariseLines", "TheBuildArrangement", "edges_out", "edge_segments"));
-    ls.push_back(std::make_tuple("TheBuildArrangement", "TheProcessArrangement", "arrangement", "arrangement"));
-    ls.push_back(std::make_tuple("TheProcessArrangement", "TheExtruder", "arrangement", "arrangement"));
-    nodes_.PreloadLinks(ls);
+    // ImGui::LinkStore ls;
+    // ls.push_back(std::make_tuple("ThePointsInFootprint", "TheComputeMetrics", "points", "points"));
+    // ls.push_back(std::make_tuple("ThePointsInFootprint", "TheBuildArrangement", "footprint", "footprint"));
+    // ls.push_back(std::make_tuple("ThePointsInFootprint", "TheRegulariseLines", "footprint_vec3f", "footprint_vec3f"));
+    // ls.push_back(std::make_tuple("TheComputeMetrics", "TheClassifyEdgePoints", "points", "points"));
+    // ls.push_back(std::make_tuple("TheComputeMetrics", "TheProcessArrangement", "points", "points"));
+    // ls.push_back(std::make_tuple("TheClassifyEdgePoints", "TheDetectLines", "edge_points", "edge_points"));
+    // ls.push_back(std::make_tuple("TheDetectLines", "TheRegulariseLines", "edge_segments", "edge_segments"));
+    // ls.push_back(std::make_tuple("TheRegulariseLines", "TheBuildArrangement", "edges_out", "edge_segments"));
+    // ls.push_back(std::make_tuple("TheBuildArrangement", "TheProcessArrangement", "arrangement", "arrangement"));
+    // ls.push_back(std::make_tuple("TheProcessArrangement", "TheExtruder", "arrangement", "arrangement"));
+    // nodes_.PreloadLinks(ls);
 
     a->run();
 }

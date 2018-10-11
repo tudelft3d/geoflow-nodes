@@ -19,43 +19,115 @@
 
 using namespace geoflow;
 
+class LASLoaderNode:public Node {
+
+  public:
+  char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+  int thin_nth = 20;
+  bool use_thin = true;
+
+  LASLoaderNode(NodeManager& manager):Node(manager, "LASLoader") {
+    add_output("geometry", TT_geometry);
+    add_output("points", TT_vec3f);
+    add_output("classification", TT_vec1i);
+    add_output("intensity", TT_vec1f);
+    GDALAllRegister();
+  }
+
+  void gui(){
+    ImGui::InputText("File path", filepath, IM_ARRAYSIZE(filepath));
+    ImGui::SliderInt("Thin nth", &thin_nth, 1, 100);
+  }
+
+  void process(){
+    gfGeometry3D geometry;
+    geometry.type = geoflow::points;
+    geometry.format = geoflow::simple;
+    vec1i classification;
+    vec1f intensity;
+
+    LASreadOpener lasreadopener;
+    lasreadopener.set_file_name(filepath);
+    LASreader* lasreader = lasreadopener.open();
+    if (!lasreader)
+      return;
+
+    size_t i=0;
+    while (lasreader->read_point()) {
+
+      if (i++ % thin_nth == 0) {
+        classification.push_back(lasreader->point.get_classification());
+        intensity.push_back(float(lasreader->point.get_intensity()));
+        geometry.vertices.push_back({
+          float(lasreader->point.get_x()), 
+          float(lasreader->point.get_y()), 
+          float(lasreader->point.get_z())}
+        );
+        if(i%100000000==0) std::cout << "Read " << i << " points...\n";
+      }
+    }
+    lasreader->close();
+    delete lasreader;
+
+    set_value("points", geometry.vertices);
+    set_value("geometry", geometry);
+    set_value("classification", classification);
+    set_value("intensity", intensity);
+  }
+};
+
 class OGRLoaderNode:public Node {
+  int layer_count = 0;
+  
+  int current_layer_id = 0;
+  std::string geometry_type_name;
+  OGRwkbGeometryType geometry_type;
+
+  // GDALDatasetUniquePtr poDS = nullptr;
+
   public:
   char filepath[256] = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_dgmr_.gpkg";
   // char filepath[256] = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_v01_simp_dp1m.gpkg";
   // char filepath[256] = "/Users/ravi/surfdrive/Projects/RWS-Basisbestand-3D-geluid/3D-basisbestand-geluid-v0.1/output/hoogtelijnen/hoogtelijnen_v2/hoogtelijnen_out";
 
   OGRLoaderNode(NodeManager& manager):Node(manager, "OGRLoader") {
-    add_output("features", TT_any);
-    add_output("features_vec3f", TT_vec3f);
+    add_output("geometries", TT_geometry);
+    add_output("vertices", TT_vec3f);
+    GDALAllRegister();
   }
 
   void gui(){
     ImGui::InputText("File path", filepath, IM_ARRAYSIZE(filepath));
+    ImGui::SliderInt("Layer id", &current_layer_id, 0, layer_count-1);
+    ImGui::Text(geometry_type_name.c_str());
   }
 
   void process(){
-    // Set up vertex data (and buffer(s)) and attribute pointers
-    std::vector<vec3f> features;
-    vec3f features_vec3f;
-
-    GDALAllRegister();
-
     GDALDatasetUniquePtr poDS(GDALDataset::Open( filepath, GDAL_OF_VECTOR));
     if( poDS == nullptr )
     {
         std::cerr<<"Open failed.\n";
         return;
     }
+    layer_count = poDS->GetLayerCount();
+    std::cout << "Layer count: " << layer_count << "\n";
+    current_layer_id = 0;
+
+    // Set up vertex data (and buffer(s)) and attribute pointers
+    gfGeometry3D geometries;
+    vec3f vertices_vec3f;
 
     OGRLayer  *poLayer;
-    std::cout << "Layer count: " << poDS->GetLayerCount() << "\n";
-    poLayer = poDS->GetLayer( 0 );
-    std::cout << "Layer 0 feature count: " << poLayer->GetFeatureCount() << "\n";
-    poLayer->ResetReading();
-    std::cout << "Layer geometry type: " << OGRGeometryTypeToName(poLayer->GetGeomType()) << "[" << poLayer->GetGeomType() << "]\n";
+    poLayer = poDS->GetLayer( current_layer_id );
+    std::cout << "Layer " << current_layer_id << " feature count: " << poLayer->GetFeatureCount() << "\n";
+    geometry_type = poLayer->GetGeomType();
+    geometry_type_name = OGRGeometryTypeToName(geometry_type);
+    std::cout << "Layer geometry type: " << geometry_type_name << "\n";
+
+    if(geometry_type == wkbLineString25D || geometry_type == wkbLineStringZM)
+      geometries.type = geoflow::line_strip;
+    geometries.format = geoflow::count;
     
-    poLayer->ResetReading();
     // OGREnvelope *poExtent;
     // poLayer->GetExtent(poExtent);
     auto center_x = 0;//poExtent->MaxX - poExtent->MinX;
@@ -63,68 +135,47 @@ class OGRLoaderNode:public Node {
     poLayer->ResetReading();
     for( auto& poFeature: poLayer )
     {
-      // read feature fields
-      // for( auto&& oField: *poFeature )
-      // {
-      //   switch( oField.GetType() )
-      //   {
-      //     case OFTInteger:
-      //       printf( "%d,", oField.GetInteger() );
-      //       break;
-      //     case OFTInteger64:
-      //       printf( CPL_FRMT_GIB ",", oField.GetInteger64() );
-      //       break;
-      //     case OFTReal:
-      //       printf( "%.3f,", oField.GetDouble() );
-      //       break;
-      //     case OFTString:
-      //       printf( "%s,", oField.GetString() );
-      //       break;
-      //     default:
-      //       printf( "%s,", oField.GetAsString() );
-      //       break;
-      //   }
-      // }
-
       // read feature geometry
       OGRGeometry *poGeometry;
       poGeometry = poFeature->GetGeometryRef();
-      // auto geom_name = poGeometry->getGeometryName();
-      // auto geom_type = poGeometry->getGeometryType();
-      // std::cout << poGeometry->getGeometryName() <<"\n";
-      if( poGeometry != nullptr
-              && (poGeometry->getGeometryType() == wkbLineString25D || poGeometry->getGeometryType() == wkbLineStringZM) )
+      // std::cout << "Layer geometry type: " << poGeometry->getGeometryType() << " , " << geometry_type << "\n";
+      if( poGeometry != nullptr ) // FIXME: we should check if te layer geometrytype matches with this feature's geometry type. Messy because they can be a bit different eg. wkbLineStringZM and wkbLineString25D
       {
-        vec3f line;
-        OGRLineString *poLineString = poGeometry->toLineString();
-        for(auto& poPoint : poLineString){
-          // std::cout << poPoint.getX() << " " << poPoint.getY() << " " << poPoint.getZ() << "\n";
-          line.push_back({float(poPoint.getX()-center_x), float(poPoint.getY()-center_y), float(poPoint.getZ())});
+        if (poGeometry->getGeometryType() == wkbLineString25D || poGeometry->getGeometryType() == wkbLineStringZM) {
+          OGRLineString *poLineString = poGeometry->toLineString();
+          for(auto& poPoint : poLineString){
+            geometries.vertices.push_back({float(poPoint.getX()), float(poPoint.getY()), float(poPoint.getZ())});
+          }
+          geometries.counts.push_back(poLineString->get_Length());
+
+          // temporary code, until Painter is updated to handle the gfGeometry3D struct
+          vec3f line;
+          for(auto& poPoint : poLineString){
+            // std::cout << poPoint.getX() << " " << poPoint.getY() << " " << poPoint.getZ() << "\n";
+            line.push_back({float(poPoint.getX()-center_x), float(poPoint.getY()-center_y), float(poPoint.getZ())});
+          }
+          
+          vertices_vec3f.push_back(line[0]);
+          for (size_t i=1; i<(line.size()-1); i++){
+            vertices_vec3f.push_back(line[i]);
+            vertices_vec3f.push_back(line[i]);
+          }
+          vertices_vec3f.push_back(line[line.size()-1]);
+          // end of temporary code
+
+        } else if( poGeometry != nullptr
+                && (poGeometry->getGeometryType() == wkbPolygon25D || poGeometry->getGeometryType() == wkbPolygon || poGeometry->getGeometryType() == wkbPolygonZM || poGeometry->getGeometryType() == wkbPolygonM) ) 
+        {
+          
+        } else {
+          std::cout << "no supported geometry\n";
         }
-        
-        features_vec3f.push_back(line[0]);
-        for (size_t i=1; i<(line.size()-1); i++){
-          features_vec3f.push_back(line[i]);
-          features_vec3f.push_back(line[i]);
-        }
-        features_vec3f.push_back(line[line.size()-1]);
-        features.push_back(line);
-      }
-      else if( poGeometry != nullptr
-              && (poGeometry->getGeometryType() == wkbPolygon25D || poGeometry->getGeometryType() == wkbPolygon || poGeometry->getGeometryType() == wkbPolygonZM || poGeometry->getGeometryType() == wkbPolygonM) ) {
-        vec3f ring;
-        
-      } else {
-        std::cout << "no supported geometry\n";
       }
 
     }
-    
-    // poLayer = poDS->GetLayerByName( "point" );
-
-    std::cout << "pushed " << features.size() << " features...\n";
-    set_value("features", features);
-    set_value("features_vec3f", features_vec3f);
+    std::cout << "pushed " << geometries.counts.size() << " features...\n";
+    set_value("geometries", geometries);
+    set_value("vertices", vertices_vec3f);
   }
 };
 // class OGRLoaderOldNode:public Node {
