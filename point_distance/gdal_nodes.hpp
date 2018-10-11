@@ -52,6 +52,11 @@ class LASLoaderNode:public Node {
     if (!lasreader)
       return;
 
+    geometry.bounding_box.set(
+      {float(lasreader->get_min_x()), float(lasreader->get_min_y()), float(lasreader->get_min_z())},
+      {float(lasreader->get_max_x()), float(lasreader->get_max_y()), float(lasreader->get_max_z())}
+    );
+
     size_t i=0;
     while (lasreader->read_point()) {
 
