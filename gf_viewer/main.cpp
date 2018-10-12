@@ -46,6 +46,7 @@ int main(int ac, const char * av[])
     N.register_node<PointDistanceNode>("PointDistance");
     N.register_node<ComparePointDistanceNode>("ComparePointDistance");
     N.register_node<CSVLoaderNode>("CSVLoader");
+    N.register_node<TinSimpNode>("TinSimp");
 
     a->draw_that(on_draw);
 

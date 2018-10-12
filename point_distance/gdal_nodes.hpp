@@ -17,6 +17,8 @@
 
 #include <lasreader.hpp>
 
+#include "tinsimp.hpp"
+
 using namespace geoflow;
 
 class LASLoaderNode:public Node {
@@ -554,13 +556,13 @@ class CSVLoaderNode:public Node {
   }
 };
 
-class TriPointSimplifierNode:public Node {
+class TinSimpNode:public Node {
   public:
   float thres_error = 2;
 
-  TriPointSimplifierNode(NodeManager& manager):Node(manager, "TriPointSimplifier") {
-    add_input("points", TT_vec3f);
-    add_output("triangles", TT_vec3f);
+  TinSimpNode(NodeManager& manager):Node(manager, "TinSimp") {
+    add_input("geometry", TT_geometry);
+    add_output("triangles_vec3f", TT_vec3f);
   }
 
   void gui(){
@@ -568,6 +570,44 @@ class TriPointSimplifierNode:public Node {
   }
 
   void process(){
+    auto geometry = std::any_cast<gfGeometry3D>(get_value("geometry"));
 
+    if (geometry.type == geoflow::points) {
+      float min_x = geometry.bounding_box.min()[0]-1;
+      float min_y = geometry.bounding_box.min()[1]-1;
+      float max_x = geometry.bounding_box.max()[0]+1;
+      float max_y = geometry.bounding_box.max()[1]+1;
+      float mean_z = (geometry.bounding_box.max()[2]-geometry.bounding_box.min()[2])/2;
+
+      tinsimp::CDT cdt;
+
+      std::vector<tinsimp::Point> initial_points = {
+        tinsimp::Point(min_x, min_y, mean_z),
+        tinsimp::Point(max_x, min_y, mean_z),
+        tinsimp::Point(max_x, max_y, mean_z),
+        tinsimp::Point(min_x, max_y, mean_z)
+      };
+      cdt.insert(initial_points.begin(), initial_points.end());
+
+      tinsimp::greedy_insert(cdt, geometry.vertices, double(thres_error));
+
+      vec3f triangles_vec3f;
+      for (tinsimp::CDT::Finite_faces_iterator fit = cdt.finite_faces_begin();
+        fit != cdt.finite_faces_end();
+        ++fit)
+      {
+          auto p0 = fit->vertex(0)->point();
+          triangles_vec3f.push_back({float(p0.x()), float(p0.y()), float(p0.z())});
+          auto p1 = fit->vertex(1)->point();
+          triangles_vec3f.push_back({float(p1.x()), float(p1.y()), float(p1.z())});
+          auto p2 = fit->vertex(2)->point();
+          triangles_vec3f.push_back({float(p2.x()), float(p2.y()), float(p2.z())});
+      }
+
+      set_value("triangles_vec3f", triangles_vec3f);
+
+    } else if (geometry.type == geoflow::line_strip) {
+
+    }
   }
 };
