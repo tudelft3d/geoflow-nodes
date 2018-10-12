@@ -137,8 +137,7 @@ class OGRLoaderNode:public Node {
     
     // OGREnvelope *poExtent;
     // poLayer->GetExtent(poExtent);
-    auto center_x = 0;//poExtent->MaxX - poExtent->MinX;
-    auto center_y = 0;//poExtent->MaxY - poExtent->MinY;
+    // geometries.bounding_box.set({poExtent->MinX, poExtent->MinY, 0}, {poExtent->MaxX, poExtent->MaxY, 0});
     poLayer->ResetReading();
     for( auto& poFeature: poLayer )
     {
@@ -151,7 +150,9 @@ class OGRLoaderNode:public Node {
         if (poGeometry->getGeometryType() == wkbLineString25D || poGeometry->getGeometryType() == wkbLineStringZM) {
           OGRLineString *poLineString = poGeometry->toLineString();
           for(auto& poPoint : poLineString){
-            geometries.vertices.push_back({float(poPoint.getX()), float(poPoint.getY()), float(poPoint.getZ())});
+            std::array<float,3> p = {float(poPoint.getX()), float(poPoint.getY()), float(poPoint.getZ())};
+            geometries.vertices.push_back(p);
+            geometries.bounding_box.add(p.data());
           }
           geometries.counts.push_back(poLineString->get_Length());
 
@@ -159,7 +160,7 @@ class OGRLoaderNode:public Node {
           vec3f line;
           for(auto& poPoint : poLineString){
             // std::cout << poPoint.getX() << " " << poPoint.getY() << " " << poPoint.getZ() << "\n";
-            line.push_back({float(poPoint.getX()-center_x), float(poPoint.getY()-center_y), float(poPoint.getZ())});
+            line.push_back({float(poPoint.getX()), float(poPoint.getY()), float(poPoint.getZ())});
           }
           
           vertices_vec3f.push_back(line[0]);
@@ -572,42 +573,43 @@ class TinSimpNode:public Node {
   void process(){
     auto geometry = std::any_cast<gfGeometry3D>(get_value("geometry"));
 
+    float min_x = geometry.bounding_box.min()[0]-1;
+    float min_y = geometry.bounding_box.min()[1]-1;
+    float max_x = geometry.bounding_box.max()[0]+1;
+    float max_y = geometry.bounding_box.max()[1]+1;
+    float center_z = (geometry.bounding_box.max()[2]-geometry.bounding_box.min()[2])/2;
+
+    tinsimp::CDT cdt;
+
+    std::vector<tinsimp::Point> initial_points = {
+      tinsimp::Point(min_x, min_y, center_z),
+      tinsimp::Point(max_x, min_y, center_z),
+      tinsimp::Point(max_x, max_y, center_z),
+      tinsimp::Point(min_x, max_y, center_z)
+    };
+    cdt.insert(initial_points.begin(), initial_points.end());
+
     if (geometry.type == geoflow::points) {
-      float min_x = geometry.bounding_box.min()[0]-1;
-      float min_y = geometry.bounding_box.min()[1]-1;
-      float max_x = geometry.bounding_box.max()[0]+1;
-      float max_y = geometry.bounding_box.max()[1]+1;
-      float mean_z = (geometry.bounding_box.max()[2]-geometry.bounding_box.min()[2])/2;
-
-      tinsimp::CDT cdt;
-
-      std::vector<tinsimp::Point> initial_points = {
-        tinsimp::Point(min_x, min_y, mean_z),
-        tinsimp::Point(max_x, min_y, mean_z),
-        tinsimp::Point(max_x, max_y, mean_z),
-        tinsimp::Point(min_x, max_y, mean_z)
-      };
-      cdt.insert(initial_points.begin(), initial_points.end());
-
       tinsimp::greedy_insert(cdt, geometry.vertices, double(thres_error));
 
-      vec3f triangles_vec3f;
-      for (tinsimp::CDT::Finite_faces_iterator fit = cdt.finite_faces_begin();
-        fit != cdt.finite_faces_end();
-        ++fit)
-      {
-          auto p0 = fit->vertex(0)->point();
-          triangles_vec3f.push_back({float(p0.x()), float(p0.y()), float(p0.z())});
-          auto p1 = fit->vertex(1)->point();
-          triangles_vec3f.push_back({float(p1.x()), float(p1.y()), float(p1.z())});
-          auto p2 = fit->vertex(2)->point();
-          triangles_vec3f.push_back({float(p2.x()), float(p2.y()), float(p2.z())});
-      }
-
-      set_value("triangles_vec3f", triangles_vec3f);
-
     } else if (geometry.type == geoflow::line_strip) {
-
+      tinsimp::greedy_insert_lines(cdt, geometry.vertices, geometry.counts, double(thres_error));
     }
+
+    vec3f triangles_vec3f;
+    for (tinsimp::CDT::Finite_faces_iterator fit = cdt.finite_faces_begin();
+      fit != cdt.finite_faces_end();
+      ++fit)
+    {
+        auto p0 = fit->vertex(0)->point();
+        triangles_vec3f.push_back({float(p0.x()), float(p0.y()), float(p0.z())});
+        auto p1 = fit->vertex(1)->point();
+        triangles_vec3f.push_back({float(p1.x()), float(p1.y()), float(p1.z())});
+        auto p2 = fit->vertex(2)->point();
+        triangles_vec3f.push_back({float(p2.x()), float(p2.y()), float(p2.z())});
+    }
+
+    set_value("triangles_vec3f", triangles_vec3f);
+
   }
 };

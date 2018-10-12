@@ -131,4 +131,84 @@ void greedy_insert(CDT &T, const std::vector<std::array<float,3>> &pts, double t
     }
 
 }
+
+inline double compute_error_lines(Point &p, CDT::Face_handle &face) {
+  auto plane = CGAL::Plane_3<K>(
+      face->vertex(0)->point(),
+      face->vertex(1)->point(),
+      face->vertex(2)->point()
+  );
+
+  auto interpolate = - plane.a()/plane.c() * p.x() - plane.b()/plane.c()*p.y() - plane.d()/plane.c();
+  double error = std::fabs(interpolate - p.z());
+  return error;
+}
+void greedy_insert_lines(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold) {
+  // assumes all lidar points are inside a triangle
+
+  // create vector with the starting indices of the linestrips
+  std::vector<size_t> start_idx;
+  start_idx.reserve(counts.size());
+  size_t cumulative_index=0;
+  for(auto& count : counts) {
+    start_idx.push_back(cumulative_index);
+    cumulative_index += count;
+  }
+
+  // Convert all elevation points to CGAL points
+  std::vector<Point> cpts;
+  cpts.reserve(pts.size());
+  for (auto& p : pts) {
+    cpts.push_back(Point(p[0], p[1], p[2]));
+  }
+
+  std::set<std::pair<size_t,size_t>> S; // index, line_index
+  // compute initial point errors, build heap, store point indices in triangles
+  {
+    size_t si = 0, line_index=0;
+    for(auto& count : counts){
+      std::unordered_set<Point, PointXYHash, PointXYEqual> set;
+      for(size_t i=0; i<count; i++){
+        auto p = cpts[si+i];
+        // detect and skip duplicate points
+        auto not_duplicate = set.insert(p).second;
+        if(not_duplicate){
+          S.insert(std::make_pair(si+i,line_index));
+        }
+      }
+      si+=count;
+      line_index++;
+    }
+  }
+  
+  // insert points, update errors of affected triangles until threshold error is reached
+  double max_error = threshold;
+  size_t max_index;
+  while (!S.empty() && max_error > threshold){
+    // get top element (with largest error) from heap
+    size_t l_id;
+    for (auto element : S){
+      auto p = cpts[element.first];
+      auto containing_face = T.locate(p);
+      const double e = compute_error_lines(p, containing_face);
+      if (e>max_error){
+        max_error = e;
+        max_index = element.first;
+        l_id = element.second;
+      }
+    }
+
+    // insert line in triangulation as a constraint, remove corresponding elements from S
+    auto max_p = cpts[max_index];
+    std::vector<Point> linestrip;
+    for(size_t i=0; i<counts[l_id]; i++) {
+      auto p_id = start_idx[l_id]+i;
+      linestrip.push_back(cpts[p_id]);
+      S.erase({p_id,l_id});
+    }
+    
+    T.insert_constraint(linestrip.begin(), linestrip.end());
+    
+  }
+}
 }
