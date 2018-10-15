@@ -139,6 +139,7 @@ class OGRLoaderNode:public Node {
     // poLayer->GetExtent(poExtent);
     // geometries.bounding_box.set({poExtent->MinX, poExtent->MinY, 0}, {poExtent->MaxX, poExtent->MaxY, 0});
     poLayer->ResetReading();
+    size_t count = 0;
     for( auto& poFeature: poLayer )
     {
       // read feature geometry
@@ -149,12 +150,16 @@ class OGRLoaderNode:public Node {
       {
         if (poGeometry->getGeometryType() == wkbLineString25D || poGeometry->getGeometryType() == wkbLineStringZM) {
           OGRLineString *poLineString = poGeometry->toLineString();
+          
+          geometries.firsts.push_back(count);
           for(auto& poPoint : poLineString){
             std::array<float,3> p = {float(poPoint.getX()), float(poPoint.getY()), float(poPoint.getZ())};
             geometries.vertices.push_back(p);
             geometries.bounding_box.add(p.data());
+            count++;
           }
-          geometries.counts.push_back(poLineString->get_Length());
+          geometries.counts.push_back(poLineString->getNumPoints());
+          
 
           // temporary code, until Painter is updated to handle the gfGeometry3D struct
           vec3f line;
@@ -564,6 +569,7 @@ class TinSimpNode:public Node {
   TinSimpNode(NodeManager& manager):Node(manager, "TinSimp") {
     add_input("geometry", TT_geometry);
     add_output("triangles_vec3f", TT_vec3f);
+    add_output("lines_vec3f", TT_vec3f);
   }
 
   void gui(){
@@ -593,7 +599,18 @@ class TinSimpNode:public Node {
       tinsimp::greedy_insert(cdt, geometry.vertices, double(thres_error));
 
     } else if (geometry.type == geoflow::line_strip) {
-      tinsimp::greedy_insert_lines(cdt, geometry.vertices, geometry.counts, double(thres_error));
+      auto selected_lines = tinsimp::greedy_insert_lines(cdt, geometry.vertices, geometry.counts, double(thres_error));
+      vec3f lines_vec3f;
+      for (auto line_id : selected_lines) {
+        auto first = geometry.firsts[line_id];
+        lines_vec3f.push_back(geometry.vertices[first]);
+          for (size_t i=1; i<(geometry.counts[line_id]-1); i++){
+            lines_vec3f.push_back(geometry.vertices[first+i]);
+            lines_vec3f.push_back(geometry.vertices[first+i]);
+          }
+          lines_vec3f.push_back(geometry.vertices[geometry.counts[line_id]]);
+      }
+      set_value("lines_vec3f", lines_vec3f);
     }
 
     vec3f triangles_vec3f;

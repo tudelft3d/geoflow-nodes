@@ -143,17 +143,8 @@ inline double compute_error_lines(Point &p, CDT::Face_handle &face) {
   double error = std::fabs(interpolate - p.z());
   return error;
 }
-void greedy_insert_lines(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold) {
-  // assumes all lidar points are inside a triangle
-
-  // create vector with the starting indices of the linestrips
-  std::vector<size_t> start_idx;
-  start_idx.reserve(counts.size());
-  size_t cumulative_index=0;
-  for(auto& count : counts) {
-    start_idx.push_back(cumulative_index);
-    cumulative_index += count;
-  }
+std::vector<size_t> greedy_insert_lines(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold) {
+  // assumes all pts points are inside a triangle
 
   // Convert all elevation points to CGAL points
   std::vector<Point> cpts;
@@ -162,35 +153,47 @@ void greedy_insert_lines(CDT &T, const std::vector<std::array<float,3>> &pts, co
     cpts.push_back(Point(p[0], p[1], p[2]));
   }
 
-  std::set<std::pair<size_t,size_t>> S; // index, line_index
-  // compute initial point errors, build heap, store point indices in triangles
+  typedef std::set<std::pair<size_t,size_t>> set_type;
+  set_type S; // index, line_index
+  typedef std::vector<set_type::iterator> vec_it_type;
+  std::vector<vec_it_type> lines_handles;
+  // initialise the set
   {
     size_t si = 0, line_index=0;
     for(auto& count : counts){
-      std::unordered_set<Point, PointXYHash, PointXYEqual> set;
+      std::unordered_set<Point, PointXYHash, PointXYEqual> dupe_set;
+      vec_it_type line_handles;
       for(size_t i=0; i<count; i++){
         auto p = cpts[si+i];
         // detect and skip duplicate points
-        auto not_duplicate = set.insert(p).second;
+        auto not_duplicate = dupe_set.insert(p).second;
         if(not_duplicate){
-          S.insert(std::make_pair(si+i,line_index));
+          auto ret = S.insert(std::make_pair(si+i,line_index));
+          line_handles.push_back(ret.first);
+        } else {
+          std::cout << "dup detected!\n";
         }
       }
+      lines_handles.push_back(line_handles);
       si+=count;
       line_index++;
     }
   }
   
-  // insert points, update errors of affected triangles until threshold error is reached
+  // insert points, update errors until threshold error is reached
   double max_error = threshold;
   size_t max_index;
-  while (!S.empty() && max_error > threshold){
-    // get top element (with largest error) from heap
+  CDT::Face_handle face_hint = T.locate(cpts[0]);
+  std::vector<size_t> selected_lines;
+  while (!S.empty() && max_error >= threshold){
+    // get highest error
     size_t l_id;
+    // std::cout << "new iteration greedy insertion, max_error=" << max_error << ", S.size()=" << S.size() <<"\n";
+    max_error=0;
     for (auto element : S){
       auto p = cpts[element.first];
-      auto containing_face = T.locate(p);
-      const double e = compute_error_lines(p, containing_face);
+      face_hint = T.locate(p,face_hint);
+      const double e = compute_error_lines(p, face_hint);
       if (e>max_error){
         max_error = e;
         max_index = element.first;
@@ -199,16 +202,15 @@ void greedy_insert_lines(CDT &T, const std::vector<std::array<float,3>> &pts, co
     }
 
     // insert line in triangulation as a constraint, remove corresponding elements from S
-    auto max_p = cpts[max_index];
     std::vector<Point> linestrip;
-    for(size_t i=0; i<counts[l_id]; i++) {
-      auto p_id = start_idx[l_id]+i;
-      linestrip.push_back(cpts[p_id]);
-      S.erase({p_id,l_id});
+    for (auto& handle : lines_handles[l_id]) {
+      S.erase(handle);
+      linestrip.push_back(cpts[handle->first]);
     }
-    
     T.insert_constraint(linestrip.begin(), linestrip.end());
+    selected_lines.push_back(l_id);
     
   }
+  return selected_lines;
 }
 }
