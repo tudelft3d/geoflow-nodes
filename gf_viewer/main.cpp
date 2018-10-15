@@ -30,6 +30,7 @@ int main(int ac, const char * av[])
 
     //processing nodes
     N.register_node<SimplifyFootprintNode>("SimplifyFootprint");
+    N.register_node<SimplifyLinesNode>("SimplifyLines");
     N.register_node<ExtruderNode>("Extruder");
     N.register_node<ProcessArrangementNode>("ProcessArrangement");
     N.register_node<BuildArrangementNode>("BuildArrangement");
