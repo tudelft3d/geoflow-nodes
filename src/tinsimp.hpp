@@ -13,6 +13,7 @@ struct point_error {
   point_error(size_t i, double e) : index(i), error(e){}
   size_t index;
   double error;
+  size_t line_id;
   
   bool operator<(point_error const & rhs) const
   {
@@ -43,6 +44,7 @@ typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, Tds, Itag>	CDT;
 typedef CDT::Point													Point;
 
 void greedy_insert(CDT &T, const std::vector<std::array<float,3>> &pts, double threshold);
-std::vector<size_t> greedy_insert_lines(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold);
+void greedy_insert_lines(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold);
+void greedy_insert_lines2(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold);
 
 }

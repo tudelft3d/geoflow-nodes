@@ -429,10 +429,10 @@ class PointsInFootprintNode:public Node {
   bool run_on_change=false;
   bool isInitialised = false;
 
-  // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
-  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-  // char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
-  char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
+  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+  // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+  char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+  // char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
   // char las_filepath[256] = "/Users/ravi/data/VOLTA-ICGC-BCN/VOLTA_LAS/LAS_ETOH/116102.LAS";
   // char csv_filepath[256] = "/Users/ravi/data/VOLTA-ICGC-BCN/DGN-SHP/Footprints_MUC/tile_117102/footprints2d.csv";
 //   /Users/ravi/data/VOLTA-ICGC-BCN/VOLTA_LAS/LAS_ETOH/117102.LAS
@@ -784,6 +784,78 @@ class RegulariseLinesNode:public Node {
   }
 };
 
+class SimplifyLineNode:public Node {
+
+  float threshold_stop_cost=0.1;
+
+  public:
+  SimplifyLineNode(NodeManager& manager):Node(manager, "SimplifyLine") {
+    add_input("lines", TT_geometry);
+    add_output("lines", TT_geometry);
+    add_output("lines_vec3f", TT_vec3f);
+  }
+
+  void gui(){
+    if(ImGui::DragFloat("stop cost", &threshold_stop_cost,0.01)) {
+      manager.run(*this);
+    }
+  }
+
+  void process(){
+    // Set up vertex data (and buffer(s)) and attribute pointers
+    auto geometry = std::any_cast<gfGeometry3D>(get_value("lines"));
+    
+    namespace PS = CGAL::Polyline_simplification_2;
+    typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+    typedef PS::Vertex_base_2<K>  Vb;
+    typedef CGAL::Constrained_triangulation_face_base_2<K> Fb;
+    typedef CGAL::Triangulation_data_structure_2<Vb, Fb> TDS;
+    typedef CGAL::Exact_predicates_tag                          Itag;
+    typedef CGAL::Constrained_Delaunay_triangulation_2<K,TDS, Itag> CDT;
+    typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
+    typedef PS::Stop_below_count_ratio_threshold Stop_count_ratio;
+    typedef PS::Stop_above_cost_threshold        Stop_cost;
+    typedef PS::Squared_distance_cost            Cost;
+
+    Cost cost;
+
+    size_t s_index=0;
+    size_t sum_count=0,count=0;
+    gfGeometry3D geometry_out;
+    vec3f vertices_vec3f;
+    for (auto c : geometry.counts) {
+      std::vector<K::Point_2> line;
+      std::cerr << "count: " <<c << "\n";
+      for (size_t i=0; i<c; i++ ) {
+        auto p = geometry.vertices[s_index+i];
+        line.push_back(K::Point_2(p[0], p[1]));
+        std::cerr << "\t "<< p[0] << ", " << p[1] << "\n";
+      }
+      s_index+=c;
+      std::vector <K::Point_2> points_out;
+      points_out.reserve(c);
+      PS::simplify(line.begin(), line.end(), cost, Stop_cost(threshold_stop_cost), points_out.begin());
+      
+      auto points_begin = points_out.begin();
+      auto points_end = points_out.end();
+      size_t psize = points_out.size();
+      for(auto pit = points_begin; pit != points_end; ++pit) {
+
+        if(pit!=points_begin && pit!=points_end)
+          vertices_vec3f.push_back({float(pit->x()), float(pit->y()), 0});
+        vertices_vec3f.push_back({float(pit->x()), float(pit->y()), 0});
+        geometry_out.vertices.push_back({float(pit->x()), float(pit->y()), 0});
+        count++;
+      }
+      geometry_out.counts.push_back(count);
+      geometry_out.firsts.push_back(sum_count);
+      sum_count += count;
+    }
+
+    set_value("lines_vec3f", vertices_vec3f);
+    set_value("lines", geometry_out);
+  }
+};
 class SimplifyLinesNode:public Node {
 
   float threshold_stop_cost=0.1;
@@ -792,7 +864,7 @@ class SimplifyLinesNode:public Node {
   SimplifyLinesNode(NodeManager& manager):Node(manager, "SimplifyLines") {
     add_input("lines", TT_geometry);
     add_output("lines", TT_geometry);
-    add_output("footprint_vec3f", TT_vec3f);
+    add_output("lines_vec3f", TT_vec3f);
   }
 
   void gui(){
@@ -824,9 +896,11 @@ class SimplifyLinesNode:public Node {
     size_t s_index=0;
     for (auto c : geometry.counts) {
       std::vector<CDT::Point> line;
+      std::cerr << "count: " <<c << "\n";
       for (size_t i=0; i<c; i++ ) {
         auto p = geometry.vertices[s_index+i];
         line.push_back(CDT::Point(p[0], p[1]));
+        std::cerr << "\t "<< p[0] << ", " << p[1] << "\n";
       }
       s_index+=c;
       ct.insert_constraint(line.begin(), line.end());

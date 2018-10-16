@@ -6,7 +6,7 @@ include_directories(
   ../thirdparty/geoflow/thirdparty/imgui
   ../thirdparty/geoflow/thirdparty/imgui/examples)
 
-add_executable(gf_viewer main.cpp ../point_distance/tinsimp.cpp)
+add_executable(gf_viewer main.cpp ../src/tinsimp.cpp)
 target_link_libraries( gf_viewer 
   point_edge_lib 
   flowchart-gui

@@ -3,7 +3,9 @@
 #include <cstring>
 
 #include "geoflow.hpp"
-#include "gdal_nodes.hpp"
+#include "../src/gdal_nodes.hpp"
+#include "../src/cgal_nodes.hpp"
+#include "../src/las_nodes.hpp"
 #include <array>
 
 #include <boost/program_options.hpp>
