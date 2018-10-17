@@ -5,9 +5,9 @@ brew install llvm
 ```
 
 External dependencies:
-1. CGAL
-1. GDAL
-1. Boost 
+1. CGAL [tested with version 4.12/4.13]
+1. GDAL [requires version 2.3+]
+1. Boost [tested with version 1.68]
 
 
 To build checkout the submodules and run cmake/make:
