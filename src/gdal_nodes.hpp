@@ -2,6 +2,25 @@
 #include "geoflow.hpp"
 #include "ogrsf_frmts.h"
 
+#include <unordered_map>
+
+enum class GeometryType : char {Polygon, LineString};
+typedef std::vector< std::vector< std::array< float,3 >>> geometry;
+typedef std::unordered_map< std::string, std::vector<float>> attributes;
+
+// struct gfTestAttributes {
+//     float height; // height of the building
+//     float error; // error of the line
+// };
+
+struct gfTestGeometry {
+    GeometryType type;
+    geometry geom;
+    // gfTestAttributes attributes;
+};
+
+using namespace geoflow;
+
 class OGRLoaderNode:public Node {
   int layer_count = 0;
   
@@ -206,7 +225,86 @@ class OGRLoaderNode:public Node {
 //   }
 // };
 
+class OGRWriterNode:public Node {
+    public:
+    std::string filepath = "blabla.gpkg";
+    std::string epsg_string = "EPSG:28992";
+    
+    
+    OGRWriterNode(NodeManager& manager):Node(manager, "OGRWriter") {
+        add_input("geometries", TT_any); // struct with 'type' attrubute and a std::vector of vectors of coordinates
+        add_input("attributes", TT_any); // unordered map with attribute names as keys and the values as values (similar to python dict)
+    }
+    
+    void process() {
+        // do these getter functions exist? <- yes they are defined in the base class geoflow::Node
+        gfTestGeometry geometries = std::any_cast<gfTestGeometry>(get_value("geometries"));
+        attributes bouwpub_attributes = std::any_cast<attributes>(get_value("attributes"));
+        // what about the attributes?
 
+        const char *gszDriverName = "GPKG";
+        GDALDriver *poDriver;
+
+        GDALAllRegister();
+
+        poDriver = GetGDALDriverManager()->GetDriverByName(gszDriverName );
+        if( poDriver == NULL )
+        {
+            printf( "%s driver not available.\n", gszDriverName );
+            exit( 1 );
+        }
+
+        GDALDataset *poDS;
+
+        poDS = poDriver->Create( filepath.c_str(), 0, 0, 0, GDT_Unknown, NULL );
+        if( poDS == NULL )
+        {
+            printf( "Creation of output file failed.\n" );
+            exit( 1 );
+        }
+
+        OGRSpatialReference oSRS;
+        OGRLayer *poLayer;
+
+        oSRS.SetWellKnownGeogCS( epsg_string.c_str() ); 
+        poLayer = poDS->CreateLayer( "geom_out", &oSRS, wkbPolygon, NULL );
+        if( poLayer == NULL )
+        {
+            printf( "Layer creation failed.\n" );
+            exit( 1 );
+        }
+
+        OGRFieldDefn oField( "height", OFTReal );
+        if( poLayer->CreateField( &oField ) != OGRERR_NONE )
+        {
+            printf( "Creating Name field failed.\n" );
+            exit( 1 );
+        }
+
+        // do the actual geometry conversion and writing here
+        for (std::vector<int>::size_type i = 0; i != geometries.geom.size(); i++)
+        {
+            OGRFeature *poFeature;
+            poFeature = OGRFeature::CreateFeature( poLayer->GetLayerDefn() );
+            poFeature->SetField( "height", bouwpub_attributes["height"][i] );
+            OGRLinearRing ogrring;
+            for (auto const& g: geometries.geom[i]) {
+                ogrring.addPoint( g[0], g[1], g[2] );
+            }
+            ogrring.closeRings();
+            OGRPolygon bouwpoly;
+            bouwpoly.addRing( &ogrring );
+            poFeature->SetGeometry( &bouwpoly );
+            if( poLayer->CreateFeature( poFeature ) != OGRERR_NONE )
+            {
+                printf( "Failed to create feature in geopackage.\n" );
+                exit( 1 );
+            }
+            OGRFeature::DestroyFeature( poFeature );
+        }
+        GDALClose( poDS );
+    }
+};
 
 
 class CSVLoaderNode:public Node {
