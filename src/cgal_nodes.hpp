@@ -3,14 +3,14 @@
 
 #include "tinsimp.hpp"
 
-//CDT
+// CDT
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Projection_traits_xy_3.h>
 #include <CGAL/Triangulation_vertex_base_with_id_2.h>
 #include <CGAL/Triangulation_face_base_with_info_2.h>
 
-//AABB tree
+// AABB tree
 #include <CGAL/Simple_cartesian.h>
 #include <CGAL/AABB_tree.h>
 #include <CGAL/AABB_traits.h>

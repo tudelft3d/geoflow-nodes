@@ -42,6 +42,7 @@ int main(int ac, const char * av[])
     N.register_node<ComputeMetricsNode>("ComputeMetrics");
     N.register_node<PointsInFootprintNode>("PointsInFootprint");
     N.register_node<RegulariseLinesNode>("RegulariseLines");
+    N.register_node<AlphaShapeNode>("AlphaShape");
     
     //gdal nodes
     N.register_node<OGRLoaderNode>("OGRLoader");

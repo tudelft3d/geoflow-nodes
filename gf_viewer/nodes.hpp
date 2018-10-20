@@ -31,6 +31,73 @@ vertex get_normal(vertex v0, vertex v1, vertex v2) {
     return {n.x,n.y,n.z};
 }
 
+
+// 2D alpha shapes
+#include <CGAL/Delaunay_triangulation_2.h>
+#include <CGAL/Alpha_shape_2.h>
+#include <CGAL/Alpha_shape_vertex_base_2.h>
+#include <CGAL/Alpha_shape_face_base_2.h>
+#include <CGAL/Projection_traits_xy_3.h>
+
+class AlphaShapeNode:public Node {
+
+  public:
+  float thres_alpha = 2.0;
+  AlphaShapeNode(NodeManager& manager):Node(manager, "AlphaShape") {
+    // add_input("points", TT_any);
+    add_input("points", TT_any);
+    add_output("edge_points", TT_any);
+    add_output("edge_points_vec3f", TT_vec3f);
+  }
+
+  void gui(){
+    ImGui::InputFloat("Footprint simp", &thres_alpha, 0.01, 1);
+  }
+
+  void process(){
+    typedef CGAL::Exact_predicates_inexact_constructions_kernel  K;
+    typedef CGAL::Projection_traits_xy_3<K>								       Gt;
+    typedef K::FT                                                FT;
+    // typedef K::Point_2                                           Point;
+    // typedef K::Segment_2                                         Segment;
+    typedef CGAL::Alpha_shape_vertex_base_2<Gt>                  Vb;
+    typedef CGAL::Alpha_shape_face_base_2<Gt>                    Fb;
+    typedef CGAL::Triangulation_data_structure_2<Vb,Fb>          Tds;
+    typedef CGAL::Delaunay_triangulation_2<Gt,Tds>               Triangulation_2;
+    typedef CGAL::Alpha_shape_2<Triangulation_2>                 Alpha_shape_2;
+
+    // Set up vertex data (and buffer(s)) and attribute pointers
+    auto points = std::any_cast<PNL_vector>(get_value("points"));
+   
+    std::unordered_map<int, std::vector<Point>> points_per_segment;
+    for (auto& p : points) {
+      if (boost::get<2>(p)==0) // unsegmented
+        continue;
+      if (boost::get<3>(p)) // classified as wall
+        continue;
+      points_per_segment[boost::get<2>(p)].push_back(boost::get<0>(p));
+    }
+    std::vector<Point> edge_points;
+    vec3f edge_points_vec3f;
+    for (auto& it : points_per_segment ) {
+      auto points = it.second;
+      Alpha_shape_2 A(points.begin(), points.end(),
+                  FT(thres_alpha),
+                  Alpha_shape_2::GENERAL);
+      // thres_alpha = *A.find_optimal_alpha(1);
+      A.set_alpha(FT(thres_alpha));
+      for (auto it = A.alpha_shape_vertices_begin(); it!=A.alpha_shape_vertices_end(); it++) {
+        auto p = (*it)->point();
+        edge_points.push_back(p);
+        edge_points_vec3f.push_back({float(p.x()), float(p.y()), float(p.z())});
+      }
+    }
+    
+    set_value("edge_points", edge_points);
+    set_value("edge_points_vec3f", edge_points_vec3f);
+  }
+};
+
 class ExtruderNode:public Node {
 
   public:
@@ -429,10 +496,10 @@ class PointsInFootprintNode:public Node {
   bool run_on_change=false;
   bool isInitialised = false;
 
-  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
-  // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-  char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
-  // char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
+  // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+  // char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+  char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
   // char las_filepath[256] = "/Users/ravi/data/VOLTA-ICGC-BCN/VOLTA_LAS/LAS_ETOH/116102.LAS";
   // char csv_filepath[256] = "/Users/ravi/data/VOLTA-ICGC-BCN/DGN-SHP/Footprints_MUC/tile_117102/footprints2d.csv";
 //   /Users/ravi/data/VOLTA-ICGC-BCN/VOLTA_LAS/LAS_ETOH/117102.LAS
