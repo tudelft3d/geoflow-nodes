@@ -42,7 +42,7 @@ vertex get_normal(vertex v0, vertex v1, vertex v2) {
 class AlphaShapeNode:public Node {
 
   public:
-  float thres_alpha = 2.0;
+  float thres_alpha = 0.7;
   AlphaShapeNode(NodeManager& manager):Node(manager, "AlphaShape") {
     // add_input("points", TT_any);
     add_input("points", TT_any);
@@ -51,7 +51,7 @@ class AlphaShapeNode:public Node {
   }
 
   void gui(){
-    ImGui::InputFloat("Footprint simp", &thres_alpha, 0.01, 1);
+    ImGui::InputFloat("Alpha", &thres_alpha, 0.01, 1);
   }
 
   void process(){
@@ -496,10 +496,10 @@ class PointsInFootprintNode:public Node {
   bool run_on_change=false;
   bool isInitialised = false;
 
-  // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
-  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-  // char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
-  char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
+  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+  // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+  char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+  // char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
   // char las_filepath[256] = "/Users/ravi/data/VOLTA-ICGC-BCN/VOLTA_LAS/LAS_ETOH/116102.LAS";
   // char csv_filepath[256] = "/Users/ravi/data/VOLTA-ICGC-BCN/DGN-SHP/Footprints_MUC/tile_117102/footprints2d.csv";
 //   /Users/ravi/data/VOLTA-ICGC-BCN/VOLTA_LAS/LAS_ETOH/117102.LAS
