@@ -44,7 +44,7 @@ class OGRLoaderNode:public Node {
   void gui(){
     ImGui::InputText("File path", filepath, IM_ARRAYSIZE(filepath));
     ImGui::SliderInt("Layer id", &current_layer_id, 0, layer_count-1);
-    ImGui::Text(geometry_type_name.c_str());
+    ImGui::Text("%s", geometry_type_name.c_str());
   }
 
   void process(){
