@@ -22,6 +22,7 @@ class OGRLoaderNode:public Node {
 
   OGRLoaderNode(NodeManager& manager):Node(manager, "OGRLoader") {
     add_output("geometries", TT_geometry);
+    add_output("features", TT_any);
     add_output("vertices", TT_vec3f);
     GDALAllRegister();
   }
@@ -46,6 +47,7 @@ class OGRLoaderNode:public Node {
     // Set up vertex data (and buffer(s)) and attribute pointers
     gfGeometry3D geometries;
     vec3f vertices_vec3f;
+    Feature features;
 
     OGRLayer  *poLayer;
     poLayer = poDS->GetLayer( current_layer_id );
@@ -54,8 +56,12 @@ class OGRLoaderNode:public Node {
     geometry_type_name = OGRGeometryTypeToName(geometry_type);
     std::cout << "Layer geometry type: " << geometry_type_name << "\n";
 
-    if(geometry_type == wkbLineString25D || geometry_type == wkbLineStringZM)
+    if (geometry_type == wkbLineString25D || geometry_type == wkbLineStringZM) {
       geometries.type = geoflow::line_strip;
+    } else if (geometry_type == wkbPolygon || geometry_type == wkbPolygon25D || geometry_type == wkbPolygonZM || geometry_type == wkbPolygonM) {
+      geometries.type = geoflow::line_loop;
+      features.type = geoflow::line_loop;
+    }
     geometries.format = geoflow::count;
     
     // OGREnvelope *poExtent;
@@ -90,6 +96,7 @@ class OGRLoaderNode:public Node {
             // std::cout << poPoint.getX() << " " << poPoint.getY() << " " << poPoint.getZ() << "\n";
             line.push_back({float(poPoint.getX()), float(poPoint.getY()), float(poPoint.getZ())});
           }
+          features.geom.push_back(line);
           
           vertices_vec3f.push_back(line[0]);
           for (size_t i=1; i<(line.size()-1); i++){
@@ -99,10 +106,16 @@ class OGRLoaderNode:public Node {
           vertices_vec3f.push_back(line[line.size()-1]);
           // end of temporary code
 
-        } else if( poGeometry != nullptr
-                && (poGeometry->getGeometryType() == wkbPolygon25D || poGeometry->getGeometryType() == wkbPolygon || poGeometry->getGeometryType() == wkbPolygonZM || poGeometry->getGeometryType() == wkbPolygonM) ) 
-        {
-          
+        } else if (poGeometry->getGeometryType() == wkbPolygon25D || poGeometry->getGeometryType() == wkbPolygon || poGeometry->getGeometryType() == wkbPolygonZM ||    poGeometry->getGeometryType() == wkbPolygonM ) {
+          OGRPolygon *poPolygon = poGeometry->toPolygon();
+    
+          vec3f ring;
+          for(auto& poPoint : poPolygon->getExteriorRing()){
+            std::array<float,3> p = {float(poPoint.getX()), float(poPoint.getY()), float(poPoint.getZ())};
+            ring.push_back(p);
+          }
+          features.geom.push_back(ring);
+
         } else {
           std::cout << "no supported geometry\n";
         }
@@ -110,6 +123,7 @@ class OGRLoaderNode:public Node {
 
     }
     std::cout << "pushed " << geometries.counts.size() << " features...\n";
+    set_value("features", features);
     set_value("geometries", geometries);
     set_value("vertices", vertices_vec3f);
   }

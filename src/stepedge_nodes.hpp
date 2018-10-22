@@ -234,8 +234,8 @@ class SimplifyFootprintNode:public Node {
 
   public:
   SimplifyFootprintNode(NodeManager& manager):Node(manager, "SimplifyFootprint") {
-    add_input("footprint", TT_any);
-    add_output("footprint", TT_any);
+    add_input("features", TT_any);
+    add_output("features_simp", TT_any);
     add_output("footprint_vec3f", TT_vec3f);
   }
 
@@ -247,7 +247,6 @@ class SimplifyFootprintNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto footprint = std::any_cast<bg::model::polygon<point_type>>(get_value("footprint"));
 
     namespace PS = CGAL::Polyline_simplification_2;
     typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -257,28 +256,36 @@ class SimplifyFootprintNode:public Node {
     typedef PS::Stop_above_cost_threshold        Stop_cost;
     typedef PS::Squared_distance_cost            Cost;
 
-    Polygon_2 polygon;
-    Cost cost;
+    auto features = std::any_cast<Feature>(get_value("features"));
+    if (features.type != line_loop) return; //FIXME better
 
-    for (auto p : footprint.outer()) {
-      polygon.push_back(Point_2(bg::get<0>(p), bg::get<1>(p)));
-    }
-    polygon.erase(polygon.vertices_end()-1); // remove repeated point from the boost polygon
-    
-    // polygon = PS::simplify(polygon, cost, Stop_count_ratio(0.5));
-
-    polygon = PS::simplify(polygon, cost, Stop_cost(threshold_stop_cost));
-    
+    Feature features_out;
+    features_out.type = features.type;
     vec3f footprint_vec3f;
-    bg::model::polygon<point_type> footprint_out;
-    footprint.outer().clear();
-    for (auto v = polygon.vertices_begin(); v!=polygon.vertices_end(); v++){
-      footprint_vec3f.push_back({float(v->x()),float(v->y()),0});
-      footprint_out.outer().push_back(point_type(v->x(),v->y()));
+    for (auto& ring : features.geom) {
+      Polygon_2 polygon;
+      Cost cost;
+
+      for (auto p : ring) {
+        polygon.push_back(Point_2(p[0], p[1]));
+      }
+      // polygon.erase(polygon.vertices_end()-1); // remove repeated point from the boost polygon
+      
+      // polygon = PS::simplify(polygon, cost, Stop_count_ratio(0.5));
+
+      polygon = PS::simplify(polygon, cost, Stop_cost(threshold_stop_cost));
+      
+      
+
+      for (auto v = polygon.vertices_begin(); v!=polygon.vertices_end(); v++){
+        footprint_vec3f.push_back({float(v->x()),float(v->y()),0});
+      }
+      auto bv = polygon.vertices_begin(); // repeat first pt as last
+      footprint_vec3f.push_back({float(bv->x()),float(bv->y()),0});
+      features_out.geom.push_back(footprint_vec3f);
     }
-    footprint_out.outer().push_back(point_type(polygon.vertices_begin()->x(),polygon.vertices_begin()->y()));
     set_value("footprint_vec3f", footprint_vec3f);
-    set_value("footprint", footprint_out);
+    set_value("features_simp", features_out);
   }
 };
 class ProcessArrangementNode:public Node {

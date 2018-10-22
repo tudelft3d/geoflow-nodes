@@ -21,3 +21,19 @@ set_target_properties(
   hoogtelijnen
   PROPERTIES CXX_STANDARD 17
 )
+
+add_executable(footprint-simp footprint-simp.cpp ../src/tinsimp.cpp)
+target_link_libraries( footprint-simp 
+  point_edge_lib 
+  flowchart-gui
+  Boost::program_options
+  ${GDAL_LIBRARY}
+)
+if(NOT MSVC)
+  target_link_libraries(footprint-simp c++fs)
+endif()
+
+set_target_properties(
+  footprint-simp
+  PROPERTIES CXX_STANDARD 17
+)
