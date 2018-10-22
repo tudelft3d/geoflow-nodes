@@ -46,7 +46,7 @@ typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
 typedef CDT::Point													Point;
 
 void greedy_insert(CDT &T, const std::vector<std::array<float,3>> &pts, double threshold);
-void greedy_insert_lines(CT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold);
+void greedy_insert_lines(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold);
 void greedy_insert_lines2(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold);
 
 }
