@@ -4,7 +4,7 @@
 #include "imgui.h"
 #include "app_povi.h"
 #include "nodes.h"
-#include "nodes.hpp"
+#include "../src/stepedge_nodes.hpp"
 #include "../src/gdal_nodes.hpp"
 #include "../src/las_nodes.hpp"
 #include "../src/cgal_nodes.hpp"

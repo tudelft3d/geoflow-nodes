@@ -261,7 +261,7 @@ inline double compute_error_lines(Point &p, CDT::Face_handle &face) {
   double error = std::fabs(interpolate - p.z());
   return error;
 }
-void greedy_insert_lines(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold) {
+void greedy_insert_lines(CT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold) {
   // assumes all pts points are inside a triangle
 
   // Convert all elevation points to CGAL points

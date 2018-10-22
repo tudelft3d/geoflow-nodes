@@ -256,6 +256,7 @@ class TinSimpNode:public Node {
     add_input("geometry", TT_geometry);
     add_output("triangles_vec3f", TT_vec3f);
     add_output("lines_vec3f", TT_vec3f);
+    add_output("line_features", TT_any);
   }
 
   void gui(){
@@ -271,7 +272,7 @@ class TinSimpNode:public Node {
     float max_y = geometry.bounding_box.max()[1]+1;
     float center_z = (geometry.bounding_box.max()[2]-geometry.bounding_box.min()[2])/2;
 
-    tinsimp::CDT cdt;
+    tinsimp::CT cdt;
 
     std::vector<tinsimp::Point> initial_points = {
       tinsimp::Point(min_x, min_y, center_z),
@@ -286,6 +287,7 @@ class TinSimpNode:public Node {
 
     } else if (geometry.type == geoflow::line_strip) {
       tinsimp::greedy_insert_lines(cdt, geometry.vertices, geometry.counts, double(thres_error));
+      Feature line_features;
       vec3f lines_vec3f;
       for (auto cit=cdt.constrained_edges_begin(); cit!= cdt.constrained_edges_end(); cit++ ){
         auto& face = cit->first;
@@ -294,7 +296,18 @@ class TinSimpNode:public Node {
         auto p2 = face->vertex(cdt.ccw(index))->point();
         lines_vec3f.push_back({float(p1.x()), float(p1.y()), float(p1.z())});
         lines_vec3f.push_back({float(p2.x()), float(p2.y()), float(p2.z())});
+        
       }
+      line_features.type = line_strip;
+      for (auto cidit=cdt.constraints_begin(); cidit!=cdt.constraints_end(); cidit++) {
+        vec3f line;
+        for (auto cit=cdt.vertices_in_constraint_begin(*cidit); cit!= cdt.vertices_in_constraint_end(*cidit); cit++ ){
+          auto p = (*cit)->point();
+          line.push_back({float(p.x()), float(p.y()), float(p.z())});
+        }
+        line_features.geom.push_back(line);
+      }
+      
       // for (auto line : selected_lines) {
       //   for (auto& p : line) {
       //     lines_vec3f.push_back(p);
@@ -305,6 +318,7 @@ class TinSimpNode:public Node {
           
       //   }
       // }
+      set_value("line_features", line_features);
       set_value("lines_vec3f", lines_vec3f);
     }
 

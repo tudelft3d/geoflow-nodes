@@ -4,21 +4,6 @@
 
 #include <unordered_map>
 
-enum class GeometryType : char {Polygon, LineString};
-typedef std::vector< std::vector< std::array< float,3 >>> geometry;
-typedef std::unordered_map< std::string, std::vector<float>> attributes;
-
-// struct gfTestAttributes {
-//     float height; // height of the building
-//     float error; // error of the line
-// };
-
-struct gfTestGeometry {
-    GeometryType type;
-    geometry geom;
-    // gfTestAttributes attributes;
-};
-
 using namespace geoflow;
 
 class OGRLoaderNode:public Node {
@@ -228,18 +213,18 @@ class OGRLoaderNode:public Node {
 class OGRWriterNode:public Node {
     public:
     std::string filepath = "blabla.gpkg";
-    std::string epsg_string = "EPSG:28992";
+    std::string epsg_string = "EPSG:7415";
     
     
     OGRWriterNode(NodeManager& manager):Node(manager, "OGRWriter") {
-        add_input("geometries", TT_any); // struct with 'type' attrubute and a std::vector of vectors of coordinates
-        add_input("attributes", TT_any); // unordered map with attribute names as keys and the values as values (similar to python dict)
+        add_input("features", TT_any); // struct with 'type' attrubute and a std::vector of vectors of coordinates
+        // add_input("attributes", TT_any); // unordered map with attribute names as keys and the values as values (similar to python dict)
     }
     
     void process() {
         // do these getter functions exist? <- yes they are defined in the base class geoflow::Node
-        gfTestGeometry geometries = std::any_cast<gfTestGeometry>(get_value("geometries"));
-        attributes bouwpub_attributes = std::any_cast<attributes>(get_value("attributes"));
+        auto features = std::any_cast<Feature>(get_value("features"));
+        // auto attributes = std::any_cast<Attributes>(get_value("attributes"));
         // what about the attributes?
 
         const char *gszDriverName = "GPKG";
@@ -267,34 +252,54 @@ class OGRWriterNode:public Node {
         OGRLayer *poLayer;
 
         oSRS.SetWellKnownGeogCS( epsg_string.c_str() ); 
-        poLayer = poDS->CreateLayer( "geom_out", &oSRS, wkbPolygon, NULL );
+        OGRwkbGeometryType wkbType;
+        if (features.type == line_loop) {
+          wkbType = wkbPolygon;
+        } else if (features.type == line_strip) {
+          wkbType = wkbLineString25D;
+        }
+        poLayer = poDS->CreateLayer( "geom", &oSRS, wkbType, NULL );
         if( poLayer == NULL )
         {
             printf( "Layer creation failed.\n" );
             exit( 1 );
         }
 
-        OGRFieldDefn oField( "height", OFTReal );
-        if( poLayer->CreateField( &oField ) != OGRERR_NONE )
-        {
-            printf( "Creating Name field failed.\n" );
-            exit( 1 );
+        for (auto& attr : features.attr) {
+          OGRFieldDefn oField( attr.first.c_str(), OFTReal );
+          if( poLayer->CreateField( &oField ) != OGRERR_NONE )
+          {
+              printf( "Creating Name field failed.\n" );
+              exit( 1 );
+          }
         }
-
         // do the actual geometry conversion and writing here
-        for (std::vector<int>::size_type i = 0; i != geometries.geom.size(); i++)
+        for (std::vector<int>::size_type i = 0; i != features.geom.size(); i++)
         {
             OGRFeature *poFeature;
             poFeature = OGRFeature::CreateFeature( poLayer->GetLayerDefn() );
-            poFeature->SetField( "height", bouwpub_attributes["height"][i] );
-            OGRLinearRing ogrring;
-            for (auto const& g: geometries.geom[i]) {
-                ogrring.addPoint( g[0], g[1], g[2] );
+            for (auto& attr : features.attr) {
+              poFeature->SetField( attr.first.c_str(), attr.second[i] );
             }
-            ogrring.closeRings();
-            OGRPolygon bouwpoly;
-            bouwpoly.addRing( &ogrring );
-            poFeature->SetGeometry( &bouwpoly );
+            
+            if (features.type == line_loop) {
+              OGRLinearRing ogrring;
+              for (auto const& g: features.geom[i]) {
+                  ogrring.addPoint( g[0], g[1], g[2] );
+              }
+              ogrring.closeRings();
+              OGRPolygon bouwpoly;
+              bouwpoly.addRing( &ogrring );
+              poFeature->SetGeometry( &bouwpoly );
+            }
+            if (features.type == line_strip) {
+              OGRLineString ogrlinestring;
+              for (auto const& g: features.geom[i]) {
+                  ogrlinestring.addPoint( g[0], g[1], g[2] );
+              }
+              poFeature->SetGeometry( &ogrlinestring );
+            }
+
             if( poLayer->CreateFeature( poFeature ) != OGRERR_NONE )
             {
                 printf( "Failed to create feature in geopackage.\n" );

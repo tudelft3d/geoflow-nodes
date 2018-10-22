@@ -302,7 +302,7 @@ class ProcessArrangementNode:public Node {
 };
 
 class BuildArrangementNode:public Node {
-  float footprint_simp_thres=0;
+  // float footprint_simp_thres=0;
 
   public:
   BuildArrangementNode(NodeManager& manager):Node(manager, "BuildArrangement") {
@@ -313,7 +313,7 @@ class BuildArrangementNode:public Node {
   }
 
   void gui(){
-    ImGui::InputFloat("Footprint simp", &footprint_simp_thres, 0.01, 1);
+    // ImGui::InputFloat("Footprint simp", &footprint_simp_thres, 0.01, 1);
   }
 
   void process(){
@@ -649,8 +649,8 @@ class PointsInFootprintNode:public Node {
 
 class RegulariseLinesNode:public Node {
   static constexpr double pi = 3.14159265358979323846;
-  float dist_threshold = 1.0;
-  float angle_threshold = 10*(pi/180);
+  float dist_threshold = 0.5;
+  float angle_threshold = 5*(pi/180);
 
   public:
   RegulariseLinesNode(NodeManager& manager):Node(manager, "RegulariseLines") {
