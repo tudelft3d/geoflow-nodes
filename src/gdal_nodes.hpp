@@ -16,8 +16,8 @@ class OGRLoaderNode:public Node {
   // GDALDatasetUniquePtr poDS = nullptr;
 
   public:
-  char filepath[256] = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_dgmr_.gpkg";
-  // char filepath[256] = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_v01_simp_dp1m.gpkg";
+  // char filepath[256] = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_dgmr_.gpkg";
+  char filepath[256] = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_v01_simp_dp1m_subset.gpkg";
   // char filepath[256] = "/Users/ravi/surfdrive/Projects/RWS-Basisbestand-3D-geluid/3D-basisbestand-geluid-v0.1/output/hoogtelijnen/hoogtelijnen_v2/hoogtelijnen_out";
 
   OGRLoaderNode(NodeManager& manager):Node(manager, "OGRLoader") {
@@ -212,13 +212,17 @@ class OGRLoaderNode:public Node {
 
 class OGRWriterNode:public Node {
     public:
-    std::string filepath = "blabla.gpkg";
+    char filepath[256] = "blabla.gpkg";
     std::string epsg_string = "EPSG:7415";
     
     
     OGRWriterNode(NodeManager& manager):Node(manager, "OGRWriter") {
         add_input("features", TT_any); // struct with 'type' attrubute and a std::vector of vectors of coordinates
         // add_input("attributes", TT_any); // unordered map with attribute names as keys and the values as values (similar to python dict)
+    }
+
+    void gui() {
+      ImGui::InputText("File path", filepath, IM_ARRAYSIZE(filepath));
     }
     
     void process() {
@@ -241,7 +245,7 @@ class OGRWriterNode:public Node {
 
         GDALDataset *poDS;
 
-        poDS = poDriver->Create( filepath.c_str(), 0, 0, 0, GDT_Unknown, NULL );
+        poDS = poDriver->Create( filepath, 0, 0, 0, GDT_Unknown, NULL );
         if( poDS == NULL )
         {
             printf( "Creation of output file failed.\n" );
