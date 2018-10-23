@@ -556,10 +556,6 @@ class LASInPolygonsNode:public Node {
   }
 
   void process() {
-    typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-    typedef K::Point_2          Point_2;
-    typedef CGAL::Polygon_2<K>  Polygon_2;
-
     auto polygons = std::any_cast<Feature>(get_value("polygons"));
     if (polygons.type != line_loop) return;
 
@@ -782,7 +778,7 @@ class PointsInFootprintNode:public Node {
 class RegulariseLinesNode:public Node {
   static constexpr double pi = 3.14159265358979323846;
   float dist_threshold = 0.5;
-  float angle_threshold = 5*(pi/180);
+  float angle_threshold = 0.1;//5*(pi/180);
 
   public:
   RegulariseLinesNode(NodeManager& manager):Node(manager, "RegulariseLines") {
@@ -795,7 +791,7 @@ class RegulariseLinesNode:public Node {
 
   void gui(){
     ImGui::DragFloat("Distance threshold", &dist_threshold, 0.1, 0);
-    ImGui::DragFloat("Angle threshold", &angle_threshold, 0.1, 0.1, pi);
+    ImGui::DragFloat("Angle threshold", &angle_threshold, 0.1, 0.0, pi);
   }
 
   void process(){

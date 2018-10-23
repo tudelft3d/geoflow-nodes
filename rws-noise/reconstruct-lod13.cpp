@@ -44,7 +44,6 @@ class LOD13GeneratorNode:public Node {
 
       auto ComputeMetrics_node = std::make_shared<ComputeMetricsNode>(N);
       auto AlphaShape_node = std::make_shared<AlphaShapeNode>(N);
-      auto ClassifyEdgePoints_node = std::make_shared<ClassifyEdgePointsNode>(N);
       auto DetectLines_node = std::make_shared<DetectLinesNode>(N);
       auto RegulariseLines_node = std::make_shared<RegulariseLinesNode>(N);
       auto BuildArrangement_node = std::make_shared<BuildArrangementNode>(N);
@@ -120,23 +119,17 @@ int main(int ac, const char * av[])
 
     ImGui::NodeStore ns;
     ns.push_back(std::make_tuple("OGRLoader", "TheOGRLoader", ImVec2(75,75)));
-    ns.push_back(std::make_tuple("LASInPolygons", "TheLASInPolygons", ImVec2(75,275)));
-    ns.push_back(std::make_tuple("LOD13Generator", "TheLOD13Generator", ImVec2(275,75)));
-    ns.push_back(std::make_tuple("OGRWriter", "TheOGRWriter", ImVec2(475,75)));
+    ns.push_back(std::make_tuple("LASInPolygons", "TheLASInPolygons", ImVec2(300,75)));
+    ns.push_back(std::make_tuple("LOD13Generator", "TheLOD13Generator", ImVec2(650,75)));
+    ns.push_back(std::make_tuple("OGRWriter", "TheOGRWriter", ImVec2(1000,75)));
     nodes_.PreloadNodes(ns);
 
     ImGui::LinkStore ls;
-    // ls.push_back(std::make_tuple("ThePointsInFootprint", "TheComputeMetrics", "points", "points"));
-    // ls.push_back(std::make_tuple("ThePointsInFootprint", "TheBuildArrangement", "footprint", "footprint"));
-    // ls.push_back(std::make_tuple("ThePointsInFootprint", "TheRegulariseLines", "footprint_vec3f", "footprint_vec3f"));
-    // ls.push_back(std::make_tuple("TheComputeMetrics", "TheClassifyEdgePoints", "points", "points"));
-    // ls.push_back(std::make_tuple("TheComputeMetrics", "TheProcessArrangement", "points", "points"));
-    // ls.push_back(std::make_tuple("TheClassifyEdgePoints", "TheDetectLines", "edge_points", "edge_points"));
-    // ls.push_back(std::make_tuple("TheDetectLines", "TheRegulariseLines", "edge_segments", "edge_segments"));
-    // ls.push_back(std::make_tuple("TheRegulariseLines", "TheBuildArrangement", "edges_out", "edge_segments"));
-    // ls.push_back(std::make_tuple("TheBuildArrangement", "TheProcessArrangement", "arrangement", "arrangement"));
-    // ls.push_back(std::make_tuple("TheProcessArrangement", "TheExtruder", "arrangement", "arrangement"));
-    // nodes_.PreloadLinks(ls);
+    ls.push_back(std::make_tuple("TheOGRLoader", "TheLASInPolygons", "features", "polygons"));
+    ls.push_back(std::make_tuple("TheOGRLoader", "TheLOD13Generator", "features", "polygons"));
+    ls.push_back(std::make_tuple("TheLASInPolygons", "TheLOD13Generator", "point_clouds", "point_clouds"));
+    ls.push_back(std::make_tuple("TheLOD13Generator", "TheOGRWriter", "decomposed_polygons", "features"));
+    nodes_.PreloadLinks(ls);
 
     a->run();
 }

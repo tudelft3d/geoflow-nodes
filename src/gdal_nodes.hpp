@@ -114,7 +114,7 @@ class OGRLoaderNode:public Node {
             std::array<float,3> p = {float(poPoint.getX()), float(poPoint.getY()), float(poPoint.getZ())};
             ring.push_back(p);
           }
-          ring.erase(ring.end()-1);
+          // ring.erase(ring.end()-1);
           features.geom.push_back(ring);
 
         } else {
