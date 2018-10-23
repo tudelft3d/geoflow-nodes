@@ -37,3 +37,19 @@ set_target_properties(
   footprint-simp
   PROPERTIES CXX_STANDARD 17
 )
+
+add_executable(reconstruct-lod13 reconstruct-lod13.cpp ../src/tinsimp.cpp)
+target_link_libraries( reconstruct-lod13 
+  point_edge_lib 
+  flowchart-gui
+  Boost::program_options
+  ${GDAL_LIBRARY}
+)
+if(NOT MSVC)
+  target_link_libraries(reconstruct-lod13 c++fs)
+endif()
+
+set_target_properties(
+  reconstruct-lod13
+  PROPERTIES CXX_STANDARD 17
+)

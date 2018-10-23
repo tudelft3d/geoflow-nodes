@@ -32,33 +32,31 @@ void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<po
   }
   lasreader->close();
   delete lasreader;
-
-  int j=0;
-  for (auto &points: points_vec){
-    std::cout << "Found " << points.size() << " points in footprint #" << j++ << std::endl;
-    if(points.size()==0) continue;
-    // Estimates normals direction.
-    // Note: pca_estimate_normals() requiresa range of points
-    // as well as property maps to access each point's position and normal.
-    const int nb_neighbors = 5; // K-nearest neighbors = 3 rings
-    CGAL::pca_estimate_normals<Concurrency_tag>
-      (points, nb_neighbors,
-      CGAL::parameters::point_map(Point_map()).
-      normal_map(Normal_map()));
-    // Orients normals.
-    // Note: mst_orient_normals() requires a range of points
-    // as well as property maps to access each point's position and normal.
-    PNL_vector::iterator unoriented_points_begin =
-      CGAL::mst_orient_normals(points, nb_neighbors,
-                                CGAL::parameters::point_map(Point_map()).
-                                normal_map(Normal_map()));
-    // Optional: delete points with an unoriented normal
-    // if you plan to call a reconstruction algorithm that expects oriented normals.
-    // points.erase(unoriented_points_begin, points.end());
-  }
 }
 
 void compute_metrics(PNL_vector &points, config c) {
+
+  if(points.size()==0) return;
+
+  // Estimates normals
+  // Note: pca_estimate_normals() requiresa range of points
+  // as well as property maps to access each point's position and normal.
+  const int nb_neighbors = 5; // K-nearest neighbors = 3 rings
+  CGAL::pca_estimate_normals<Concurrency_tag>
+    (points, nb_neighbors,
+    CGAL::parameters::point_map(Point_map()).
+    normal_map(Normal_map()));
+  // Orients normals.
+  // Note: mst_orient_normals() requires a range of points
+  // as well as property maps to access each point's position and normal.
+  PNL_vector::iterator unoriented_points_begin =
+    CGAL::mst_orient_normals(points, nb_neighbors,
+                              CGAL::parameters::point_map(Point_map()).
+                              normal_map(Normal_map()));
+  // Optional: delete points with an unoriented normal
+  // if you plan to call a reconstruction algorithm that expects oriented normals.
+  // points.erase(unoriented_points_begin, points.end());
+
   size_t i=0;
   for (auto &p : points) {
     boost::get<8>(p) = i++;

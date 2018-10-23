@@ -98,6 +98,35 @@ class AlphaShapeNode:public Node {
   }
 };
 
+class Arr2FeatureNode:public Node {
+
+  public:
+  Arr2FeatureNode(NodeManager& manager):Node(manager, "Arr2Feature") {
+    add_input("arrangement", TT_any);
+    add_output("decomposed_footprint", TT_any);
+  }
+
+  void process(){
+    auto arr = std::any_cast<Arrangement_2>(get_value("arrangement"));
+
+    Feature decomposed_footprint;
+    decomposed_footprint.type=geoflow::line_loop;
+    for (auto face: arr.face_handles()){
+      if(face->data().is_finite) {
+        vec2f polygon, face_triangles;
+        arrangementface_to_polygon(face, polygon);
+        vec3f polygon3d;
+        for (auto& p : polygon) {
+          polygon3d.push_back({p[0],p[1],0});
+        }
+        decomposed_footprint.geom.push_back(polygon3d);
+        decomposed_footprint.attr["height"].push_back(face->data().elevation_avg);
+      }
+    }
+    set_value("decomposed_footprint", decomposed_footprint);
+  }
+};
+
 class ExtruderNode:public Node {
 
   public:
@@ -261,7 +290,7 @@ class SimplifyFootprintNode:public Node {
 
     Feature features_out;
     features_out.type = features.type;
-    vec3f footprint_vec3f;
+    
     for (auto& ring : features.geom) {
       Polygon_2 polygon;
       Cost cost;
@@ -275,8 +304,7 @@ class SimplifyFootprintNode:public Node {
 
       polygon = PS::simplify(polygon, cost, Stop_cost(threshold_stop_cost));
       
-      
-
+      vec3f footprint_vec3f;
       for (auto v = polygon.vertices_begin(); v!=polygon.vertices_end(); v++){
         footprint_vec3f.push_back({float(v->x()),float(v->y()),0});
       }
@@ -284,7 +312,7 @@ class SimplifyFootprintNode:public Node {
       footprint_vec3f.push_back({float(bv->x()),float(bv->y()),0});
       features_out.geom.push_back(footprint_vec3f);
     }
-    set_value("footprint_vec3f", footprint_vec3f);
+    // set_value("footprint_vec3f", footprint_vec3f);
     set_value("features_simp", features_out);
   }
 };
@@ -314,8 +342,9 @@ class BuildArrangementNode:public Node {
   public:
   BuildArrangementNode(NodeManager& manager):Node(manager, "BuildArrangement") {
     add_input("edge_segments", TT_any);
-    add_input("footprint", TT_any);
+    add_input("footprint_vec3f", TT_vec3f);
     add_output("arrangement", TT_any);
+    add_output("features", TT_any);
     add_output("arr_segments_vec3f", TT_vec3f);
   }
 
@@ -326,7 +355,13 @@ class BuildArrangementNode:public Node {
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
     auto edge_segments = std::any_cast<std::vector<std::pair<Point,Point>>>(get_value("edge_segments"));
-    auto fp = std::any_cast<bg::model::polygon<point_type>>(get_value("footprint"));
+    auto fp_vec3f = std::any_cast<vec3f>(get_value("footprint_vec3f"));
+
+    bg::model::polygon<point_type> fp;
+    for(auto& p : fp_vec3f) {
+       bg::append(fp.outer(), point_type(p[0], p[1]));
+     }
+
     Arrangement_2 arr;
     arr.clear();
     build_arrangement(fp, edge_segments, arr);
@@ -450,12 +485,13 @@ class ComputeMetricsNode:public Node {
   public:
   ComputeMetricsNode(NodeManager& manager):Node(manager, "ComputeMetrics") {
     add_output("points", TT_any);
-    add_input("points", TT_any);
+    add_input("points_vec3f", TT_vec3f); // change to Feature
     add_output("plane_id", TT_vec1i);
     add_output("is_wall", TT_vec1i);
     add_output("line_dist", TT_vec1f);
     add_output("jump_count", TT_vec1f);
     add_output("jump_ele", TT_vec1f);
+    add_output("points_vec3f", TT_vec3f);
   }
 
   void gui(){
@@ -469,24 +505,113 @@ class ComputeMetricsNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto points = std::any_cast<PNL_vector>(get_value("points"));
-    compute_metrics(points, c);
+    auto points = std::any_cast<vec3f>(get_value("points_vec3f"));
+    PNL_vector pnl_points;
+    for (auto& p : points) {
+      PNL pv;
+      CGAL::cpp11::get<0>(pv) = Point(p[0], p[1], p[2]);
+      pnl_points.push_back(pv);
+    }
+    compute_metrics(pnl_points, c);
     vec1f line_dist, jump_count, jump_ele;
     vec1i plane_id, is_wall;
-    for(auto& p : points){
+    vec3f points_vec3f;
+    for(auto& p : pnl_points){
       plane_id.push_back(boost::get<2>(p));
       is_wall.push_back(boost::get<3>(p));
       line_dist.push_back(boost::get<4>(p));
       jump_count.push_back(boost::get<5>(p));
       jump_ele.push_back(boost::get<7>(p));
+      std::array<float,3> a = {
+              float(boost::get<0>(p).x()),
+              float(boost::get<0>(p).y()),
+              float(boost::get<0>(p).z())
+            };
+      points_vec3f.push_back(a);
     }
-    set_value("points", points);
+    set_value("points", pnl_points);
+    set_value("points_vec3f", points_vec3f);
     set_value("plane_id", plane_id);
     set_value("is_wall", is_wall);
     set_value("line_dist", line_dist);
     set_value("jump_count", jump_count);
     set_value("jump_ele", jump_ele);
 
+  }
+};
+
+class LASInPolygonsNode:public Node {
+  public:
+  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
+  // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+  char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
+  // char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
+  LASInPolygonsNode(NodeManager& manager):Node(manager, "LASInPolygons") {
+    add_input("polygons", TT_any);
+    add_output("point_clouds", TT_any);
+  }
+
+  void gui() {
+    ImGui::InputText("LAS file path", las_filepath, IM_ARRAYSIZE(las_filepath));
+  }
+
+  void process() {
+    typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+    typedef K::Point_2          Point_2;
+    typedef CGAL::Polygon_2<K>  Polygon_2;
+
+    auto polygons = std::any_cast<Feature>(get_value("polygons"));
+    if (polygons.type != line_loop) return;
+
+    std::vector<bg::model::polygon<point_type>> boost_polygons;
+            
+    for (auto& ring : polygons.geom) {
+      bg::model::polygon<point_type> boost_poly;
+      for (auto& p : ring) {
+        bg::append(boost_poly.outer(), point_type(p[0], p[1]));
+      }
+      bg::unique(boost_poly);
+      boost_polygons.push_back(boost_poly);
+    }
+
+    //  for(auto& p : ring) {
+    //    bg::append(new_fp.outer(), point_type(p[0], p[1]));
+    //  }
+    //  footprints.push_back(new_fp);
+
+    LASreadOpener lasreadopener;
+    lasreadopener.set_file_name(las_filepath);
+    LASreader* lasreader = lasreadopener.open();
+
+    Feature pc_collection;
+    pc_collection.type = geoflow::points;
+    pc_collection.geom.resize(boost_polygons.size());
+
+    while (lasreader->read_point()) {
+      if (lasreader->point.get_classification() == 6) {
+        int i=0;
+        point_type p;
+        p.set<0>(lasreader->point.get_x());
+        p.set<1>(lasreader->point.get_y());
+        
+        for (auto& poly:boost_polygons) {
+          if (bg::within(p,poly)) {
+            pc_collection.geom[i].push_back({
+              float(lasreader->point.get_x()), 
+              float(lasreader->point.get_y()),
+              float(lasreader->point.get_z())
+            });
+            break;
+            // laswriter->write_point(&lasreader->point);
+          }
+          i++;
+        }
+      }
+    }
+    lasreader->close();
+    delete lasreader;
+
+    set_value("point_clouds", pc_collection);
   }
 };
 

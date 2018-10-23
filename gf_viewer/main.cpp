@@ -43,9 +43,11 @@ int main(int ac, const char * av[])
     N.register_node<PointsInFootprintNode>("PointsInFootprint");
     N.register_node<RegulariseLinesNode>("RegulariseLines");
     N.register_node<AlphaShapeNode>("AlphaShape");
+    N.register_node<Arr2FeatureNode>("Arr2Feature");
     
     //gdal nodes
     N.register_node<OGRLoaderNode>("OGRLoader");
+    N.register_node<OGRWriterNode>("OGRWriter");
     N.register_node<LASLoaderNode>("LASLoader");
     N.register_node<CDTNode>("CDT");
     N.register_node<PointDistanceNode>("PointDistance");
@@ -58,7 +60,7 @@ int main(int ac, const char * av[])
     ImGui::NodeStore ns;
     ns.push_back(std::make_tuple("PointsInFootprint", "ThePointsInFootprint", ImVec2(75,75)));
     ns.push_back(std::make_tuple("ComputeMetrics", "TheComputeMetrics", ImVec2(300,75)));
-    ns.push_back(std::make_tuple("ClassifyEdgePoints", "TheClassifyEdgePoints", ImVec2(600,75)));
+    ns.push_back(std::make_tuple("AlphaShape", "TheAlphaShape", ImVec2(600,75)));
     ns.push_back(std::make_tuple("DetectLines", "TheDetectLines", ImVec2(900,75)));
     ns.push_back(std::make_tuple("RegulariseLines", "TheRegulariseLines", ImVec2(1200,175)));
     ns.push_back(std::make_tuple("BuildArrangement", "TheBuildArrangement", ImVec2(1200,75)));
@@ -67,12 +69,12 @@ int main(int ac, const char * av[])
     nodes_.PreloadNodes(ns);
 
     ImGui::LinkStore ls;
-    ls.push_back(std::make_tuple("ThePointsInFootprint", "TheComputeMetrics", "points", "points"));
-    ls.push_back(std::make_tuple("ThePointsInFootprint", "TheBuildArrangement", "footprint", "footprint"));
+    ls.push_back(std::make_tuple("ThePointsInFootprint", "TheComputeMetrics", "points_vec3f", "points_vec3f"));
+    ls.push_back(std::make_tuple("ThePointsInFootprint", "TheBuildArrangement", "footprint_vec3f", "footprint_vec3f"));
     ls.push_back(std::make_tuple("ThePointsInFootprint", "TheRegulariseLines", "footprint_vec3f", "footprint_vec3f"));
-    ls.push_back(std::make_tuple("TheComputeMetrics", "TheClassifyEdgePoints", "points", "points"));
+    ls.push_back(std::make_tuple("TheComputeMetrics", "TheAlphaShape", "points", "points"));
     ls.push_back(std::make_tuple("TheComputeMetrics", "TheProcessArrangement", "points", "points"));
-    ls.push_back(std::make_tuple("TheClassifyEdgePoints", "TheDetectLines", "edge_points", "edge_points"));
+    ls.push_back(std::make_tuple("TheAlphaShape", "TheDetectLines", "edge_points", "edge_points"));
     ls.push_back(std::make_tuple("TheDetectLines", "TheRegulariseLines", "edge_segments", "edge_segments"));
     ls.push_back(std::make_tuple("TheRegulariseLines", "TheBuildArrangement", "edges_out", "edge_segments"));
     ls.push_back(std::make_tuple("TheBuildArrangement", "TheProcessArrangement", "arrangement", "arrangement"));
