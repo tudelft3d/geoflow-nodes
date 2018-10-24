@@ -46,13 +46,19 @@ endif()
 add_definitions(
   -DGLM_FORCE_CTOR_INIT # FIXME: get rid of this (by doing proper initialisation of glm objects, especially the quaternions)
 )
-include_directories( src thirdparty ${CGAL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${GDAL_INCLUDE_DIR} thirdparty/LAStools/LASlib/inc thirdparty/LAStools/LASzip/inc thirdparty/LAStools/LASzip/src thirdparty/geoflow/thirdparty/glm)
+include_directories( src thirdparty ${CGAL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${GDAL_INCLUDE_DIR} thirdparty/LAStools/LASlib/inc thirdparty/LAStools/LASzip/inc thirdparty/LAStools/LASzip/src thirdparty/geoflow/thirdparty/glm thirdparty/ptinpoly)
 
 add_library(point_edge_lib STATIC src/point_edge.cpp src/region_growing.cpp)
 target_link_libraries(point_edge_lib ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} LASlib)
 set_target_properties(
   point_edge_lib
   PROPERTIES CXX_STANDARD 17
+)
+
+add_library(ptinpoly_lib STATIC thirdparty/ptinpoly/ptinpoly.c)
+set_target_properties(
+  ptinpoly_lib
+  PROPERTIES C_STANDARD 11
 )
 # Creating entries for target
 

@@ -2,6 +2,7 @@
 #include "gloo.h"
 #include "geoflow.hpp"
 #include "point_edge.h"
+#include "ptinpoly.h"
 
 #include "earcut.hpp"
 
@@ -540,6 +541,22 @@ class ComputeMetricsNode:public Node {
   }
 };
 
+pGridSet build_grid(vec3f& ring) {
+  int Grid_Resolution = 20;
+
+  int size = ring.size();
+  std::vector<pPipoint> pgon;
+  for (auto& p : ring) {
+    pgon.push_back(new Pipoint{ p[0],p[1] });
+  }
+  pGridSet grid_set = new GridSet();
+  GridSetup(&pgon[0], pgon.size(), Grid_Resolution, grid_set);
+  for (int i = 0; i < size; i++) {
+    delete pgon[i];
+  }
+  return grid_set;
+}
+
 class LASInPolygonsNode:public Node {
   public:
   char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
@@ -559,15 +576,17 @@ class LASInPolygonsNode:public Node {
     auto polygons = std::any_cast<Feature>(get_value("polygons"));
     if (polygons.type != line_loop) return;
 
-    std::vector<bg::model::polygon<point_type>> boost_polygons;
+    // std::vector<bg::model::polygon<point_type>> boost_polygons;
+    std::vector<pGridSet> poly_grids;
             
     for (auto& ring : polygons.geom) {
-      bg::model::polygon<point_type> boost_poly;
-      for (auto& p : ring) {
-        bg::append(boost_poly.outer(), point_type(p[0], p[1]));
-      }
-      bg::unique(boost_poly);
-      boost_polygons.push_back(boost_poly);
+      poly_grids.push_back(build_grid(ring));
+      // bg::model::polygon<point_type> boost_poly;
+      // for (auto& p : ring) {
+      //   bg::append(boost_poly.outer(), point_type(p[0], p[1]));
+      // }
+      // bg::unique(boost_poly);
+      // boost_polygons.push_back(boost_poly);
     }
 
     //  for(auto& p : ring) {
@@ -581,7 +600,7 @@ class LASInPolygonsNode:public Node {
 
     Feature pc_collection;
     pc_collection.type = geoflow::points;
-    pc_collection.geom.resize(boost_polygons.size());
+    pc_collection.geom.resize(polygons.geom.size());
 
     while (lasreader->read_point()) {
       if (lasreader->point.get_classification() == 6) {
@@ -589,9 +608,10 @@ class LASInPolygonsNode:public Node {
         point_type p;
         p.set<0>(lasreader->point.get_x());
         p.set<1>(lasreader->point.get_y());
+        pPipoint point = new Pipoint{ lasreader->point.get_x(), lasreader->point.get_y() };
         
-        for (auto& poly:boost_polygons) {
-          if (bg::within(p,poly)) {
+        for (auto& poly_grid:poly_grids) {
+          if (GridTest(poly_grid, point)) {
             pc_collection.geom[i].push_back({
               float(lasreader->point.get_x()), 
               float(lasreader->point.get_y()),
@@ -602,7 +622,11 @@ class LASInPolygonsNode:public Node {
           }
           i++;
         }
+        delete point;
       }
+    }
+    for (int i=0; i<poly_grids.size(); i++) {
+      delete poly_grids[i];
     }
     lasreader->close();
     delete lasreader;

@@ -243,6 +243,7 @@ void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<st
   }
   footprint_pts.pop_back(); // get rid of repeated vertex in boost polygon
   Polygon_2 cgal_footprint(footprint_pts.begin(), footprint_pts.end());
+  std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
   insert_non_intersecting_curves(arr, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
 
   // std::cout << arr.number_of_faces() <<std::endl;

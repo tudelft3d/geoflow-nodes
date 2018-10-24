@@ -2,6 +2,14 @@
 #include "geoflow.hpp"
 #include "ogrsf_frmts.h"
 
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/point_xy.hpp>
+#include <boost/geometry/geometries/linestring.hpp>
+#include <boost/geometry/geometries/polygon.hpp>
+namespace bg = boost::geometry;
+typedef bg::model::d2::point_xy<double> point_type;
+typedef bg::model::point<double, 3, bg::cs::cartesian> point_type_3d;
+
 #include <unordered_map>
 
 using namespace geoflow;
@@ -115,7 +123,16 @@ class OGRLoaderNode:public Node {
             ring.push_back(p);
           }
           // ring.erase(ring.end()-1);
-          features.geom.push_back(ring);
+          bg::model::polygon<point_type_3d> boost_poly;
+          for (auto& p : ring) {
+            bg::append(boost_poly.outer(), point_type_3d(p[0], p[1], p[2]));
+          }
+          bg::unique(boost_poly);
+          vec3f ring_dedup;
+          for (auto& p : boost_poly.outer()){
+            ring_dedup.push_back({float(bg::get<0>(p)), float(bg::get<1>(p)), float(bg::get<2>(p))}); //FIXME losing potential z...
+          }
+          features.geom.push_back(ring_dedup);
 
         } else {
           std::cout << "no supported geometry\n";

@@ -44,6 +44,7 @@ target_link_libraries( lod13
   flowchart-gui
   Boost::program_options
   ${GDAL_LIBRARY}
+  ptinpoly_lib
 )
 if(NOT MSVC)
   target_link_libraries(lod13 c++fs)
