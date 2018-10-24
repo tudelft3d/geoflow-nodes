@@ -203,7 +203,7 @@ struct config {
   float classify_jump_ele = 1.0;
 
   float linedetect_dist_threshold = 0.4;
-  int linedetect_min_segment_count = 15;
+  int linedetect_min_segment_count = 10;
   int linedetect_k = 20;
 
   float step_height_threshold = 1.0;
