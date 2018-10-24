@@ -83,18 +83,18 @@ void compute_metrics(PNL_vector &points, config c) {
   // Registers planar shapes via template method.
   shape_detection.add_shape_factory<SCPlane>();
   // Detects registered shapes with parameters.
-  std::cout << "points.size: " << points.size() << "\n";
+  // std::cout << "points.size: " << points.size() << "\n";
   shape_detection.detect(parameters);
   // Prints number of detected shapes.
-  std::cout << shape_detection.shapes().end() - shape_detection.shapes().begin() << " shapes detected." << std::endl;
+  // std::cout << shape_detection.shapes().end() - shape_detection.shapes().begin() << " shapes detected." << std::endl;
 
   i=1;
   for(auto shape: shape_detection.shapes()){
     // this dot product is close to 0 for vertical planes
     SCPlane* plane = dynamic_cast<SCPlane*>(shape.get());
-    std::cout << shape->info() << std::endl;
+    // std::cout << shape->info() << std::endl;
     Vector n = plane->plane_normal();
-    std::cout << n*Vector(0,0,1) << std::endl;
+    // std::cout << n*Vector(0,0,1) << std::endl;
     bool is_wall = CGAL::abs(n*Vector(0,0,1)) < c.metrics_is_wall_threshold;
     
     // store cluster id's and is_wall as point attributes
@@ -197,14 +197,14 @@ void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vect
   LD.N = c.linedetect_k;
   LD.detect();
 
-  std::cout << LD.segment_shapes.size() << " lines detected." << std::endl;
+  // std::cout << LD.segment_shapes.size() << " lines detected." << std::endl;
   //  std::vector<int> &edges_index_map,
   
   int line_id=0;
   for(auto seg: LD.segment_shapes){
     auto l = seg.second;
     auto l_idx = LD.get_point_indices(seg.first);
-    std::cout << l.direction() << ", #Pts: " << l_idx.size() <<std::endl;
+    // std::cout << l.direction() << ", #Pts: " << l_idx.size() <<std::endl;
     //find the two extreme points on this line
     double minpl=1, maxpl=0;
     size_t j=0;
@@ -244,7 +244,7 @@ void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<st
   }
   footprint_pts.pop_back(); // get rid of repeated vertex in boost polygon
   Polygon_2 cgal_footprint(footprint_pts.begin(), footprint_pts.end());
-  std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
+  // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
   insert_non_intersecting_curves(arr, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
 
   // std::cout << arr.number_of_faces() <<std::endl;
