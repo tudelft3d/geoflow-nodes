@@ -12,6 +12,7 @@ target_link_libraries( gf_viewer
   flowchart-gui
   Boost::program_options
   ${GDAL_LIBRARY}
+  ptinpoly_lib
 )
 if(NOT MSVC)
   target_link_libraries(gf_viewer c++fs)
