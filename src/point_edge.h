@@ -105,6 +105,7 @@ struct FaceInfo {
   float elevation_avg=0;
   size_t segid=0;
   float segid_coverage;
+  float segid_count;
 };
 typedef CGAL::Arr_face_extended_dcel<Traits_2, FaceInfo>   Dcel;
 typedef CGAL::Arrangement_2<Traits_2, Dcel>           Arrangement_2;
@@ -204,6 +205,8 @@ struct config {
   float linedetect_dist_threshold = 0.4;
   int linedetect_min_segment_count = 15;
   int linedetect_k = 20;
+
+  float step_height_threshold = 1.0;
 };
 
 typedef std::vector<std::array<float,2>> vec2f;
@@ -213,5 +216,5 @@ void compute_metrics(PNL_vector &points, config = config()) ;
 void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &points, config = config()) ;
 void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, config = config()) ;
 void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<std::pair<Point,Point>> & edge_segments, Arrangement_2 &arr);
-void process_arrangement(PNL_vector& points, Arrangement_2& arr);
+void process_arrangement(PNL_vector& points, Arrangement_2& arr, config = config());
 void arrangementface_to_polygon(Face_handle face, vec2f& polygons);

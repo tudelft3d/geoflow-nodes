@@ -288,7 +288,7 @@ void arrangementface_to_polygon(Face_handle face, vec2f& polygons){
 }
 
 // convert each face to polygon and compute an average elevation
-void process_arrangement(PNL_vector& points, Arrangement_2& arr) {
+void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
   typedef CGAL::Arr_walk_along_line_point_location<Arrangement_2> Point_location;
   
 
@@ -331,15 +331,45 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr) {
     fh->data().segid = max_segid;
     fh->data().segid_coverage = max_count/fpoints.size();
     fh->data().elevation_avg = sum/max_count;
+    fh->data().segid_count = max_count;
   }
-
   // merge faces with the same segment id
-  for (auto& edge : arr.edge_handles()) {
-    auto&& f1 = edge->face();
-    auto&& f2 = edge->twin()->face();
-    if(f1->data().is_finite && f2->data().is_finite) {
-      if(f1->data().segid == f2->data().segid){
-        arr.remove_edge(edge); // should add face merge call back in face observer class...
+  {
+    std::vector<Arrangement_2::Halfedge_handle> edges;
+    for (auto edge : arr.edge_handles()) {
+      edges.push_back(edge);
+    }
+    for (auto& edge : edges) {
+      auto&& f1 = edge->face();
+      auto&& f2 = edge->twin()->face();
+      if(f1->data().is_finite && f2->data().is_finite) {
+        if(f1->data().segid == f2->data().segid){
+          f2->data().segid_count = f1->data().segid_count + f2->data().segid_count;
+          f1->data().segid_count = f1->data().segid_count + f2->data().segid_count;
+          arr.remove_edge(edge); // should add face merge call back in face observer class...
+        }
+      }
+    }
+  }
+  // merge faces with step height below threshold
+  {
+    std::vector<Arrangement_2::Halfedge_handle> edges;
+    for (auto edge : arr.edge_handles()) {
+      edges.push_back(edge);
+    }
+    for (auto& edge : edges) {
+      auto&& f1 = edge->face();
+      auto&& f2 = edge->twin()->face();
+      if(f1->data().is_finite && f2->data().is_finite) {
+        if(std::abs(f1->data().elevation_avg - f2->data().elevation_avg) < c.step_height_threshold){
+          // should add face merge call back in face observer class...
+          if (f1->data().segid_count > f2->data().segid_count) {
+            f2->data().elevation_avg = f1->data().elevation_avg;
+          } else {
+            f1->data().elevation_avg = f2->data().elevation_avg;
+          }
+          arr.remove_edge(edge);
+        }
       }
     }
   }

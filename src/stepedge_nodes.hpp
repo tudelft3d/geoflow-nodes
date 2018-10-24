@@ -318,12 +318,17 @@ class SimplifyFootprintNode:public Node {
   }
 };
 class ProcessArrangementNode:public Node {
-
+  
   public:
+  config c;
   ProcessArrangementNode(NodeManager& manager):Node(manager, "ProcessArrangement") {
     add_input("arrangement", TT_any);
     add_input("points", TT_any);
     add_output("arrangement", TT_any);
+  }
+
+  void gui() {
+    ImGui::DragFloat("Min step height", &c.step_height_threshold, 0.1);
   }
 
   void process(){
@@ -331,7 +336,7 @@ class ProcessArrangementNode:public Node {
     auto points = std::any_cast<PNL_vector>(get_value("points"));
     auto arr = std::any_cast<Arrangement_2>(get_value("arrangement"));
 
-    process_arrangement(points, arr);
+    process_arrangement(points, arr, c);
     
     set_value("arrangement", arr);
   }
