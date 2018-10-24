@@ -68,10 +68,10 @@ class LOD13GeneratorNode:public Node {
       auto polygons_feature = std::any_cast<Feature>(oTerm->cdata);
 
       for (int i=0; i<polygons_feature.geom.size(); i++) {
-        if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
+        // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
           decomposed_polygons.geom.push_back(polygons_feature.geom[i]);
           decomposed_polygons.attr["height"].push_back(polygons_feature.attr["height"][i]);
-        }
+        // }
       }
     }
     set_value("decomposed_polygons", decomposed_polygons);

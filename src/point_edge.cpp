@@ -36,7 +36,7 @@ void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<po
 
 void compute_metrics(PNL_vector &points, config c) {
 
-  if(points.size()==0) return;
+  if(points.size()<c.metrics_plane_min_points) return;
 
   // Estimates normals
   // Note: pca_estimate_normals() requiresa range of points
@@ -83,6 +83,7 @@ void compute_metrics(PNL_vector &points, config c) {
   // Registers planar shapes via template method.
   shape_detection.add_shape_factory<SCPlane>();
   // Detects registered shapes with parameters.
+  std::cout << "points.size: " << points.size() << "\n";
   shape_detection.detect(parameters);
   // Prints number of detected shapes.
   std::cout << shape_detection.shapes().end() - shape_detection.shapes().begin() << " shapes detected." << std::endl;

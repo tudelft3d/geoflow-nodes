@@ -550,7 +550,8 @@ pGridSet build_grid(vec3f& ring) {
     pgon.push_back(new Pipoint{ p[0],p[1] });
   }
   pGridSet grid_set = new GridSet();
-  GridSetup(&pgon[0], pgon.size(), Grid_Resolution, grid_set);
+  // skip last point in the ring, ie the repetition of the first vertex
+  GridSetup(&pgon[0], pgon.size()-1, Grid_Resolution, grid_set);
   for (int i = 0; i < size; i++) {
     delete pgon[i];
   }
@@ -855,9 +856,9 @@ class RegulariseLinesNode:public Node {
     }
     set_value("tmp_vec3f", tmp_vec3f);
 
-    for (auto line: lines) {
-      std::cout << std::get<0>(line) << " " << std::get<4>(line) << "\n";
-    }
+    // for (auto line: lines) {
+    //   std::cout << std::get<0>(line) << " " << std::get<4>(line) << "\n";
+    // }
 
     //sort by angle, smallest on top
     std::sort(lines.begin(), lines.end(), [](linetype a, linetype b) {
@@ -876,12 +877,12 @@ class RegulariseLinesNode:public Node {
       last_angle=std::get<0>(line);
     }
 
-    for (auto cluster: angle_clusters) {
-      std::cout << "cluster ..\n";
-      for (auto line: cluster) {
-        std::cout << std::get<0>(line) << " " << std::get<4>(line) << "\n";
-      }
-    }
+    // for (auto cluster: angle_clusters) {
+    //   std::cout << "cluster ..\n";
+    //   for (auto line: cluster) {
+    //     std::cout << std::get<0>(line) << " " << std::get<4>(line) << "\n";
+    //   }
+    // }
 
     // snap to average angle in each cluster
     vec3f directions_before, directions_after;
@@ -900,13 +901,13 @@ class RegulariseLinesNode:public Node {
       cluster_id++;
     }
 
-    std::cout << "\nafter angle snapping...:\n";
-    for (auto cluster: angle_clusters) {
-      std::cout << "cluster ..\n";
-      for (auto line: cluster) {
-        std::cout << std::get<0>(line) << " " << std::get<4>(line) << "\n";
-      }
-    }
+    // std::cout << "\nafter angle snapping...:\n";
+    // for (auto cluster: angle_clusters) {
+    //   std::cout << "cluster ..\n";
+    //   for (auto line: cluster) {
+    //     std::cout << std::get<0>(line) << " " << std::get<4>(line) << "\n";
+    //   }
+    // }
 
     vec1f distances;
     // snap nearby lines that are close
@@ -943,13 +944,13 @@ class RegulariseLinesNode:public Node {
       }
     }
 
-    std::cout << "\nafter distance snapping...:\n";
-    for (auto cluster: dist_clusters) {
-      std::cout << "cluster ..\n";
-      for (auto line: cluster) {
-        std::cout << std::get<2>(line) << " " << std::get<4>(line) << "\n";
-      }
-    }
+    // std::cout << "\nafter distance snapping...:\n";
+    // for (auto cluster: dist_clusters) {
+    //   std::cout << "cluster ..\n";
+    //   for (auto line: cluster) {
+    //     std::cout << std::get<2>(line) << " " << std::get<4>(line) << "\n";
+    //   }
+    // }
 
     // compute one line per dist cluster => the one with the highest elevation
     vec3f edges_out_vec3f;
