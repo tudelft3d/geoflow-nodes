@@ -21,7 +21,7 @@ class LOD13GeneratorNode:public Node {
   }
 
   void gui(){
-    ImGui::InputFloat("Plane epsilon", &step_threshold, 0.1, 1);
+    ImGui::InputFloat("Step height", &step_threshold, 0.1, 1);
   }
 
   void process(){
@@ -62,6 +62,8 @@ class LOD13GeneratorNode:public Node {
       connect(*BuildArrangement_node, *ProcessArrangement_node, "arrangement", "arrangement");
       connect(*ProcessArrangement_node, *Arr2Feature_node, "arrangement", "arrangement");
 
+      // config and run
+      ProcessArrangement_node->c.step_height_threshold = step_threshold;
       N.run(*ComputeMetrics_node);
 
       auto oTerm = Arr2Feature_node->outputTerminals["decomposed_footprint"];
@@ -92,8 +94,10 @@ void on_draw() {
 
 int main(int ac, const char * av[])
 {
-    //‎⁨ /Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/pand.gpkg
+    //‎⁨ /Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg
+    //‎⁨ /Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las
     // /Users/ravi/surfdrive/Data/step-edge-detector/C_31HZ1_clip.LAZ
+    // /Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las
     // /Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_0.gpkg
     //viewer nodes
     N.register_node<TriangleNode>("Triangle");

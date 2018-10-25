@@ -12,6 +12,7 @@ target_link_libraries( hoogtelijnen
   flowchart-gui
   Boost::program_options
   ${GDAL_LIBRARY}
+  ptinpoly_lib
 )
 if(NOT MSVC)
   target_link_libraries(hoogtelijnen c++fs)
@@ -28,6 +29,7 @@ target_link_libraries( footprint-simp
   flowchart-gui
   Boost::program_options
   ${GDAL_LIBRARY}
+  ptinpoly_lib
 )
 if(NOT MSVC)
   target_link_libraries(footprint-simp c++fs)

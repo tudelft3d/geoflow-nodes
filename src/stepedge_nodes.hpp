@@ -501,6 +501,7 @@ class ComputeMetricsNode:public Node {
   }
 
   void gui(){
+    ImGui::InputInt("K estimate normal ", &c.metrics_normal_k);
     ImGui::InputInt("Plane min points", &c.metrics_plane_min_points);
     ImGui::InputFloat("Plane epsilon", &c.metrics_plane_epsilon, 0.01, 1);
     ImGui::InputFloat("Plane normal thres", &c.metrics_plane_normal_threshold, 0.01, 1);
@@ -564,22 +565,36 @@ pGridSet build_grid(vec3f& ring) {
 }
 
 class LASInPolygonsNode:public Node {
+  Feature point_clouds;
+  Feature polygons;
+
   public:
+  int footprint_id=0;
   // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
   char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-  // char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/rdam_sample_0.csv";
-  char csv_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/bag_amersfoort_0.csv";
   LASInPolygonsNode(NodeManager& manager):Node(manager, "LASInPolygons") {
     add_input("polygons", TT_any);
     add_output("point_clouds", TT_any);
+    add_output("points_vec3f", TT_vec3f);
+    add_output("footprint_vec3f", TT_vec3f);
   }
 
   void gui() {
     ImGui::InputText("LAS file path", las_filepath, IM_ARRAYSIZE(las_filepath));
+    if (ImGui::SliderInt("#", &footprint_id, 0, polygons.geom.size()-1)) {
+      // if(run_on_change) {
+      //   manager.run(*this);
+      // } else {
+        notify_children();
+        set_value("points_vec3f", point_clouds.geom[footprint_id]);
+        set_value("footprint_vec3f", polygons.geom[footprint_id]);
+        propagate_outputs();
+      // }
+    }
   }
 
   void process() {
-    auto polygons = std::any_cast<Feature>(get_value("polygons"));
+    polygons = std::any_cast<Feature>(get_value("polygons"));
     if (polygons.type != line_loop) return;
 
     // std::vector<bg::model::polygon<point_type>> boost_polygons;
@@ -604,24 +619,21 @@ class LASInPolygonsNode:public Node {
     lasreadopener.set_file_name(las_filepath);
     LASreader* lasreader = lasreadopener.open();
 
-    Feature pc_collection;
-    pc_collection.type = geoflow::points;
-    pc_collection.geom.resize(polygons.geom.size());
+    point_clouds = Feature();
+    point_clouds.type = geoflow::points;
+    point_clouds.geom.resize(polygons.geom.size());
 
     while (lasreader->read_point()) {
       if (lasreader->point.get_classification() == 6) {
         int i=0;
-        point_type p;
-        p.set<0>(lasreader->point.get_x());
-        p.set<1>(lasreader->point.get_y());
-        pPipoint point = new Pipoint{ lasreader->point.get_x(), lasreader->point.get_y() };
+        pPipoint point = new Pipoint{ lasreader->point.get_x()-manager.data_offset[0], lasreader->point.get_y()-manager.data_offset[1] };
         
         for (auto& poly_grid:poly_grids) {
           if (GridTest(poly_grid, point)) {
-            pc_collection.geom[i].push_back({
-              float(lasreader->point.get_x()), 
-              float(lasreader->point.get_y()),
-              float(lasreader->point.get_z())
+            point_clouds.geom[i].push_back({
+              float(lasreader->point.get_x()-manager.data_offset[0]), 
+              float(lasreader->point.get_y()-manager.data_offset[1]),
+              float(lasreader->point.get_z()-manager.data_offset[2])
             });
             break;
             // laswriter->write_point(&lasreader->point);
@@ -637,7 +649,9 @@ class LASInPolygonsNode:public Node {
     lasreader->close();
     delete lasreader;
 
-    set_value("point_clouds", pc_collection);
+    set_value("point_clouds", point_clouds);
+    set_value("points_vec3f", point_clouds.geom[footprint_id]);
+    set_value("footprint_vec3f", polygons.geom[footprint_id]);
   }
 };
 

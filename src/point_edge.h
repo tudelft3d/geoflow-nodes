@@ -190,6 +190,7 @@ typedef bg::model::segment<point_type> segment;
 
 struct config {
   public:
+  int metrics_normal_k = 15;
   int metrics_plane_min_points = 40;
   float metrics_plane_epsilon = 0.2;
   float metrics_plane_normal_threshold = 0.95;

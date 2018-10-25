@@ -1,4 +1,5 @@
 #include "point_edge.h"
+#include "region_growing_plane.h"
 #include <CGAL/Arr_walk_along_line_point_location.h>
 #include <unordered_map>
 #include <boost/tuple/tuple.hpp>
@@ -41,65 +42,90 @@ void compute_metrics(PNL_vector &points, config c) {
   // Estimates normals
   // Note: pca_estimate_normals() requiresa range of points
   // as well as property maps to access each point's position and normal.
-  const int nb_neighbors = 5; // K-nearest neighbors = 3 rings
+  // const int nb_neighbors = 5; // K-nearest neighbors = 3 rings
   CGAL::pca_estimate_normals<Concurrency_tag>
-    (points, nb_neighbors,
+    (points, c.metrics_normal_k,
     CGAL::parameters::point_map(Point_map()).
     normal_map(Normal_map()));
   // Orients normals.
   // Note: mst_orient_normals() requires a range of points
   // as well as property maps to access each point's position and normal.
-  PNL_vector::iterator unoriented_points_begin =
-    CGAL::mst_orient_normals(points, nb_neighbors,
-                              CGAL::parameters::point_map(Point_map()).
-                              normal_map(Normal_map()));
+  // PNL_vector::iterator unoriented_points_begin =
+    // CGAL::mst_orient_normals(points, c.metrics_normal_k,
+                              // CGAL::parameters::point_map(Point_map()).
+                              // normal_map(Normal_map()));
   // Optional: delete points with an unoriented normal
   // if you plan to call a reconstruction algorithm that expects oriented normals.
   // points.erase(unoriented_points_begin, points.end());
 
+  // Orient normals quick n dirty and predictable way
+  auto up = Vector(0,0,1);
+  for ( auto& pv : points) {
+    auto &n = boost::get<1>(pv);
+    if (n*up<0) 
+      boost::get<1>(pv) = -n;
+  }
+
+
   size_t i=0;
+  std::vector<Point> points_vec;
+  std::vector<Vector> normals_vec;
+  points_vec.reserve(points.size());
   for (auto &p : points) {
+    points_vec.push_back(boost::get<0>(p));
+    normals_vec.push_back(boost::get<1>(p));
     boost::get<8>(p) = i++;
   }
-  // Instantiates shape detection engine.
-  Region_growing shape_detection;
 
-  // Sets parameters for shape detection.
-  Region_growing::Parameters parameters;
-  // Sets probability to miss the largest primitive at each iteration.
-  // parameters.probability = 0.05;
-  // Detect shapes with at least 500 points.
-  parameters.min_points = c.metrics_plane_min_points;
-  // Sets maximum Euclidean distance between a point and a shape.
-  parameters.epsilon = c.metrics_plane_epsilon;
-  // Sets maximum Euclidean distance between points to be clustered.
-  // parameters.cluster_epsilon = 0.01;
-  // Sets maximum normal deviation.
-  // 0.9 < dot(surface_normal, point_normal); 
-  parameters.normal_threshold = c.metrics_plane_normal_threshold;
+  auto PD = planedect::PlaneDetector(points_vec, normals_vec);
+  PD.dist_thres = c.metrics_plane_epsilon * c.metrics_plane_epsilon;
+  PD.normal_thres = c.metrics_plane_normal_threshold;
+  PD.min_segment_count = c.metrics_plane_min_points;
+  PD.N = c.metrics_normal_k;
+  PD.detect();
+  std::cout << PD.segment_shapes.size() << " shapes detected." << std::endl;
 
-  // Provides the input data.
-  shape_detection.set_input(points);
-  // Registers planar shapes via template method.
-  shape_detection.add_shape_factory<SCPlane>();
-  // Detects registered shapes with parameters.
+  // // Instantiates shape detection engine.
+  // Region_growing shape_detection;
+
+  // // Sets parameters for shape detection.
+  // Region_growing::Parameters parameters;
+  // // Sets probability to miss the largest primitive at each iteration.
+  // // parameters.probability = 0.05;
+  // // Detect shapes with at least 500 points.
+  // parameters.min_points = c.metrics_plane_min_points;
+  // // Sets maximum Euclidean distance between a point and a shape.
+  // parameters.epsilon = c.metrics_plane_epsilon;
+  // // Sets maximum Euclidean distance between points to be clustered.
+  // // parameters.cluster_epsilon = 0.01;
+  // // Sets maximum normal deviation.
+  // // 0.9 < dot(surface_normal, point_normal); 
+  // parameters.normal_threshold = c.metrics_plane_normal_threshold;
+
+  // // Provides the input data.
+  // shape_detection.set_input(points);
+  // // Registers planar shapes via template method.
+  // shape_detection.add_shape_factory<SCPlane>();
+  // // Detects registered shapes with parameters.
   // std::cout << "points.size: " << points.size() << "\n";
-  shape_detection.detect(parameters);
-  // Prints number of detected shapes.
+  // shape_detection.detect(parameters);
+  // // Prints number of detected shapes.
   // std::cout << shape_detection.shapes().end() - shape_detection.shapes().begin() << " shapes detected." << std::endl;
 
   i=1;
-  for(auto shape: shape_detection.shapes()){
+  for(auto seg: PD.segment_shapes){
+    auto& plane = seg.second;
+    auto plane_idx = PD.get_point_indices(seg.first);
     // this dot product is close to 0 for vertical planes
-    SCPlane* plane = dynamic_cast<SCPlane*>(shape.get());
+    // SCPlane* plane = dynamic_cast<SCPlane*>(shape.get());
     // std::cout << shape->info() << std::endl;
-    Vector n = plane->plane_normal();
+    Vector n = plane.orthogonal_vector();
     // std::cout << n*Vector(0,0,1) << std::endl;
     bool is_wall = CGAL::abs(n*Vector(0,0,1)) < c.metrics_is_wall_threshold;
     
     // store cluster id's and is_wall as point attributes
     int label = i++;
-    for(auto ind : shape->indices_of_assigned_points()){
+    for(auto ind : plane_idx){
       boost::get<2>(points[ind])=label;
       boost::get<3>(points[ind])=is_wall;
       // std::cout <<  << std::endl;
@@ -108,13 +134,13 @@ void compute_metrics(PNL_vector &points, config c) {
     if(!is_wall){
       const unsigned int N = c.metrics_k_linefit;
       PNL_vector cluster_points;
-      for(auto ind : shape->indices_of_assigned_points()){
+      for(auto ind : plane_idx){
         cluster_points.push_back(points[ind]);
       }
       Tree tree(cluster_points.begin(), cluster_points.end());
       // Point_d query(0,0);
       // Select candidate edge point based on line fit through k-neighborhood
-      for(auto ind : shape->indices_of_assigned_points()){
+      for(auto ind : plane_idx){
         Point q(boost::get<0>(points[ind]));
         Neighbor_search search(tree, q, N);
         std::vector<Point_SCK> neighbor_points;

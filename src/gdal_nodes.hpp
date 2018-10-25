@@ -73,8 +73,12 @@ class OGRLoaderNode:public Node {
     geometries.format = geoflow::count;
     
     // OGREnvelope *poExtent;
-    // poLayer->GetExtent(poExtent);
+    // poLayer->ResetReading();
+    // poLayer->GetExtent(poExtent, true);
+    // features.offset = {(poExtent->MaxX-poExtent->MinX)/2, (poExtent->MaxY-poExtent->MinY)/2, 0};
+    // std::cout << "setting offset to " << features.offset[0] << " " << features.offset[1] << "\n";
     // geometries.bounding_box.set({poExtent->MinX, poExtent->MinY, 0}, {poExtent->MaxX, poExtent->MaxY, 0});
+    bool found_offset = false;
     poLayer->ResetReading();
     size_t count = 0;
     for( auto& poFeature: poLayer )
@@ -101,8 +105,12 @@ class OGRLoaderNode:public Node {
           // temporary code, until Painter is updated to handle the gfGeometry3D struct
           vec3f line;
           for(auto& poPoint : poLineString){
+            if (!found_offset) {
+              manager.data_offset = {poPoint.getX(), poPoint.getY(), 0};
+              found_offset = true;
+            }
             // std::cout << poPoint.getX() << " " << poPoint.getY() << " " << poPoint.getZ() << "\n";
-            line.push_back({float(poPoint.getX()), float(poPoint.getY()), float(poPoint.getZ())});
+            line.push_back({float(poPoint.getX()-manager.data_offset[0]), float(poPoint.getY()-manager.data_offset[1]), float(poPoint.getZ()-manager.data_offset[2])});
           }
           features.geom.push_back(line);
           
@@ -119,7 +127,11 @@ class OGRLoaderNode:public Node {
     
           vec3f ring;
           for(auto& poPoint : poPolygon->getExteriorRing()){
-            std::array<float,3> p = {float(poPoint.getX()), float(poPoint.getY()), float(poPoint.getZ())};
+            if (!found_offset) {
+              manager.data_offset = {poPoint.getX(), poPoint.getY(), 0};
+              found_offset = true;
+            }
+            std::array<float,3> p = {float(poPoint.getX()-manager.data_offset[0]), float(poPoint.getY()-manager.data_offset[1]), float(poPoint.getZ()-manager.data_offset[2])};
             ring.push_back(p);
           }
           // ring.erase(ring.end()-1);
@@ -321,7 +333,7 @@ class OGRWriterNode:public Node {
             if (features.type == line_loop) {
               OGRLinearRing ogrring;
               for (auto const& g: features.geom[i]) {
-                  ogrring.addPoint( g[0], g[1], g[2] );
+                  ogrring.addPoint( g[0]+manager.data_offset[0], g[1]+manager.data_offset[1], g[2]+manager.data_offset[2] );
               }
               ogrring.closeRings();
               OGRPolygon bouwpoly;
@@ -331,7 +343,7 @@ class OGRWriterNode:public Node {
             if (features.type == line_strip) {
               OGRLineString ogrlinestring;
               for (auto const& g: features.geom[i]) {
-                  ogrlinestring.addPoint( g[0], g[1], g[2] );
+                  ogrlinestring.addPoint( g[0]+manager.data_offset[0], g[1]+manager.data_offset[1], g[2]+manager.data_offset[2] );
               }
               poFeature->SetGeometry( &ogrlinestring );
             }

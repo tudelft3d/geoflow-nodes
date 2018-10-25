@@ -48,7 +48,7 @@ add_definitions(
 )
 include_directories( src thirdparty ${CGAL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${GDAL_INCLUDE_DIR} thirdparty/LAStools/LASlib/inc thirdparty/LAStools/LASzip/inc thirdparty/LAStools/LASzip/src thirdparty/geoflow/thirdparty/glm thirdparty/ptinpoly)
 
-add_library(point_edge_lib STATIC src/point_edge.cpp src/region_growing.cpp)
+add_library(point_edge_lib STATIC src/point_edge.cpp src/region_growing.cpp src/region_growing_plane.cpp)
 target_link_libraries(point_edge_lib ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} LASlib)
 set_target_properties(
   point_edge_lib
