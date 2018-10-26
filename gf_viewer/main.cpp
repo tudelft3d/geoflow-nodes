@@ -45,6 +45,7 @@ int main(int ac, const char * av[])
     N.register_node<RegulariseLinesNode>("RegulariseLines");
     N.register_node<AlphaShapeNode>("AlphaShape");
     N.register_node<Arr2FeatureNode>("Arr2Feature");
+    N.register_node<PolygonExtruderNode>("PolygonExtruder");
     
     //gdal nodes
     N.register_node<OGRLoaderNode>("OGRLoader");

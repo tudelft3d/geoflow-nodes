@@ -118,6 +118,8 @@ int main(int ac, const char * av[])
     
     N.register_node<LASInPolygonsNode>("LASInPolygons");
     N.register_node<LOD13GeneratorNode>("LOD13Generator");
+    
+    N.register_node<PolygonExtruderNode>("PolygonExtruder");
 
     a->draw_that(on_draw);
 

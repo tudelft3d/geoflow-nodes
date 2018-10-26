@@ -20,6 +20,8 @@ using json = nlohmann::json;
 #include <CGAL/Constrained_triangulation_plus_2.h>
 
 #include <filesystem>
+#include <numeric>
+
 namespace fs=std::filesystem;
 
 typedef std::array<float,3> vertex;
@@ -96,6 +98,33 @@ class AlphaShapeNode:public Node {
     
     set_value("edge_points", edge_points);
     set_value("edge_points_vec3f", edge_points_vec3f);
+  }
+};
+
+class PolygonExtruderNode:public Node {
+
+  public:
+  PolygonExtruderNode(NodeManager& manager):Node(manager, "PolygonExtruder") {
+    add_input("polygons", TT_any);
+    add_input("point_clouds", TT_any);
+    add_output("polygons_extruded", TT_any);
+  }
+
+  void process(){
+    auto polygons = std::any_cast<Feature>(get_value("polygons"));
+    auto point_clouds = std::any_cast<Feature>(get_value("point_clouds"));
+
+    if(polygons.geom.size()!=point_clouds.geom.size()) return;
+
+    polygons.attr["height"] = vec1f();
+    for (auto& point_cloud : point_clouds.geom) {
+      double sum_elevation = 0;
+      for (auto& p : point_cloud) {
+        sum_elevation += p[2];
+      }
+      polygons.attr["height"].push_back(sum_elevation/point_cloud.size());
+    }
+    set_value("polygons_extruded", polygons);
   }
 };
 
