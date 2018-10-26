@@ -1,8 +1,5 @@
 ## Building
-Requires compiler with c++17 support (see https://en.cppreference.com/w/cpp/compiler_support). Can be installed on macOS with:
-```
-brew install llvm
-```
+Requires compiler with c++17 support (see https://en.cppreference.com/w/cpp/compiler_support).
 
 External dependencies:
 1. CGAL [tested with version 4.12/4.13]
