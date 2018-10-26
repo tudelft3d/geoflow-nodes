@@ -103,6 +103,7 @@ typedef Traits_2::X_monotone_curve_2                  X_monotone_curve_2;
 struct FaceInfo {
   bool is_finite=false;
   float elevation_avg=0;
+  float elevation_min, elevation_max;
   size_t segid=0;
   float segid_coverage;
   float segid_count;

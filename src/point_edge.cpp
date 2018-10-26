@@ -313,6 +313,18 @@ void arrangementface_to_polygon(Face_handle face, vec2f& polygons){
   }
 }
 
+inline void merge_faces(Face_handle f1, Face_handle f2) {
+  auto count1 = f1->data().segid_count;
+  auto count2 = f2->data().segid_count;
+  auto sum_count = count1+count2;
+  auto new_elevation = f1->data().elevation_avg * (count1/sum_count) + f2->data().elevation_avg * (count2/sum_count);
+  f2->data().elevation_avg = f1->data().elevation_avg = new_elevation;
+  // and sum the counts
+  f2->data().segid_count = f1->data().segid_count = sum_count;
+  f1->data().elevation_min = f2->data().elevation_min = std::min(f1->data().elevation_min, f2->data().elevation_min);
+  f1->data().elevation_max = f2->data().elevation_min = std::max(f1->data().elevation_max, f2->data().elevation_max);
+}
+
 // convert each face to polygon and compute an average elevation
 void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
   typedef CGAL::Arr_walk_along_line_point_location<Arrangement_2> Point_location;
@@ -349,14 +361,21 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
         max_segid = pair.first;
       }
     }
-    float sum = 0;
+    float sum = 0, minz, maxz;
+    minz=maxz=boost::get<0>(fpoints[0]).z();
     for (auto& p : fpoints) {
-      if (boost::get<2>(p) == max_segid)
-        sum = sum + boost::get<0>(p).z();
+      if (boost::get<2>(p) == max_segid) {
+        auto z = float(boost::get<0>(p).z());
+        sum = sum + z;
+        minz = std::min(minz,z);
+        maxz = std::max(maxz,z);
+      }
     }
     fh->data().segid = max_segid;
     fh->data().segid_coverage = max_count/fpoints.size();
     fh->data().elevation_avg = sum/max_count;
+    fh->data().elevation_min = minz;
+    fh->data().elevation_max = maxz;
     fh->data().segid_count = max_count;
   }
   // merge faces with the same segment id
@@ -366,13 +385,36 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
       edges.push_back(edge);
     }
     for (auto& edge : edges) {
-      auto&& f1 = edge->face();
-      auto&& f2 = edge->twin()->face();
-      if(f1->data().is_finite && f2->data().is_finite) {
+      auto f1 = edge->face();
+      auto f2 = edge->twin()->face();
+      if((f1->data().is_finite && f2->data().is_finite) && (f1->data().segid!=0 && f2->data().segid!=0)) {
         if(f1->data().segid == f2->data().segid){
-          f2->data().segid_count = f1->data().segid_count + f2->data().segid_count;
-          f1->data().segid_count = f1->data().segid_count + f2->data().segid_count;
+          // elevation of new face is a weighted sum of elevation_avg of two old faces
+          merge_faces(f1,f2);
           arr.remove_edge(edge); // should add face merge call back in face observer class...
+        }
+      }
+    }
+  }
+  // merge faces with segments that have an overlapping z-range, ie two adjacent segments without a step edge
+  {
+    std::vector<Arrangement_2::Halfedge_handle> edges;
+    for (auto edge : arr.edge_handles()) {
+      edges.push_back(edge);
+    }
+    for (auto& edge : edges) {
+      auto f1 = edge->face();
+      auto f2 = edge->twin()->face();
+      if((f1->data().is_finite && f2->data().is_finite) && (f1->data().segid!=0 && f2->data().segid!=0)) {
+        auto z1_min = f1->data().elevation_min;
+        auto z1_max = f1->data().elevation_max;
+        auto z2_min = f2->data().elevation_min;
+        auto z2_max = f2->data().elevation_max;
+        if((z2_max > z1_min) && (z2_min < z1_max)) {
+          // should add face merge call back in face observer class...
+          // elevation of new face is a weighted sum of elevation_avg of two old faces
+          merge_faces(f1,f2);
+          arr.remove_edge(edge);
         }
       }
     }
@@ -384,11 +426,12 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
       edges.push_back(edge);
     }
     for (auto& edge : edges) {
-      auto&& f1 = edge->face();
-      auto&& f2 = edge->twin()->face();
-      if(f1->data().is_finite && f2->data().is_finite) {
+      auto f1 = edge->face();
+      auto f2 = edge->twin()->face();
+      if((f1->data().is_finite && f2->data().is_finite) && (f1->data().segid!=0 && f2->data().segid!=0)) {
         if(std::abs(f1->data().elevation_avg - f2->data().elevation_avg) < c.step_height_threshold){
           // should add face merge call back in face observer class...
+          // pick elevation of the segment with the highest count
           if (f1->data().segid_count > f2->data().segid_count) {
             f2->data().elevation_avg = f1->data().elevation_avg;
           } else {
@@ -399,4 +442,91 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
       }
     }
   }
+  // cleanup faces with segid==0 by merging them to a finite neighbour face
+  {
+    std::vector<Face_handle> empty_faces;
+    for (auto face: arr.face_handles()){
+      if(face->data().is_finite && face->data().segid==0 ) {
+        empty_faces.push_back(face);
+      }
+    }
+    for (auto face : empty_faces) {
+      auto he = face->outer_ccb();
+      auto first = he;
+      while(true){
+        auto face_neighbour = he->twin()->face();
+        // only care about interior faces
+        if (face_neighbour->data().is_finite && face_neighbour->data().segid!=0){ 
+          arr.remove_edge(he); //merge with first finite face we encounter!
+          face->data() = face_neighbour->data(); // we want to preserve data of the face with segid !=0
+          break;
+        }
+        he = he->next();
+        if (he==first) break;
+      }
+    }
+
+  }
+  // cleanup dangling edges 
+  {
+    std::vector<Arrangement_2::Halfedge_handle> edges;
+    for (auto edge : arr.edge_handles()) {
+      edges.push_back(edge);
+    }
+    for (auto& edge : edges) {
+      if (edge->face() == edge->twin()->face()){
+        arr.remove_edge(edge);
+      }
+    }
+  }
+  // // cleanup faces with segid==0 by merging them to valid neighbour with most shared edges
+  // {
+  //   // collect empty faces
+  //   std::vector<Face_handle> empty_faces;
+  //   for (auto face: arr.face_handles()){
+  //     if(face->data().is_finite && face->data().segid==0 ) {
+  //       empty_faces.push_back(face);
+  //     }
+  //   }
+  //   // loop until all empty faces are merged
+  //   while (empty_faces.size()!=0) {
+  //     std::unordered_map<Face_handle, size_t> face_histogram;
+  //     // find for each empty face the neighbor with most shared edges
+  //     for (auto face : empty_faces) {  
+  //       auto he = face->outer_ccb();
+  //       auto first = he;
+
+  //       // loop over neighbour faces
+  //       while(true){
+  //         auto face_neighbour = he->twin()->face();
+  //         // only care about interior faces
+  //         if (face_neighbour->data().is_finite){ 
+  //           // make histogram of how many edges we share with each neighbour
+  //           if (face_histogram.count(face_neighbour)) {
+  //             face_histogram[face_neighbour]++;
+  //           } else {
+  //             face_histogram[face_neighbour] = 1;
+  //           }
+  //           // find most occuring neighbour face in face_histogram
+  //           Face_handle max_face;
+  //           size_t max_count=0;
+  //           for(auto el : face_histogram) {
+  //             auto new_max = std::max(max_count, el.second);
+  //             if (new_max!=max_count) {
+  //               max_count = new_max;
+  //               max_face = el.first;
+  //             }
+  //           }
+  //           //finish it by adding 10 more nested loops?! maybe later...
+  //           std
+
+  //         }
+  //         he = he->next();
+  //         if (he==first) break;
+  //       }
+  //     }
+  //   }
+        
+    
+  // }
 }
