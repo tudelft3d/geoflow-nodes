@@ -56,3 +56,20 @@ set_target_properties(
   lod13
   PROPERTIES CXX_STANDARD 17
 )
+
+add_executable(lod13-cli lod13-cli.cpp ../src/tinsimp.cpp)
+target_link_libraries( lod13-cli 
+  point_edge_lib 
+  flowchart-gui
+  Boost::program_options
+  ${GDAL_LIBRARY}
+  ptinpoly_lib
+)
+if(NOT MSVC)
+  target_link_libraries(lod13-cli c++fs)
+endif()
+
+set_target_properties(
+  lod13-cli
+  PROPERTIES CXX_STANDARD 17
+)

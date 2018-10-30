@@ -1210,9 +1210,8 @@ class SimplifyLinesNode:public Node {
 
 
 class LOD13GeneratorNode:public Node {
-  float step_threshold = 1.0;
-
   public:
+  float step_threshold = 1.0;
   LOD13GeneratorNode(NodeManager& manager):Node(manager, "LOD13Generator") {
     add_input("point_clouds", TT_any);
     add_input("polygons", TT_any);
