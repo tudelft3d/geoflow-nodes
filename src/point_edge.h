@@ -209,6 +209,12 @@ struct config {
   int linedetect_k = 20;
 
   float step_height_threshold = 1.0;
+  float zrange_threshold = 0.5;
+  bool merge_segid = true;
+  bool merge_zrange = true;
+  bool merge_step_height = true;
+  bool merge_unsegmented = true;
+  bool merge_dangling_egdes = true;
 };
 
 typedef std::vector<std::array<float,2>> vec2f;

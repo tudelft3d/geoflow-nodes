@@ -358,6 +358,12 @@ class ProcessArrangementNode:public Node {
 
   void gui() {
     ImGui::DragFloat("Min step height", &c.step_height_threshold, 0.1);
+    ImGui::DragFloat("zrange_threshold", &c.zrange_threshold, 0.1);
+    ImGui::Checkbox("merge_segid", &c.merge_segid);
+    ImGui::Checkbox("merge_zrange", &c.merge_zrange);
+    ImGui::Checkbox("merge_step_height", &c.merge_step_height);
+    ImGui::Checkbox("merge_unsegmented", &c.merge_unsegmented);
+    ImGui::Checkbox("merge_dangling_egdes", &c.merge_dangling_egdes);
   }
 
   void process(){

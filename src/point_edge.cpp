@@ -379,7 +379,7 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
     fh->data().segid_count = max_count;
   }
   // merge faces with the same segment id
-  {
+  if (c.merge_segid) {
     std::vector<Arrangement_2::Halfedge_handle> edges;
     for (auto edge : arr.edge_handles()) {
       edges.push_back(edge);
@@ -397,7 +397,7 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
     }
   }
   // merge faces with segments that have an overlapping z-range, ie two adjacent segments without a step edge
-  {
+  if (c.merge_zrange) {
     std::vector<Arrangement_2::Halfedge_handle> edges;
     for (auto edge : arr.edge_handles()) {
       edges.push_back(edge);
@@ -410,7 +410,7 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
         auto z1_max = f1->data().elevation_max;
         auto z2_min = f2->data().elevation_min;
         auto z2_max = f2->data().elevation_max;
-        if((z2_max > z1_min) && (z2_min < z1_max)) {
+        if(((z2_max+c.zrange_threshold) > z1_min) && ((z2_min-c.zrange_threshold) < z1_max)) {
           // should add face merge call back in face observer class...
           // elevation of new face is a weighted sum of elevation_avg of two old faces
           merge_faces(f1,f2);
@@ -420,7 +420,7 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
     }
   }
   // merge faces with step height below threshold
-  {
+  if (c.merge_step_height) {
     std::vector<Arrangement_2::Halfedge_handle> edges;
     for (auto edge : arr.edge_handles()) {
       edges.push_back(edge);
@@ -443,7 +443,7 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
     }
   }
   // cleanup faces with segid==0 by merging them to a finite neighbour face
-  {
+  if (c.merge_unsegmented) {
     std::vector<Face_handle> empty_faces;
     for (auto face: arr.face_handles()){
       if(face->data().is_finite && face->data().segid==0 ) {
@@ -468,7 +468,7 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
 
   }
   // cleanup dangling edges 
-  {
+  if (c.merge_dangling_egdes) {
     std::vector<Arrangement_2::Halfedge_handle> edges;
     for (auto edge : arr.edge_handles()) {
       edges.push_back(edge);
