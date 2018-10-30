@@ -1207,3 +1207,74 @@ class SimplifyLinesNode:public Node {
     set_value("lines", geometry_out);
   }
 };
+
+
+class LOD13GeneratorNode:public Node {
+  float step_threshold = 1.0;
+
+  public:
+  LOD13GeneratorNode(NodeManager& manager):Node(manager, "LOD13Generator") {
+    add_input("point_clouds", TT_any);
+    add_input("polygons", TT_any);
+    add_output("decomposed_polygons", TT_any);
+  }
+
+  void gui(){
+    ImGui::InputFloat("Step height", &step_threshold, 0.1, 1);
+  }
+
+  void process(){
+    auto point_clouds = std::any_cast<Feature>(get_value("point_clouds"));
+    auto polygons = std::any_cast<Feature>(get_value("polygons"));
+    
+    // for each pair of polygon and point_cloud
+      //create nodes and connections
+      //run the thing
+    if (point_clouds.geom.size()!=polygons.geom.size()) return;
+
+    Feature decomposed_polygons;
+    decomposed_polygons.type=geoflow::line_loop;
+    
+    for(int i=0; i<point_clouds.geom.size(); i++) {
+      auto& points_vec3f = point_clouds.geom[i];
+      auto& polygon_vec3f = polygons.geom[i];
+
+      NodeManager N = NodeManager();
+
+      auto ComputeMetrics_node = std::make_shared<ComputeMetricsNode>(N);
+      auto AlphaShape_node = std::make_shared<AlphaShapeNode>(N);
+      auto DetectLines_node = std::make_shared<DetectLinesNode>(N);
+      auto RegulariseLines_node = std::make_shared<RegulariseLinesNode>(N);
+      auto BuildArrangement_node = std::make_shared<BuildArrangementNode>(N);
+      auto ProcessArrangement_node = std::make_shared<ProcessArrangementNode>(N);
+      auto Arr2Feature_node = std::make_shared<Arr2FeatureNode>(N);
+
+      ComputeMetrics_node->inputTerminals["points_vec3f"]->push(points_vec3f);
+      BuildArrangement_node->inputTerminals["footprint_vec3f"]->push(polygon_vec3f);
+      RegulariseLines_node->inputTerminals["footprint_vec3f"]->push(polygon_vec3f);
+
+      connect(*ComputeMetrics_node, *AlphaShape_node, "points", "points");
+      connect(*ComputeMetrics_node, *ProcessArrangement_node, "points", "points");
+      connect(*AlphaShape_node, *DetectLines_node, "edge_points", "edge_points");
+      connect(*DetectLines_node, *RegulariseLines_node, "edge_segments", "edge_segments");
+      connect(*RegulariseLines_node, *BuildArrangement_node, "edges_out", "edge_segments");
+      connect(*BuildArrangement_node, *ProcessArrangement_node, "arrangement", "arrangement");
+      connect(*ProcessArrangement_node, *Arr2Feature_node, "arrangement", "arrangement");
+
+      // config and run
+      ProcessArrangement_node->c.step_height_threshold = step_threshold;
+      N.run(*ComputeMetrics_node);
+
+      auto oTerm = Arr2Feature_node->outputTerminals["decomposed_footprint"];
+      auto polygons_feature = std::any_cast<Feature>(oTerm->cdata);
+
+      for (int i=0; i<polygons_feature.geom.size(); i++) {
+        // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
+          decomposed_polygons.geom.push_back(polygons_feature.geom[i]);
+          decomposed_polygons.attr["height"].push_back(polygons_feature.attr["height"][i]);
+        // }
+      }
+    }
+    set_value("decomposed_polygons", decomposed_polygons);
+  }
+};
