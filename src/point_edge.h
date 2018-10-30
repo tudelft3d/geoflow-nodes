@@ -191,12 +191,12 @@ typedef bg::model::segment<point_type> segment;
 
 struct config {
   public:
-  int metrics_normal_k = 15;
-  int metrics_plane_min_points = 40;
+  int metrics_normal_k = 10;
+  int metrics_plane_min_points = 25;
   float metrics_plane_epsilon = 0.2;
-  float metrics_plane_normal_threshold = 0.95;
+  float metrics_plane_normal_threshold = 0.75;
   float metrics_is_wall_threshold = 0.1;
-  int metrics_k_linefit = 30;
+  int metrics_k_linefit = 15;
   int metrics_k_jumpcnt_elediff = 10;
 
   int classify_jump_count_min = 1;
@@ -204,12 +204,12 @@ struct config {
   float classify_line_dist = 0.005;
   float classify_jump_ele = 1.0;
 
-  float linedetect_dist_threshold = 0.4;
-  int linedetect_min_segment_count = 10;
+  float linedetect_dist_threshold = 0.3;
+  int linedetect_min_segment_count = 8;
   int linedetect_k = 20;
 
   float step_height_threshold = 1.0;
-  float zrange_threshold = 0.5;
+  float zrange_threshold = 0.2;
   bool merge_segid = true;
   bool merge_zrange = true;
   bool merge_step_height = true;
