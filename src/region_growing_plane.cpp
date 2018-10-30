@@ -105,5 +105,7 @@ void PlaneDetector::grow_region(size_t seed_idx){
     segment_shapes.erase(region_counter);
     for (auto idx: idx_in_region)
       point_segment_idx[idx] = 0;
+  } else {
+    
   }
 }

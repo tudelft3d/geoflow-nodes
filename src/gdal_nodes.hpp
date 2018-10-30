@@ -257,7 +257,7 @@ class OGRLoaderNode:public Node {
 class OGRWriterNode:public Node {
     public:
     char filepath[256] = "blabla.gpkg";
-    std::string epsg_string = "EPSG:7415";
+    int epsg = 7415;
     
     
     OGRWriterNode(NodeManager& manager):Node(manager, "OGRWriter") {
@@ -275,7 +275,7 @@ class OGRWriterNode:public Node {
         // auto attributes = std::any_cast<Attributes>(get_value("attributes"));
         // what about the attributes?
 
-        const char *gszDriverName = "GPKG";
+        const char *gszDriverName = "ESRI Shapefile";
         GDALDriver *poDriver;
 
         GDALAllRegister();
@@ -299,7 +299,7 @@ class OGRWriterNode:public Node {
         OGRSpatialReference oSRS;
         OGRLayer *poLayer;
 
-        oSRS.SetWellKnownGeogCS( epsg_string.c_str() ); 
+        oSRS.importFromEPSG( epsg ); 
         OGRwkbGeometryType wkbType;
         if (features.type == line_loop) {
           wkbType = wkbPolygon;
