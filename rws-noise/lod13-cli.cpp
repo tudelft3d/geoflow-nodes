@@ -10,7 +10,8 @@
 #include "../src/cgal_nodes.hpp"
 #include <array>
 
-// #include <boost/program_options.hpp>
+#include <boost/program_options.hpp>
+namespace po = boost::program_options;
 
 int main(int ac, const char * av[])
 {
@@ -23,6 +24,20 @@ int main(int ac, const char * av[])
     std::string footprints_file = "/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bgt_singleparts.gpkg";
     std::string las_file = "/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las";
     std::string decomposed_footprints_file = "out.shp";
+    
+    po::options_description desc("Allowed options");
+    desc.add_options()
+    ("help", "produce help message")
+    ("las", po::value<std::string>(&las_file), "Point cloud ")
+    ("footprints", po::value<std::string>(&footprints_file), "Footprints")
+    ;
+    po::variables_map vm;
+    po::store(po::parse_command_line(ac, av, desc), vm);
+    po::notify(vm);
+    if (vm.count("help")) {
+        std::cout << desc << "\n";
+        return 1;
+    }
 
     geoflow::NodeManager N;
 

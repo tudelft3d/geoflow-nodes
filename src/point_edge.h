@@ -206,7 +206,7 @@ struct config {
 
   float linedetect_dist_threshold = 0.3;
   int linedetect_min_segment_count = 8;
-  int linedetect_k = 20;
+  int linedetect_k = 10;
 
   float step_height_threshold = 1.0;
   float zrange_threshold = 0.2;
