@@ -880,16 +880,17 @@ class RegulariseLinesNode:public Node {
     typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_2 Point_2;
 
     //compute midpoint and direction for each segment
-    typedef std::tuple<double, Point_2, double, double, bool> linetype; // angle, midpoint, distance in angle cluster, elevation, is_footprint
+    typedef std::tuple<double, Point_2, double, double, bool, double, double> linetype; // new angle, midpoint, distance in angle cluster, elevation, is_footprint, initial angle, squared distance from midpoint to an end point
     std::vector<linetype> lines;
     // add non-footprint lines
     for(auto edge : edges) {
       auto v = edge.second-edge.first;
       auto p_ = edge.first + v/2;
       auto p = Point_2(p_.x(),p_.y());
+      auto l = v.squared_length();
       auto angle = std::atan2(v.x(),v.y());
       if (angle < 0) angle += pi;
-      lines.push_back(std::make_tuple(angle,p,0,p_.z(), false));
+      lines.push_back(std::make_tuple(angle,p,0,p_.z(), false, angle, l));
     }
     // add footprint edges
     // footprint_vec3f.push_back(footprint_vec3f[0]); //repeat first point as last
@@ -904,9 +905,10 @@ class RegulariseLinesNode:public Node {
 
       auto p_ = p_first + v/2;
       auto p = Point_2(p_.x(),p_.y());
+      auto l = v.squared_length();
       auto angle = std::atan2(v.x(),v.y());
       if (angle < 0) angle += pi;
-      lines.push_back(std::make_tuple(angle,p,0,0, true));
+      lines.push_back(std::make_tuple(angle,p,0,0, true, angle, l));
     }
     set_value("tmp_vec3f", tmp_vec3f);
 
@@ -1012,11 +1014,13 @@ class RegulariseLinesNode:public Node {
     for(auto& cluster : dist_clusters) {
       //try to find a footprint line
       linetype best_line;
+      double best_angle;
       bool found_fp=false, found_non_fp=false;
       for(auto& line : cluster) {
         if(std::get<4>(line)){
           found_fp=true;
           best_line = line;
+          best_angle = std::get<5>(line); // initial angle of this fp line
         } else {
           found_non_fp = true;
         }
@@ -1032,19 +1036,20 @@ class RegulariseLinesNode:public Node {
           if(z > max_z) {
             max_z = z;
             best_line = line;
+            best_angle = std::get<0>(best_line);
           }
         }
       }
       // compute vec orthogonal to lines in this cluster
-      double angle = std::get<0>(best_line);
       auto p0 = std::get<1>(best_line);
+      auto halfdist = std::sqrt(std::get<6>(best_line));
       // Vector_2 n(-1.0, std::tan(angle));
-      // n = n/std::sqrt(n.squared_length()); // normalize
-      Vector_2 l(std::tan(angle),1.0);
+      // n = n/std::sqrt(n.squared_length();()); // normalize
+      Vector_2 l(std::tan(best_angle),1.0);
       l = l/std::sqrt(l.squared_length()); // normalize
       auto p_center = p0;// + average_dist*n;
-      auto p_begin = p_center + 3*l;
-      auto p_end = p_center - 3*l;
+      auto p_begin = p_center + halfdist*l;
+      auto p_end = p_center - halfdist*l;
       edges_out_vec3f.push_back({float(p_begin.x()), float(p_begin.y()), 0});
       edges_out_vec3f.push_back({float(p_end.x()), float(p_end.y()), 0});
       edges_out.push_back(std::make_pair(
