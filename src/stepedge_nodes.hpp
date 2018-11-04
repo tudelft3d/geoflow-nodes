@@ -450,7 +450,7 @@ class DetectLinesNode:public Node {
   public:
   DetectLinesNode(NodeManager& manager):Node(manager, "DetectLines") {
     add_input("edge_points", TT_any);
-    add_output("edge_segments_vec3f", TT_vec3f);
+    add_output("edge_segments_c", TT_line_string_collection);
     add_output("edge_segments", TT_any);
   }
 
@@ -466,20 +466,19 @@ class DetectLinesNode:public Node {
     std::vector<std::pair<Point,Point>> edge_segments;
     detect_lines(edge_segments, edge_points, c);
     set_value("edge_segments", edge_segments);
-    vec3f edge_segments_vec3f;
+    LineStringCollection edge_segments_c;
     for (auto s : edge_segments){
-      edge_segments_vec3f.push_back({
+      edge_segments_c.push_back({{
         float(s.first.x()),
         float(s.first.y()),
         float(s.first.z())
-      });
-      edge_segments_vec3f.push_back({
+      },{
         float(s.second.x()),
         float(s.second.y()),
         float(s.second.z())
-      });
+      }});
     }
-    set_value("edge_segments_vec3f", edge_segments_vec3f);
+    set_value("edge_segments_c", edge_segments_c);
   }
 };
 
@@ -532,7 +531,7 @@ class ComputeMetricsNode:public Node {
     add_output("line_dist", TT_vec1f);
     add_output("jump_count", TT_vec1f);
     add_output("jump_ele", TT_vec1f);
-    add_output("points_vec3f", TT_vec3f);
+    add_output("points_c", TT_point_collection);
   }
 
   void gui(){
@@ -557,7 +556,7 @@ class ComputeMetricsNode:public Node {
     compute_metrics(pnl_points, c);
     vec1f line_dist, jump_count, jump_ele;
     vec1i plane_id, is_wall;
-    vec3f points_vec3f;
+    PointCollection points_c;
     for(auto& p : pnl_points){
       plane_id.push_back(boost::get<2>(p));
       is_wall.push_back(boost::get<3>(p));
@@ -569,10 +568,10 @@ class ComputeMetricsNode:public Node {
               float(boost::get<0>(p).y()),
               float(boost::get<0>(p).z())
             };
-      points_vec3f.push_back(a);
+      points_c.push_back(a);
     }
     set_value("points", pnl_points);
-    set_value("points_vec3f", points_vec3f);
+    set_value("points_c", points_c);
     set_value("plane_id", plane_id);
     set_value("is_wall", is_wall);
     set_value("line_dist", line_dist);
