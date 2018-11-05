@@ -213,7 +213,7 @@ struct config {
   bool merge_segid = true;
   bool merge_zrange = true;
   bool merge_step_height = true;
-  bool merge_unsegmented = true;
+  bool merge_unsegmented = false;
   bool merge_dangling_egdes = true;
 };
 
