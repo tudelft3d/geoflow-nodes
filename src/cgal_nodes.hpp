@@ -253,7 +253,7 @@ class TinSimpNode:public Node {
   float thres_error = 2;
 
   TinSimpNode(NodeManager& manager):Node(manager, "TinSimp") {
-    add_input("geometry", TT_geometry);
+    add_input("geometries", {TT_point_collection, TT_line_string_collection});
     add_output("triangles_vec3f", TT_vec3f);
     add_output("lines_vec3f", TT_vec3f);
     add_output("line_features", TT_any);
@@ -263,16 +263,12 @@ class TinSimpNode:public Node {
     ImGui::SliderFloat("Error threshold", &thres_error, 0, 100);
   }
 
-  void process(){
-    auto geometry = std::any_cast<gfGeometry3D>(get_value("geometry"));
-
-    float min_x = geometry.bounding_box.min()[0]-1;
-    float min_y = geometry.bounding_box.min()[1]-1;
-    float max_x = geometry.bounding_box.max()[0]+1;
-    float max_y = geometry.bounding_box.max()[1]+1;
-    float center_z = (geometry.bounding_box.max()[2]-geometry.bounding_box.min()[2])/2;
-
-    tinsimp::CDT cdt;
+  void build_initial_tin(tinsimp::CDT& cdt, geoflow::Box& bbox){ 
+    float min_x = bbox.min()[0]-1;
+    float min_y = bbox.min()[1]-1;
+    float max_x = bbox.max()[0]+1;
+    float max_y = bbox.max()[1]+1;
+    float center_z = (bbox.max()[2]-bbox.min()[2])/2;
 
     std::vector<tinsimp::Point> initial_points = {
       tinsimp::Point(min_x, min_y, center_z),
@@ -281,12 +277,20 @@ class TinSimpNode:public Node {
       tinsimp::Point(min_x, max_y, center_z)
     };
     cdt.insert(initial_points.begin(), initial_points.end());
+  }
 
-    if (geometry.type == geoflow::points) {
-      tinsimp::greedy_insert(cdt, geometry.vertices, double(thres_error));
+  void process(){
+    auto geom_term = inputTerminals["geometries"];
+    tinsimp::CDT cdt;
 
-    } else if (geometry.type == geoflow::line_strip) {
-      tinsimp::greedy_insert_lines(cdt, geometry.vertices, geometry.counts, double(thres_error));
+    if (geom_term->connected_type == TT_point_collection) {
+      auto points = geom_term->get_data<geoflow::PointCollection>();
+      build_initial_tin(cdt, points.box());
+      tinsimp::greedy_insert(cdt, points, double(thres_error));
+    } else if (geom_term->connected_type == TT_line_string_collection) {
+      auto lines = geom_term->get_data<geoflow::LineStringCollection>();
+      build_initial_tin(cdt, lines.box());
+      // tinsimp::greedy_insert_lines(cdt, lines, double(thres_error));
       Feature line_features;
       line_features.type = line_strip;
       vec3f lines_vec3f;

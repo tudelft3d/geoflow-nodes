@@ -11,6 +11,7 @@ typedef bg::model::d2::point_xy<double> point_type;
 typedef bg::model::point<double, 3, bg::cs::cartesian> point_type_3d;
 
 #include <unordered_map>
+#include <variant>
 
 using namespace geoflow;
 
@@ -29,9 +30,8 @@ class OGRLoaderNode:public Node {
   // char filepath[256] = "/Users/ravi/surfdrive/Projects/RWS-Basisbestand-3D-geluid/3D-basisbestand-geluid-v0.1/output/hoogtelijnen/hoogtelijnen_v2/hoogtelijnen_out";
 
   OGRLoaderNode(NodeManager& manager):Node(manager, "OGRLoader") {
-    add_output("geometries", TT_geometry);
-    add_output("features", TT_any);
-    add_output("vertices", TT_vec3f);
+    add_output("line_strings", TT_line_string_collection);
+    add_output("linear_rings", TT_linear_ring_collection);
     GDALAllRegister();
   }
 
@@ -53,9 +53,8 @@ class OGRLoaderNode:public Node {
     current_layer_id = 0;
 
     // Set up vertex data (and buffer(s)) and attribute pointers
-    gfGeometry3D geometries;
-    vec3f vertices_vec3f;
-    Feature features;
+    LineStringCollection line_strings;
+    LinearRingCollection linear_rings;
 
     OGRLayer  *poLayer;
     poLayer = poDS->GetLayer( current_layer_id );
@@ -64,21 +63,7 @@ class OGRLoaderNode:public Node {
     geometry_type_name = OGRGeometryTypeToName(geometry_type);
     std::cout << "Layer geometry type: " << geometry_type_name << "\n";
 
-    if (geometry_type == wkbLineString25D || geometry_type == wkbLineStringZM) {
-      geometries.type = geoflow::line_strip;
-    } else if (geometry_type == wkbPolygon || geometry_type == wkbPolygon25D || geometry_type == wkbPolygonZM || geometry_type == wkbPolygonM) {
-      geometries.type = geoflow::line_loop;
-      features.type = geoflow::line_loop;
-    }
-    geometries.format = geoflow::count;
-    
-    // OGREnvelope *poExtent;
-    // poLayer->ResetReading();
-    // poLayer->GetExtent(poExtent, true);
-    // features.offset = {(poExtent->MaxX-poExtent->MinX)/2, (poExtent->MaxY-poExtent->MinY)/2, 0};
-    // std::cout << "setting offset to " << features.offset[0] << " " << features.offset[1] << "\n";
-    // geometries.bounding_box.set({poExtent->MinX, poExtent->MinY, 0}, {poExtent->MaxX, poExtent->MaxY, 0});
-    bool found_offset = false;
+    bool found_offset = manager.data_offset.has_value();
     poLayer->ResetReading();
     size_t count = 0;
     for( auto& poFeature: poLayer )
@@ -92,35 +77,16 @@ class OGRLoaderNode:public Node {
         if (poGeometry->getGeometryType() == wkbLineString25D || poGeometry->getGeometryType() == wkbLineStringZM) {
           OGRLineString *poLineString = poGeometry->toLineString();
           
-          geometries.firsts.push_back(count);
-          for(auto& poPoint : poLineString){
-            std::array<float,3> p = {float(poPoint.getX()), float(poPoint.getY()), float(poPoint.getZ())};
-            geometries.vertices.push_back(p);
-            geometries.bounding_box.add(p.data());
-            count++;
-          }
-          geometries.counts.push_back(poLineString->getNumPoints());
-          
-
-          // temporary code, until Painter is updated to handle the gfGeometry3D struct
-          vec3f line;
+          vec3f line_string;
           for(auto& poPoint : poLineString){
             if (!found_offset) {
               manager.data_offset = {poPoint.getX(), poPoint.getY(), 0};
               found_offset = true;
             }
-            // std::cout << poPoint.getX() << " " << poPoint.getY() << " " << poPoint.getZ() << "\n";
-            line.push_back({float(poPoint.getX()-manager.data_offset[0]), float(poPoint.getY()-manager.data_offset[1]), float(poPoint.getZ()-manager.data_offset[2])});
+            std::array<float,3> p = {float(poPoint.getX()-(*manager.data_offset)[0]), float(poPoint.getY()-(*manager.data_offset)[1]), float(poPoint.getZ()-(*manager.data_offset)[2])};
+            line_string.push_back(p);
           }
-          features.geom.push_back(line);
-          
-          vertices_vec3f.push_back(line[0]);
-          for (size_t i=1; i<(line.size()-1); i++){
-            vertices_vec3f.push_back(line[i]);
-            vertices_vec3f.push_back(line[i]);
-          }
-          vertices_vec3f.push_back(line[line.size()-1]);
-          // end of temporary code
+          line_strings.push_back(line_string);
 
         } else if (poGeometry->getGeometryType() == wkbPolygon25D || poGeometry->getGeometryType() == wkbPolygon || poGeometry->getGeometryType() == wkbPolygonZM ||    poGeometry->getGeometryType() == wkbPolygonM ) {
           OGRPolygon *poPolygon = poGeometry->toPolygon();
@@ -131,7 +97,7 @@ class OGRLoaderNode:public Node {
               manager.data_offset = {poPoint.getX(), poPoint.getY(), 0};
               found_offset = true;
             }
-            std::array<float,3> p = {float(poPoint.getX()-manager.data_offset[0]), float(poPoint.getY()-manager.data_offset[1]), float(poPoint.getZ()-manager.data_offset[2])};
+            std::array<float,3> p = {float(poPoint.getX()-(*manager.data_offset)[0]), float(poPoint.getY()-(*manager.data_offset)[1]), float(poPoint.getZ()-(*manager.data_offset)[2])};
             ring.push_back(p);
           }
           // ring.erase(ring.end()-1);
@@ -144,7 +110,7 @@ class OGRLoaderNode:public Node {
           for (auto& p : boost_poly.outer()){
             ring_dedup.push_back({float(bg::get<0>(p)), float(bg::get<1>(p)), float(bg::get<2>(p))}); //FIXME losing potential z...
           }
-          features.geom.push_back(ring_dedup);
+          linear_rings.push_back(ring_dedup);
 
         } else {
           std::cout << "no supported geometry\n";
@@ -152,10 +118,13 @@ class OGRLoaderNode:public Node {
       }
 
     }
-    std::cout << "pushed " << geometries.counts.size() << " features...\n";
-    set_value("features", features);
-    set_value("geometries", geometries);
-    set_value("vertices", vertices_vec3f);
+    if (geometry_type == wkbLineString25D || geometry_type == wkbLineStringZM) {
+      set_value("line_strings", line_strings);
+      std::cout << "pushed " << line_strings.size() << " line_string features...\n";
+    } else if (geometry_type == wkbPolygon || geometry_type == wkbPolygon25D || geometry_type == wkbPolygonZM || geometry_type == wkbPolygonM) {
+      set_value("linear_rings", linear_rings);
+      std::cout << "pushed " << linear_rings.size() << " linear_ring features...\n";
+    }
   }
 };
 // class OGRLoaderOldNode:public Node {
@@ -333,7 +302,7 @@ class OGRWriterNode:public Node {
             if (features.type == line_loop) {
               OGRLinearRing ogrring;
               for (auto const& g: features.geom[i]) {
-                  ogrring.addPoint( g[0]+manager.data_offset[0], g[1]+manager.data_offset[1], g[2]+manager.data_offset[2] );
+                  ogrring.addPoint( g[0]+(*manager.data_offset)[0], g[1]+(*manager.data_offset)[1], g[2]+(*manager.data_offset)[2] );
               }
               ogrring.closeRings();
               OGRPolygon bouwpoly;
@@ -343,7 +312,7 @@ class OGRWriterNode:public Node {
             if (features.type == line_strip) {
               OGRLineString ogrlinestring;
               for (auto const& g: features.geom[i]) {
-                  ogrlinestring.addPoint( g[0]+manager.data_offset[0], g[1]+manager.data_offset[1], g[2]+manager.data_offset[2] );
+                  ogrlinestring.addPoint( g[0]+(*manager.data_offset)[0], g[1]+(*manager.data_offset)[1], g[2]+(*manager.data_offset)[2] );
               }
               poFeature->SetGeometry( &ogrlinestring );
             }

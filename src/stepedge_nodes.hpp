@@ -600,14 +600,14 @@ pGridSet build_grid(vec3f& ring) {
 
 class LASInPolygonsNode:public Node {
   Feature point_clouds;
-  Feature polygons;
+  LinearRingCollection polygons;
 
   public:
   int footprint_id=0;
   // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
   char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
   LASInPolygonsNode(NodeManager& manager):Node(manager, "LASInPolygons") {
-    add_input("polygons", TT_any);
+    add_input("polygons", TT_linear_ring_collection);
     add_output("point_clouds", TT_any);
     add_output("points_vec3f", TT_vec3f);
     add_output("footprint_vec3f", TT_vec3f);
@@ -615,26 +615,25 @@ class LASInPolygonsNode:public Node {
 
   void gui() {
     ImGui::InputText("LAS file path", las_filepath, IM_ARRAYSIZE(las_filepath));
-    if (ImGui::SliderInt("#", &footprint_id, 0, polygons.geom.size()-1)) {
+    if (ImGui::SliderInt("#", &footprint_id, 0, polygons.size()-1)) {
       // if(run_on_change) {
       //   manager.run(*this);
       // } else {
         notify_children();
         set_value("points_vec3f", point_clouds.geom[footprint_id]);
-        set_value("footprint_vec3f", polygons.geom[footprint_id]);
+        set_value("footprint_vec3f", polygons[footprint_id]);
         propagate_outputs();
       // }
     }
   }
 
   void process() {
-    polygons = std::any_cast<Feature>(get_value("polygons"));
-    if (polygons.type != line_loop) return;
+    polygons = std::any_cast<LinearRingCollection>(get_value("polygons"));
 
     // std::vector<bg::model::polygon<point_type>> boost_polygons;
     std::vector<pGridSet> poly_grids;
             
-    for (auto& ring : polygons.geom) {
+    for (auto& ring : polygons) {
       poly_grids.push_back(build_grid(ring));
       // bg::model::polygon<point_type> boost_poly;
       // for (auto& p : ring) {
@@ -655,19 +654,19 @@ class LASInPolygonsNode:public Node {
 
     point_clouds = Feature();
     point_clouds.type = geoflow::points;
-    point_clouds.geom.resize(polygons.geom.size());
+    point_clouds.geom.resize(polygons.size());
 
     while (lasreader->read_point()) {
       if (lasreader->point.get_classification() == 6) {
         int i=0;
-        pPipoint point = new Pipoint{ lasreader->point.get_x()-manager.data_offset[0], lasreader->point.get_y()-manager.data_offset[1] };
+        pPipoint point = new Pipoint{ lasreader->point.get_x()-(*manager.data_offset)[0], lasreader->point.get_y()-(*manager.data_offset)[1] };
         
         for (auto& poly_grid:poly_grids) {
           if (GridTest(poly_grid, point)) {
             point_clouds.geom[i].push_back({
-              float(lasreader->point.get_x()-manager.data_offset[0]), 
-              float(lasreader->point.get_y()-manager.data_offset[1]),
-              float(lasreader->point.get_z()-manager.data_offset[2])
+              float(lasreader->point.get_x()-(*manager.data_offset)[0]), 
+              float(lasreader->point.get_y()-(*manager.data_offset)[1]),
+              float(lasreader->point.get_z()-(*manager.data_offset)[2])
             });
             break;
             // laswriter->write_point(&lasreader->point);
@@ -685,7 +684,7 @@ class LASInPolygonsNode:public Node {
 
     set_value("point_clouds", point_clouds);
     set_value("points_vec3f", point_clouds.geom[footprint_id]);
-    set_value("footprint_vec3f", polygons.geom[footprint_id]);
+    set_value("footprint_vec3f", polygons[footprint_id]);
   }
 };
 

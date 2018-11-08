@@ -72,7 +72,7 @@ int main(int ac, const char * av[])
     nodes_.PreloadNodes(ns);
 
     ImGui::LinkStore ls;
-    ls.push_back(std::make_tuple("TheOGRLoader", "TheLASInPolygons", "features", "polygons"));
+    // ls.push_back(std::make_tuple("TheOGRLoader", "TheLASInPolygons", "linear_rings", "polygons"));
     ls.push_back(std::make_tuple("TheLASInPolygons", "TheComputeMetrics", "points_vec3f", "points_vec3f"));
     ls.push_back(std::make_tuple("TheLASInPolygons", "TheBuildArrangement", "footprint_vec3f", "footprint_vec3f"));
     ls.push_back(std::make_tuple("TheLASInPolygons", "TheRegulariseLines", "footprint_vec3f", "footprint_vec3f"));
