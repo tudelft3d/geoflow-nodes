@@ -68,6 +68,7 @@ class AlphaShapeNode:public Node {
     typedef CGAL::Triangulation_data_structure_2<Vb,Fb>          Tds;
     typedef CGAL::Delaunay_triangulation_2<Gt,Tds>               Triangulation_2;
     typedef CGAL::Alpha_shape_2<Triangulation_2>                 Alpha_shape_2;
+    typedef Triangulation_2::Vertex_handle                       VertexHandle;
 
     // Set up vertex data (and buffer(s)) and attribute pointers
     auto points = std::any_cast<PNL_vector>(get_value("points"));
@@ -84,11 +85,22 @@ class AlphaShapeNode:public Node {
     vec3f edge_points_vec3f;
     for (auto& it : points_per_segment ) {
       auto points = it.second;
-      Alpha_shape_2 A(points.begin(), points.end(),
+      Triangulation_2 T;
+      T.insert(points.begin(), points.end());
+      Alpha_shape_2 A(T,
                   FT(thres_alpha),
                   Alpha_shape_2::GENERAL);
       // thres_alpha = *A.find_optimal_alpha(1);
       A.set_alpha(FT(thres_alpha));
+      std::vector<std::pair<VertexHandle, VertexHandle>> alpha_edges;
+      for (auto it = A.alpha_shape_edges_begin(); it!=A.alpha_shape_edges_end(); it++) {
+        auto face = (it)->first;
+        auto i = (it)->second;
+        alpha_edges.push_back(std::make_pair(face->vertex(T.cw(i)), face->vertex(T.ccw(i))));
+      }
+      // find connecting edges...
+      // ...
+
       for (auto it = A.alpha_shape_vertices_begin(); it!=A.alpha_shape_vertices_end(); it++) {
         auto p = (*it)->point();
         edge_points.push_back(p);
@@ -158,7 +170,7 @@ class Arr2FeatureNode:public Node {
 };
 
 class ExtruderNode:public Node {
-
+  bool do_walls=true, do_roofs=true;
   public:
   ExtruderNode(NodeManager& manager):Node(manager, "Extruder") {
     add_input("arrangement", TT_any);
@@ -166,6 +178,11 @@ class ExtruderNode:public Node {
     add_output("triangles_vec3f", TT_vec3f);
     add_output("normals_vec3f", TT_vec3f);
     add_output("labels_vec1i", TT_vec1i); // 0==ground, 1==roof, 2==outerwall, 3==innerwall
+  }
+
+  void gui() {
+    ImGui::Checkbox("Do walls", &do_walls);
+    ImGui::Checkbox("Do roofs", &do_roofs);
   }
 
   void process(){
@@ -179,104 +196,107 @@ class ExtruderNode:public Node {
     vec1i labels;
     using N = uint32_t;
 
-    size_t cell_id=0;
-    for (auto face: arr.face_handles()){
-      if(face->data().is_finite) {
-        cell_id++;
-        vec2f polygon, face_triangles;
-        arrangementface_to_polygon(face, polygon);
-        std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
-        for(auto i : indices) {
-          face_triangles.push_back({polygon[i]});
+    if (do_roofs) {
+      size_t cell_id=0;
+      for (auto face: arr.face_handles()){
+        if(face->data().is_finite) {
+          cell_id++;
+          vec2f polygon, face_triangles;
+          arrangementface_to_polygon(face, polygon);
+          std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
+          for(auto i : indices) {
+            face_triangles.push_back({polygon[i]});
+          }
+          for (auto& vertex : face_triangles) {
+            //add to ground face
+            triangles.push_back({vertex[0], vertex[1], 0});
+            labels.push_back(0);
+            normals.push_back({0,0,-1});
+            cell_id_vec1i.push_back(cell_id);
+          } 
+          for (auto& vertex : face_triangles) {
+            //add to elevated (roof) face
+            triangles.push_back({vertex[0], vertex[1], face->data().elevation_avg});
+            labels.push_back(1);
+            normals.push_back({0,0,1});
+            cell_id_vec1i.push_back(cell_id);
+          } 
         }
-        for (auto& vertex : face_triangles) {
-          //add to ground face
-          triangles.push_back({vertex[0], vertex[1], 0});
-          labels.push_back(0);
-          normals.push_back({0,0,-1});
-          cell_id_vec1i.push_back(cell_id);
-        } 
-        for (auto& vertex : face_triangles) {
-          //add to elevated (roof) face
-          triangles.push_back({vertex[0], vertex[1], face->data().elevation_avg});
-          labels.push_back(1);
-          normals.push_back({0,0,1});
-          cell_id_vec1i.push_back(cell_id);
-        } 
       }
     }
+    if (do_walls) {
+      vertex n;
+      for (auto edge : arr.edge_handles()) {
+        // skip if faces on both sides of this edge are not finite
+        bool left_finite = edge->twin()->face()->data().is_finite;
+        bool right_finite = edge->face()->data().is_finite;
+        if (left_finite || right_finite) {
+          int wall_label = 2;
+          if (left_finite && right_finite)
+            wall_label = 3;
 
-    vertex n;
-    for (auto edge : arr.edge_handles()) {
-      // skip if faces on both sides of this edge are not finite
-      bool left_finite = edge->twin()->face()->data().is_finite;
-      bool right_finite = edge->face()->data().is_finite;
-      if (left_finite || right_finite) {
-        int wall_label = 2;
-        if (left_finite && right_finite)
-          wall_label = 3;
+          auto h1 = edge->face()->data().elevation_avg;
+          auto h2 = edge->twin()->face()->data().elevation_avg;
+          // push 2 triangles to form the quad between lower and upper edges
+          // notice that this is not always topologically correct, but fine for visualisation
+          
+          // define four points of the quad between upper and lower edge
+          std::array<float,3> l1,l2,u1,u2;
+          l1 = {
+            float(CGAL::to_double(edge->source()->point().x())),
+            float(CGAL::to_double(edge->source()->point().y())),
+            h1
+          };
+          l2 = {
+            float(CGAL::to_double(edge->target()->point().x())),
+            float(CGAL::to_double(edge->target()->point().y())),
+            h1
+          };
+          u1 = {
+            float(CGAL::to_double(edge->source()->point().x())),
+            float(CGAL::to_double(edge->source()->point().y())),
+            h2
+          };
+          u2 = {
+            float(CGAL::to_double(edge->target()->point().x())),
+            float(CGAL::to_double(edge->target()->point().y())),
+            h2
+          };
 
-        auto h1 = edge->face()->data().elevation_avg;
-        auto h2 = edge->twin()->face()->data().elevation_avg;
-        // push 2 triangles to form the quad between lower and upper edges
-        // notice that this is not always topologically correct, but fine for visualisation
-        
-        // define four points of the quad between upper and lower edge
-        std::array<float,3> l1,l2,u1,u2;
-        l1 = {
-          float(CGAL::to_double(edge->source()->point().x())),
-          float(CGAL::to_double(edge->source()->point().y())),
-          h1
-        };
-        l2 = {
-          float(CGAL::to_double(edge->target()->point().x())),
-          float(CGAL::to_double(edge->target()->point().y())),
-          h1
-        };
-        u1 = {
-          float(CGAL::to_double(edge->source()->point().x())),
-          float(CGAL::to_double(edge->source()->point().y())),
-          h2
-        };
-        u2 = {
-          float(CGAL::to_double(edge->target()->point().x())),
-          float(CGAL::to_double(edge->target()->point().y())),
-          h2
-        };
+          // 1st triangle
+          triangles.push_back(u1);
+          labels.push_back(wall_label);
+          triangles.push_back(l2);
+          labels.push_back(wall_label);
+          triangles.push_back(l1);
+          labels.push_back(wall_label);
 
-        // 1st triangle
-        triangles.push_back(u1);
-        labels.push_back(wall_label);
-        triangles.push_back(l2);
-        labels.push_back(wall_label);
-        triangles.push_back(l1);
-        labels.push_back(wall_label);
+          n = get_normal(u1,l2,l1);
+          normals.push_back(n);
+          normals.push_back(n);
+          normals.push_back(n);
 
-        n = get_normal(u1,l2,l1);
-        normals.push_back(n);
-        normals.push_back(n);
-        normals.push_back(n);
+          cell_id_vec1i.push_back(0);
+          cell_id_vec1i.push_back(0);
+          cell_id_vec1i.push_back(0);
 
-        cell_id_vec1i.push_back(0);
-        cell_id_vec1i.push_back(0);
-        cell_id_vec1i.push_back(0);
+          // 2nd triangle
+          triangles.push_back(u1);
+          labels.push_back(wall_label);
+          triangles.push_back(u2);
+          labels.push_back(wall_label);
+          triangles.push_back(l2);
+          labels.push_back(wall_label);
 
-        // 2nd triangle
-        triangles.push_back(u1);
-        labels.push_back(wall_label);
-        triangles.push_back(u2);
-        labels.push_back(wall_label);
-        triangles.push_back(l2);
-        labels.push_back(wall_label);
+          n = get_normal(u1,u2,l2);
+          normals.push_back(n);
+          normals.push_back(n);
+          normals.push_back(n);
 
-        n = get_normal(u1,u2,l2);
-        normals.push_back(n);
-        normals.push_back(n);
-        normals.push_back(n);
-
-        cell_id_vec1i.push_back(0);
-        cell_id_vec1i.push_back(0);
-        cell_id_vec1i.push_back(0);
+          cell_id_vec1i.push_back(0);
+          cell_id_vec1i.push_back(0);
+          cell_id_vec1i.push_back(0);
+        }
       }
     }
 
@@ -293,9 +313,8 @@ class SimplifyFootprintNode:public Node {
 
   public:
   SimplifyFootprintNode(NodeManager& manager):Node(manager, "SimplifyFootprint") {
-    add_input("features", TT_any);
-    add_output("features_simp", TT_any);
-    add_output("footprint_vec3f", TT_vec3f);
+    add_input("polygons", TT_linear_ring_collection);
+    add_output("polygons_simp", TT_linear_ring_collection);
   }
 
   void gui(){
@@ -315,35 +334,32 @@ class SimplifyFootprintNode:public Node {
     typedef PS::Stop_above_cost_threshold        Stop_cost;
     typedef PS::Squared_distance_cost            Cost;
 
-    auto features = std::any_cast<Feature>(get_value("features"));
-    if (features.type != line_loop) return; //FIXME better
+    auto polygons = std::any_cast<LinearRingCollection>(get_value("polygons"));
 
-    Feature features_out;
-    features_out.type = features.type;
+    LinearRingCollection polygons_out;
     
-    for (auto& ring : features.geom) {
-      Polygon_2 polygon;
+    for (auto& polygon : polygons) {
+      Polygon_2 cgal_polygon;
       Cost cost;
 
-      for (auto p : ring) {
-        polygon.push_back(Point_2(p[0], p[1]));
+      for (auto& p : polygon) {
+        cgal_polygon.push_back(Point_2(p[0], p[1]));
       }
       // polygon.erase(polygon.vertices_end()-1); // remove repeated point from the boost polygon
       
       // polygon = PS::simplify(polygon, cost, Stop_count_ratio(0.5));
 
-      polygon = PS::simplify(polygon, cost, Stop_cost(threshold_stop_cost));
+      cgal_polygon = PS::simplify(cgal_polygon, cost, Stop_cost(threshold_stop_cost));
       
       vec3f footprint_vec3f;
-      for (auto v = polygon.vertices_begin(); v!=polygon.vertices_end(); v++){
+      for (auto v = cgal_polygon.vertices_begin(); v!=cgal_polygon.vertices_end(); v++){
         footprint_vec3f.push_back({float(v->x()),float(v->y()),0});
       }
-      auto bv = polygon.vertices_begin(); // repeat first pt as last
+      auto bv = cgal_polygon.vertices_begin(); // repeat first pt as last
       footprint_vec3f.push_back({float(bv->x()),float(bv->y()),0});
-      features_out.geom.push_back(footprint_vec3f);
+      polygons_out.push_back(footprint_vec3f);
     }
-    // set_value("footprint_vec3f", footprint_vec3f);
-    set_value("features_simp", features_out);
+    set_value("polygons_simp", polygons_out);
   }
 };
 class ProcessArrangementNode:public Node {
