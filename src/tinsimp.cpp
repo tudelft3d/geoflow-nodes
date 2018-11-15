@@ -132,6 +132,107 @@ void greedy_insert(CDT &T, const std::vector<std::array<float,3>> &pts, double t
 
 }
 
+std::pair<std::vector<size_t>, std::vector<float>> greedy_insert(CDT &T, const geoflow::LineStringCollection& line_collection, double threshold) {
+  // assumes all lidar points are inside a triangle
+  Heap heap;
+
+  // Convert all elevation points to CGAL points
+  std::vector<std::pair<Point, size_t>> cpts; // point, line_id
+  // std::vector<std::vector<size_t>> line_ids; // point, line_id
+  cpts.reserve(line_collection.vertex_count());
+  size_t i=0;
+  for (auto& line : line_collection) {
+    for (auto& p : line) {
+      cpts.push_back(std::make_pair(Point(p[0], p[1], p[2]), i));
+    }
+    i++;
+  }
+
+  // compute initial point errors, build heap, store point indices in triangles
+  {
+    std::unordered_set<Point, PointXYHash, PointXYEqual> set;
+    for(int i=0; i<cpts.size(); i++){
+      auto p = cpts[i].first;
+      auto line_id = cpts[i].second;
+      // detect and skip duplicate points
+      auto not_duplicate = set.insert(p).second;
+      if(not_duplicate){
+        auto face = T.locate(p);
+        auto e = compute_error(p, face);
+        auto pe = point_error(i,e);
+        pe.line_id = line_id; // FIXME: what if one point is part of multiple lines? we will only store 1 line_id now...
+        auto handle = heap.push(pe);
+        face->info().points_inside->push_back(handle);
+      }
+    }
+  }
+  
+  // insert points, update errors of affected triangles until threshold error is reached
+  // hist of number of inserted points per line:
+  std::vector<size_t> line_counts(line_collection.size());
+  std::vector<float> line_errors(line_collection.size());
+  while (!heap.empty() && heap.top().error > threshold){
+    // get top element (with largest error) from heap
+    auto maxelement = heap.top();
+    auto max_p = cpts[maxelement.index].first;
+    auto line_id = cpts[maxelement.index].second;
+
+    // get triangles that will change after inserting this max_p
+    std::vector<CDT::Face_handle> faces;
+    T.get_conflicts ( max_p, std::back_inserter(faces) );
+
+    // insert max_p in triangulation
+    auto face_hint = faces[0];
+    auto v = T.insert(max_p, face_hint);
+    face_hint = v->face();
+    line_counts[line_id]++;
+    line_errors[line_id] = std::max(line_errors[line_id], float(maxelement.error));
+    
+    // update clear info of triangles that just changed, collect points that were inside these triangles
+    std::vector<heap_handle> points_to_update;
+    for (auto face : faces) {
+      if (face->info().plane){
+        delete face->info().plane;
+        face->info().plane = nullptr;
+      }
+      if (face->info().points_inside) {
+        for (auto h :*face->info().points_inside){
+          if( maxelement.index != (*h).index)
+            points_to_update.push_back(h);
+        }
+        face->info().points_inside->clear();
+      }
+    }
+    
+    // remove the point we just inserted in the triangulation from the heap
+    heap.pop();
+
+    // update the errors of affected elevation points
+    for (auto curelement : points_to_update){
+      auto p = cpts[(*curelement).index].first;
+      auto containing_face = T.locate(p, face_hint);
+      const double e = compute_error(p, containing_face);
+      const point_error new_pe = point_error((*curelement).index, e);
+      heap.update(curelement, new_pe);
+      containing_face->info().points_inside->push_back(curelement);
+    }
+  }
+
+  //cleanup the stuff I put in face info of triangles
+  for (CDT::Finite_faces_iterator fit = T.finite_faces_begin();
+    fit != T.finite_faces_end(); ++fit) {
+      if (fit->info().plane){
+        delete fit->info().plane;
+        fit->info().plane = nullptr;
+      }
+      if (fit->info().points_inside) {
+        delete fit->info().points_inside;
+        fit->info().points_inside = nullptr;
+      }
+    }
+  return std::make_pair(line_counts, line_errors);
+}
+
 void greedy_insert_lines2(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold) {
   // assumes all lidar points are inside a triangle
   Heap heap;

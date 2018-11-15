@@ -46,7 +46,7 @@ class AlphaShapeNode:public Node {
 
   public:
   float thres_alpha = 0.7;
-  AlphaShapeNode(NodeManager& manager):Node(manager, "AlphaShape") {
+  AlphaShapeNode(NodeManager& manager):Node(manager) {
     // add_input("points", TT_any);
     add_input("points", TT_any);
     add_output("edge_points", TT_any);
@@ -116,7 +116,7 @@ class AlphaShapeNode:public Node {
 class PolygonExtruderNode:public Node {
 
   public:
-  PolygonExtruderNode(NodeManager& manager):Node(manager, "PolygonExtruder") {
+  PolygonExtruderNode(NodeManager& manager):Node(manager) {
     add_input("polygons", TT_any);
     add_input("point_clouds", TT_any);
     add_output("polygons_extruded", TT_any);
@@ -143,7 +143,7 @@ class PolygonExtruderNode:public Node {
 class Arr2FeatureNode:public Node {
 
   public:
-  Arr2FeatureNode(NodeManager& manager):Node(manager, "Arr2Feature") {
+  Arr2FeatureNode(NodeManager& manager):Node(manager) {
     add_input("arrangement", TT_any);
     add_output("decomposed_footprint", TT_any);
   }
@@ -172,7 +172,7 @@ class Arr2FeatureNode:public Node {
 class ExtruderNode:public Node {
   bool do_walls=true, do_roofs=true;
   public:
-  ExtruderNode(NodeManager& manager):Node(manager, "Extruder") {
+  ExtruderNode(NodeManager& manager):Node(manager) {
     add_input("arrangement", TT_any);
     add_output("cell_id_vec1i", TT_vec1i);
     add_output("triangles_vec3f", TT_vec3f);
@@ -312,7 +312,7 @@ class SimplifyFootprintNode:public Node {
   float threshold_stop_cost=0.1;
 
   public:
-  SimplifyFootprintNode(NodeManager& manager):Node(manager, "SimplifyFootprint") {
+  SimplifyFootprintNode(NodeManager& manager):Node(manager) {
     add_input("polygons", TT_linear_ring_collection);
     add_output("polygons_simp", TT_linear_ring_collection);
   }
@@ -366,7 +366,7 @@ class ProcessArrangementNode:public Node {
   
   public:
   config c;
-  ProcessArrangementNode(NodeManager& manager):Node(manager, "ProcessArrangement") {
+  ProcessArrangementNode(NodeManager& manager):Node(manager) {
     add_input("arrangement", TT_any);
     add_input("points", TT_any);
     add_output("arrangement", TT_any);
@@ -397,7 +397,7 @@ class BuildArrangementNode:public Node {
   // float footprint_simp_thres=0;
 
   public:
-  BuildArrangementNode(NodeManager& manager):Node(manager, "BuildArrangement") {
+  BuildArrangementNode(NodeManager& manager):Node(manager) {
     add_input("edge_segments", TT_any);
     add_input("footprint_vec3f", TT_vec3f);
     add_output("arrangement", TT_any);
@@ -464,7 +464,7 @@ class DetectLinesNode:public Node {
   config c;
 
   public:
-  DetectLinesNode(NodeManager& manager):Node(manager, "DetectLines") {
+  DetectLinesNode(NodeManager& manager):Node(manager) {
     add_input("edge_points", TT_any);
     add_output("edge_segments_c", TT_line_string_collection);
     add_output("edge_segments", TT_any);
@@ -502,7 +502,7 @@ class ClassifyEdgePointsNode:public Node {
   config c;
 
   public:
-  ClassifyEdgePointsNode(NodeManager& manager):Node(manager, "ClassifyEdgePoints") {
+  ClassifyEdgePointsNode(NodeManager& manager):Node(manager) {
     add_output("edge_points", TT_any);
     add_output("edge_points_vec3f", TT_vec3f);
     add_input("points", TT_any);
@@ -539,7 +539,7 @@ class ComputeMetricsNode:public Node {
   config c;
 
   public:
-  ComputeMetricsNode(NodeManager& manager):Node(manager, "ComputeMetrics") {
+  ComputeMetricsNode(NodeManager& manager):Node(manager) {
     add_output("points", TT_any);
     add_input("points_vec3f", TT_vec3f); // change to Feature
     add_output("plane_id", TT_vec1i);
@@ -622,7 +622,7 @@ class LASInPolygonsNode:public Node {
   int footprint_id=0;
   // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
   char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-  LASInPolygonsNode(NodeManager& manager):Node(manager, "LASInPolygons") {
+  LASInPolygonsNode(NodeManager& manager):Node(manager) {
     add_input("polygons", TT_linear_ring_collection);
     add_output("point_clouds", TT_any);
     add_output("points_vec3f", TT_vec3f);
@@ -728,7 +728,7 @@ class PointsInFootprintNode:public Node {
   // char pc_cache_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/bcn116102_cache.cbor";
   char pc_cache_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/cache.cbor";
 
-  PointsInFootprintNode(NodeManager& manager):Node(manager, "PointsInFootprint") {
+  PointsInFootprintNode(NodeManager& manager):Node(manager) {
     add_output("points", TT_any);
     add_output("points_vec3f", TT_vec3f);
     add_output("footprint", TT_any);
@@ -874,7 +874,7 @@ class RegulariseLinesNode:public Node {
   float angle_threshold = 0.1;//5*(pi/180);
 
   public:
-  RegulariseLinesNode(NodeManager& manager):Node(manager, "RegulariseLines") {
+  RegulariseLinesNode(NodeManager& manager):Node(manager) {
     add_input("edge_segments", TT_any);
     add_input("footprint_vec3f", TT_vec3f);
     add_output("edges_out", TT_any);
@@ -1082,7 +1082,7 @@ class SimplifyLineNode:public Node {
   float threshold_stop_cost=0.1;
 
   public:
-  SimplifyLineNode(NodeManager& manager):Node(manager, "SimplifyLine") {
+  SimplifyLineNode(NodeManager& manager):Node(manager) {
     add_input("lines", TT_geometry);
     add_output("lines", TT_geometry);
     add_output("lines_vec3f", TT_vec3f);
@@ -1154,7 +1154,7 @@ class SimplifyLinesNode:public Node {
   float threshold_stop_cost=0.1;
 
   public:
-  SimplifyLinesNode(NodeManager& manager):Node(manager, "SimplifyLines") {
+  SimplifyLinesNode(NodeManager& manager):Node(manager) {
     add_input("lines", TT_geometry);
     add_output("lines", TT_geometry);
     add_output("lines_vec3f", TT_vec3f);
@@ -1231,7 +1231,7 @@ class SimplifyLinesNode:public Node {
 class LOD13GeneratorNode:public Node {
   public:
   float step_threshold = 1.0;
-  LOD13GeneratorNode(NodeManager& manager):Node(manager, "LOD13Generator") {
+  LOD13GeneratorNode(NodeManager& manager):Node(manager) {
     add_input("point_clouds", TT_any);
     add_input("polygons", TT_any);
     add_output("decomposed_polygons", TT_any);

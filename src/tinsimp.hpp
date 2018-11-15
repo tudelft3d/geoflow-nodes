@@ -7,6 +7,8 @@
 
 #include <boost/heap/fibonacci_heap.hpp>
 
+#include "geoflow.hpp"
+
 namespace tinsimp {
 
 // fibonacci heap for greedy insertion code
@@ -46,6 +48,8 @@ typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
 typedef CDT::Point													Point;
 
 void greedy_insert(CDT &T, const std::vector<std::array<float,3>> &pts, double threshold);
+std::pair<std::vector<size_t>, std::vector<float>> 
+  greedy_insert(CDT &T, const geoflow::LineStringCollection& line_collection, double threshold);
 void greedy_insert_lines(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold);
 void greedy_insert_lines2(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold);
 

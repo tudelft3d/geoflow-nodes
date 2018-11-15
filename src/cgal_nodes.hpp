@@ -16,10 +16,12 @@
 #include <CGAL/AABB_traits.h>
 #include <CGAL/AABB_triangle_primitive.h>
 
+#include <glm/glm.hpp>
+
 class CDTNode:public Node {
 
   public:
-  CDTNode(NodeManager& manager):Node(manager, "CDT") {
+  CDTNode(NodeManager& manager):Node(manager) {
     // add_input("points", TT_any);
     add_input("lines_vec3f", TT_vec3f);
     add_output("cgal_CDT", TT_any);
@@ -75,7 +77,7 @@ class ComparePointDistanceNode:public Node {
   char log_filepath[256] = "ComparePointDistanceNode.out";
   int thin_nth = 20;
 
-  ComparePointDistanceNode(NodeManager& manager):Node(manager, "ComparePointDistance") {
+  ComparePointDistanceNode(NodeManager& manager):Node(manager) {
     add_input("triangles1_vec3f", TT_vec3f);
     add_input("triangles2_vec3f", TT_vec3f);
     add_output("points", TT_vec3f);
@@ -179,7 +181,7 @@ class PointDistanceNode:public Node {
   char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
   int thin_nth = 5;
 
-  PointDistanceNode(NodeManager& manager):Node(manager, "PointDistance") {
+  PointDistanceNode(NodeManager& manager):Node(manager) {
     add_input("triangles_vec3f", TT_vec3f);
     add_output("points", TT_vec3f);
     add_output("distances", TT_vec1f);
@@ -247,16 +249,61 @@ class PointDistanceNode:public Node {
   }
 };
 
+class DensifyNode:public Node {
+  public:
+  float interval = 2;
+
+  DensifyNode(NodeManager& manager):Node(manager) {
+    add_input("geometries", {TT_linear_ring_collection, TT_line_string_collection});
+    add_output("dense_linestrings", TT_line_string_collection);
+  }
+
+  void gui(){
+    ImGui::SliderFloat("Interval", &interval, 0, 100);
+  }
+
+  void process(){
+    auto geom_term = inputTerminals["geometries"];
+
+    if (geom_term->connected_type == TT_line_string_collection) {
+      auto lines = geom_term->get_data<geoflow::LineStringCollection>();
+
+      LineStringCollection dense_linestrings;
+      for (auto& line : lines) {
+        vec3f dense_linestring;
+        dense_linestring.push_back(line[0]);
+        for(size_t i=1; i<line.size(); ++i) {
+          auto s = glm::make_vec3(line[i-1].data());
+          auto t = glm::make_vec3(line[i].data());
+          auto d = glm::distance(s,t);
+          if (d > interval) {
+            auto n = glm::normalize(t-s);
+            size_t count = glm::floor(d/interval);
+            for (size_t j=0; j<count; ++j) {
+              auto new_p = s+j*interval*n;
+              dense_linestring.push_back({new_p.x, new_p.y, new_p.z});
+            }
+          }
+          dense_linestring.push_back(line[i]);
+        }
+        dense_linestrings.push_back(dense_linestring);
+      }
+      set_value("dense_linestrings", dense_linestrings);
+    }
+
+  }
+};
 
 class TinSimpNode:public Node {
   public:
   float thres_error = 2;
 
-  TinSimpNode(NodeManager& manager):Node(manager, "TinSimp") {
+  TinSimpNode(NodeManager& manager):Node(manager) {
     add_input("geometries", {TT_point_collection, TT_line_string_collection});
     add_output("triangles_vec3f", TT_vec3f);
-    add_output("lines_vec3f", TT_vec3f);
-    add_output("line_features", TT_any);
+    add_output("selected_lines", TT_line_string_collection);
+    // add_output("count", TT_vec1ui);
+    // add_output("error", TT_vec1f);
   }
 
   void gui(){
@@ -290,32 +337,20 @@ class TinSimpNode:public Node {
     } else if (geom_term->connected_type == TT_line_string_collection) {
       auto lines = geom_term->get_data<geoflow::LineStringCollection>();
       build_initial_tin(cdt, lines.box());
-      // tinsimp::greedy_insert_lines(cdt, lines, double(thres_error));
-      Feature line_features;
-      line_features.type = line_strip;
-      vec3f lines_vec3f;
-      for (auto cit=cdt.constrained_edges_begin(); cit!= cdt.constrained_edges_end(); cit++ ){
-        auto& face = cit->first;
-        auto& index = cit->second;
-        auto p1 = face->vertex(cdt.cw(index))->point();
-        auto p2 = face->vertex(cdt.ccw(index))->point();
-        lines_vec3f.push_back({float(p1.x()), float(p1.y()), float(p1.z())});
-        lines_vec3f.push_back({float(p2.x()), float(p2.y()), float(p2.z())});
-        vec3f segment;
-        segment.push_back({float(p1.x()), float(p1.y()), float(p1.z())});
-        segment.push_back({float(p2.x()), float(p2.y()), float(p2.z())});
-        line_features.geom.push_back(segment);
+      std::vector<size_t> line_counts, selected_line_counts;
+      std::vector<float> line_errors, selected_line_errors;
+      std::tie(line_counts, line_errors) = tinsimp::greedy_insert(cdt, lines, double(thres_error));
+      LineStringCollection selected_lines;
+      for (size_t i=0; i<lines.size(); ++i) {
+        if (line_counts[i] > 0) {
+          selected_lines.push_back(lines[i]);
+          // selected_line_counts.push_back(line_counts[i]);
+          // selected_line_errors.push_back(line_errors[i]);
+        }
       }
-      // for (auto cidit=cdt.constraints_begin(); cidit!=cdt.constraints_end(); cidit++) {
-      //   vec3f line;
-      //   for (auto cit=cdt.vertices_in_constraint_begin(*cidit); cit!= cdt.vertices_in_constraint_end(*cidit); cit++ ){
-      //     auto p = (*cit)->point();
-      //     line.push_back({float(p.x()), float(p.y()), float(p.z())});
-      //   }
-      //   line_features.geom.push_back(line);
-      // }
-      set_value("line_features", line_features);
-      set_value("lines_vec3f", lines_vec3f);
+      set_value("selected_lines", selected_lines);
+      // set_value("count", line_counts);
+      // set_value("error", line_errors);
     }
 
     vec3f triangles_vec3f;

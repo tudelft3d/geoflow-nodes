@@ -29,7 +29,7 @@ class OGRLoaderNode:public Node {
   char filepath[256] = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_v01_simp_dp1m_subset.gpkg";
   // char filepath[256] = "/Users/ravi/surfdrive/Projects/RWS-Basisbestand-3D-geluid/3D-basisbestand-geluid-v0.1/output/hoogtelijnen/hoogtelijnen_v2/hoogtelijnen_out";
 
-  OGRLoaderNode(NodeManager& manager):Node(manager, "OGRLoader") {
+  OGRLoaderNode(NodeManager& manager):Node(manager) {
     add_output("line_strings", TT_line_string_collection);
     add_output("linear_rings", TT_linear_ring_collection);
     GDALAllRegister();
@@ -132,7 +132,7 @@ class OGRLoaderNode:public Node {
 //   // char filepath[256] = "/Users/ravi/surfdrive/Projects/RWS-Basisbestand-3D-geluid/3D-basisbestand-geluid-v0.1/output/hoogtelijnen/hoogtelijnen_v2/hoogtelijnen_out";
 
 //   public:
-//   OGRLoaderOldNode(NodeManager& manager):Node(manager, "OGRLoaderOld") {
+//   OGRLoaderOldNode(NodeManager& manager):Node(manager) {
 //     add_output("lines", TT_any);
 //     add_output("lines_vec3f", TT_vec3f);
 //   }
@@ -229,7 +229,7 @@ class OGRWriterNode:public Node {
     int epsg = 7415;
     
     
-    OGRWriterNode(NodeManager& manager):Node(manager, "OGRWriter") {
+    OGRWriterNode(NodeManager& manager):Node(manager) {
         add_input("features", TT_any); // struct with 'type' attrubute and a std::vector of vectors of coordinates
         // add_input("attributes", TT_any); // unordered map with attribute names as keys and the values as values (similar to python dict)
     }
@@ -334,7 +334,7 @@ class CSVLoaderNode:public Node {
   char filepath[256] = "/Users/ravi/git/heightjump-detect/build/ComparePointDistanceNode.out";
   int thin_nth = 5;
 
-  CSVLoaderNode(NodeManager& manager):Node(manager, "CSVLoader") {
+  CSVLoaderNode(NodeManager& manager):Node(manager) {
     add_output("points", TT_vec3f);
     add_output("distances1", TT_vec1f);
     add_output("distances2", TT_vec1f);

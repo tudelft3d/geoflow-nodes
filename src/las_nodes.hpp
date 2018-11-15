@@ -11,7 +11,7 @@ class LASLoaderNode:public Node {
   int thin_nth = 20;
   bool use_thin = true;
 
-  LASLoaderNode(NodeManager& manager):Node(manager, "LASLoader") {
+  LASLoaderNode(NodeManager& manager):Node(manager) {
     add_output("geometry", TT_geometry);
     add_output("points", TT_vec3f);
     add_output("classification", TT_vec1i);
