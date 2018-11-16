@@ -55,13 +55,16 @@ int main(int ac, const char * av[])
     N.register_node<CSVLoaderNode>("CSVLoader");
     N.register_node<TinSimpNode>("TinSimp");
     N.register_node<DensifyNode>("Densify");
+    N.register_node<SimplifyLine3DNode>("SimplifyLine3D");
 
     a->draw_that(on_draw);
 
     ImGui::NodeStore ns;
     ns.push_back(std::make_tuple("OGRLoader", "TheOGRLoader", ImVec2(75,75)));
-    ns.push_back(std::make_tuple("TinSimp", "TheTinSimp", ImVec2(275,75)));
-    ns.push_back(std::make_tuple("OGRWriter", "TheOGRWriter", ImVec2(475,75)));
+    // ns.push_back(std::make_tuple("Densify", "TheDensify", ImVec2(375,75)));
+    ns.push_back(std::make_tuple("TinSimp", "TheTinSimp", ImVec2(375,75)));
+    ns.push_back(std::make_tuple("SimplifyLine3D", "TheSimplifyLine3D", ImVec2(675,75)));
+    ns.push_back(std::make_tuple("OGRWriter", "TheOGRWriter", ImVec2(1075,75)));
     nodes_.PreloadNodes(ns);
 
     // ImGui::LinkStore ls;

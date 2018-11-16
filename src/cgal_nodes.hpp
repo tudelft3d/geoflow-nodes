@@ -2,6 +2,7 @@
 #include "geoflow.hpp"
 
 #include "tinsimp.hpp"
+#include "linesimp.hpp"
 
 // CDT
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
@@ -15,6 +16,11 @@
 #include <CGAL/AABB_tree.h>
 #include <CGAL/AABB_traits.h>
 #include <CGAL/AABB_triangle_primitive.h>
+
+// line simplification
+#include <CGAL/Polyline_simplification_2/simplify.h>
+#include <CGAL/Constrained_Delaunay_triangulation_2.h>
+#include <CGAL/Constrained_triangulation_plus_2.h>
 
 #include <glm/glm.hpp>
 
@@ -249,12 +255,37 @@ class PointDistanceNode:public Node {
   }
 };
 
+LineStringCollection densify_linestrings(LineStringCollection line_strings, float interval)
+{
+  LineStringCollection dense_linestrings;
+  for (auto& line : line_strings) {
+    vec3f dense_linestring;
+    dense_linestring.push_back(line[0]);
+    for(size_t i=1; i<line.size(); ++i) {
+      auto s = glm::make_vec3(line[i-1].data());
+      auto t = glm::make_vec3(line[i].data());
+      auto d = glm::distance(s,t);
+      if (d > interval) {
+        auto n = glm::normalize(t-s);
+        size_t count = glm::floor(d/interval);
+        for (size_t j=0; j<count; ++j) {
+          auto new_p = s+j*interval*n;
+          dense_linestring.push_back({new_p.x, new_p.y, new_p.z});
+        }
+      }
+      dense_linestring.push_back(line[i]);
+    }
+    dense_linestrings.push_back(dense_linestring);
+  }
+  return dense_linestrings;
+}
+
 class DensifyNode:public Node {
   public:
   float interval = 2;
 
   DensifyNode(NodeManager& manager):Node(manager) {
-    add_input("geometries", {TT_linear_ring_collection, TT_line_string_collection});
+    add_input("geometries", {TT_line_string_collection});
     add_output("dense_linestrings", TT_line_string_collection);
   }
 
@@ -267,28 +298,7 @@ class DensifyNode:public Node {
 
     if (geom_term->connected_type == TT_line_string_collection) {
       auto lines = geom_term->get_data<geoflow::LineStringCollection>();
-
-      LineStringCollection dense_linestrings;
-      for (auto& line : lines) {
-        vec3f dense_linestring;
-        dense_linestring.push_back(line[0]);
-        for(size_t i=1; i<line.size(); ++i) {
-          auto s = glm::make_vec3(line[i-1].data());
-          auto t = glm::make_vec3(line[i].data());
-          auto d = glm::distance(s,t);
-          if (d > interval) {
-            auto n = glm::normalize(t-s);
-            size_t count = glm::floor(d/interval);
-            for (size_t j=0; j<count; ++j) {
-              auto new_p = s+j*interval*n;
-              dense_linestring.push_back({new_p.x, new_p.y, new_p.z});
-            }
-          }
-          dense_linestring.push_back(line[i]);
-        }
-        dense_linestrings.push_back(dense_linestring);
-      }
-      set_value("dense_linestrings", dense_linestrings);
+      set_value("dense_linestrings", densify_linestrings(lines, interval));
     }
 
   }
@@ -297,6 +307,7 @@ class DensifyNode:public Node {
 class TinSimpNode:public Node {
   public:
   float thres_error = 2;
+  float densify_interval = 2;
 
   TinSimpNode(NodeManager& manager):Node(manager) {
     add_input("geometries", {TT_point_collection, TT_line_string_collection});
@@ -308,6 +319,7 @@ class TinSimpNode:public Node {
 
   void gui(){
     ImGui::SliderFloat("Error threshold", &thres_error, 0, 100);
+    ImGui::SliderFloat("Line densify", &densify_interval, 0, 100);
   }
 
   void build_initial_tin(tinsimp::CDT& cdt, geoflow::Box& bbox){ 
@@ -339,7 +351,7 @@ class TinSimpNode:public Node {
       build_initial_tin(cdt, lines.box());
       std::vector<size_t> line_counts, selected_line_counts;
       std::vector<float> line_errors, selected_line_errors;
-      std::tie(line_counts, line_errors) = tinsimp::greedy_insert(cdt, lines, double(thres_error));
+      std::tie(line_counts, line_errors) = tinsimp::greedy_insert(cdt, densify_linestrings(lines, densify_interval), double(thres_error));
       LineStringCollection selected_lines;
       for (size_t i=0; i<lines.size(); ++i) {
         if (line_counts[i] > 0) {
@@ -368,5 +380,239 @@ class TinSimpNode:public Node {
 
     set_value("triangles_vec3f", triangles_vec3f);
 
+  }
+};
+
+class SimplifyLine3DNode:public Node {
+
+  float area_threshold=0.1;
+
+  public:
+  SimplifyLine3DNode(NodeManager& manager):Node(manager) {
+    add_input("lines", TT_line_string_collection);
+    add_output("lines", TT_line_string_collection);
+  }
+
+  void gui(){
+    if(ImGui::DragFloat("stop cost", &area_threshold,0.1)) {
+      manager.run(*this);
+    }
+  }
+
+  void process(){
+    // Set up vertex data (and buffer(s)) and attribute pointers
+    auto lines = std::any_cast<LineStringCollection>(get_value("lines"));
+
+    LineStringCollection simplified_lines;
+    for (auto& line_string : lines) {
+      simplified_lines.push_back( linesimp::visvalingam(line_string, area_threshold) );
+    }
+
+    set_value("lines", simplified_lines);
+  }
+};
+
+class SimplifyLineNode:public Node {
+
+  float threshold_stop_cost=0.1;
+
+  public:
+  SimplifyLineNode(NodeManager& manager):Node(manager) {
+    add_input("lines", TT_geometry);
+    add_output("lines", TT_geometry);
+    add_output("lines_vec3f", TT_vec3f);
+  }
+
+  void gui(){
+    if(ImGui::DragFloat("stop cost", &threshold_stop_cost,0.01)) {
+      manager.run(*this);
+    }
+  }
+
+  void process(){
+    // Set up vertex data (and buffer(s)) and attribute pointers
+    auto geometry = std::any_cast<gfGeometry3D>(get_value("lines"));
+    
+    namespace PS = CGAL::Polyline_simplification_2;
+    typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+    typedef PS::Vertex_base_2<K>  Vb;
+    typedef CGAL::Constrained_triangulation_face_base_2<K> Fb;
+    typedef CGAL::Triangulation_data_structure_2<Vb, Fb> TDS;
+    typedef CGAL::Exact_predicates_tag                          Itag;
+    typedef CGAL::Constrained_Delaunay_triangulation_2<K,TDS, Itag> CDT;
+    typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
+    typedef PS::Stop_below_count_ratio_threshold Stop_count_ratio;
+    typedef PS::Stop_above_cost_threshold        Stop_cost;
+    typedef PS::Squared_distance_cost            Cost;
+
+    Cost cost;
+
+    size_t s_index=0;
+    size_t sum_count=0,count=0;
+    gfGeometry3D geometry_out;
+    vec3f vertices_vec3f;
+    for (auto c : geometry.counts) {
+      std::vector<K::Point_2> line;
+      std::cerr << "count: " <<c << "\n";
+      for (size_t i=0; i<c; i++ ) {
+        auto p = geometry.vertices[s_index+i];
+        line.push_back(K::Point_2(p[0], p[1], p[2]));
+        std::cerr << "\t "<< p[0] << ", " << p[1] << "\n";
+      }
+      s_index+=c;
+      std::vector <K::Point_2> points_out;
+      points_out.reserve(c);
+      PS::simplify(line.begin(), line.end(), cost, Stop_cost(threshold_stop_cost), points_out.begin());
+      
+      auto points_begin = points_out.begin();
+      auto points_end = points_out.end();
+      size_t psize = points_out.size();
+      for(auto pit = points_begin; pit != points_end; ++pit) {
+        if(pit!=points_begin && pit!=points_end)
+          vertices_vec3f.push_back({float(pit->x()), float(pit->y()), 0});
+        vertices_vec3f.push_back({float(pit->x()), float(pit->y()), 0});
+        geometry_out.vertices.push_back({float(pit->x()), float(pit->y()), 0});
+        count++;
+      }
+      geometry_out.counts.push_back(count);
+      geometry_out.firsts.push_back(sum_count);
+      sum_count += count;
+    }
+
+    set_value("lines_vec3f", vertices_vec3f);
+    set_value("lines", geometry_out);
+  }
+};
+class SimplifyLinesNode:public Node {
+
+  float threshold_stop_cost=0.1;
+
+  public:
+  SimplifyLinesNode(NodeManager& manager):Node(manager) {
+    add_input("lines", TT_geometry);
+    add_output("lines", TT_geometry);
+    add_output("lines_vec3f", TT_vec3f);
+  }
+
+  void gui(){
+    if(ImGui::DragFloat("stop cost", &threshold_stop_cost,0.01)) {
+      manager.run(*this);
+    }
+  }
+
+  void process(){
+    // Set up vertex data (and buffer(s)) and attribute pointers
+    auto geometry = std::any_cast<gfGeometry3D>(get_value("lines"));
+    
+    namespace PS = CGAL::Polyline_simplification_2;
+    typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+    typedef PS::Vertex_base_2<K>  Vb;
+    typedef CGAL::Constrained_triangulation_face_base_2<K> Fb;
+    typedef CGAL::Triangulation_data_structure_2<Vb, Fb> TDS;
+    typedef CGAL::Exact_predicates_tag                          Itag;
+    typedef CGAL::Constrained_Delaunay_triangulation_2<K,TDS, Itag> CDT;
+    typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
+    typedef PS::Stop_below_count_ratio_threshold Stop_count_ratio;
+    typedef PS::Stop_above_cost_threshold        Stop_cost;
+    typedef PS::Squared_distance_cost            Cost;
+
+    Cost cost;
+
+    CT ct;
+
+    size_t s_index=0;
+    for (auto c : geometry.counts) {
+      std::vector<CDT::Point> line;
+      std::cerr << "count: " <<c << "\n";
+      for (size_t i=0; i<c; i++ ) {
+        auto p = geometry.vertices[s_index+i];
+        line.push_back(CDT::Point(p[0], p[1]));
+        std::cerr << "\t "<< p[0] << ", " << p[1] << "\n";
+      }
+      s_index+=c;
+      ct.insert_constraint(line.begin(), line.end());
+    }
+    
+    size_t n_removed = PS::simplify(ct, cost, Stop_cost(threshold_stop_cost));
+    
+    gfGeometry3D geometry_out;
+    vec3f vertices_vec3f;
+    for(auto cid = ct.constraints_begin(); cid != ct.constraints_end(); ++cid) {
+      // auto p = (*ct.vertices_in_constraint_begin())->point();
+      // vertices_vec3f.push_back({p.x(), p.y(), 0});
+      auto vit_begin = ct.vertices_in_constraint_begin(*cid);
+      auto vit_end = ct.vertices_in_constraint_end(*cid);
+      size_t sum_count=0,count=0;
+      for(auto vit = vit_begin; vit != vit_end; ++vit) {
+        auto p = (*vit)->point();
+        if(vit!=vit_begin && vit!=vit_end)
+          vertices_vec3f.push_back({float(p.x()), float(p.y()), 0});
+        vertices_vec3f.push_back({float(p.x()), float(p.y()), 0});
+        geometry_out.vertices.push_back({float(p.x()), float(p.y()), 0});
+        count++;
+      }
+      geometry_out.counts.push_back(count);
+      geometry_out.firsts.push_back(sum_count);
+      sum_count += count;
+    }
+
+    set_value("lines_vec3f", vertices_vec3f);
+    set_value("lines", geometry_out);
+  }
+};
+
+class SimplifyFootprintNode:public Node {
+
+  float threshold_stop_cost=0.1;
+
+  public:
+  SimplifyFootprintNode(NodeManager& manager):Node(manager) {
+    add_input("polygons", TT_linear_ring_collection);
+    add_output("polygons_simp", TT_linear_ring_collection);
+  }
+
+  void gui(){
+    if(ImGui::DragFloat("stop cost", &threshold_stop_cost,0.01)) {
+      manager.run(*this);
+    }
+  }
+
+  void process(){
+    // Set up vertex data (and buffer(s)) and attribute pointers
+
+    namespace PS = CGAL::Polyline_simplification_2;
+    typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+    typedef K::Point_2 Point_2;
+    typedef CGAL::Polygon_2<K>                   Polygon_2;
+    typedef PS::Stop_below_count_ratio_threshold Stop_count_ratio;
+    typedef PS::Stop_above_cost_threshold        Stop_cost;
+    typedef PS::Squared_distance_cost            Cost;
+
+    auto polygons = std::any_cast<LinearRingCollection>(get_value("polygons"));
+
+    LinearRingCollection polygons_out;
+    
+    for (auto& polygon : polygons) {
+      Polygon_2 cgal_polygon;
+      Cost cost;
+
+      for (auto& p : polygon) {
+        cgal_polygon.push_back(Point_2(p[0], p[1]));
+      }
+      // polygon.erase(polygon.vertices_end()-1); // remove repeated point from the boost polygon
+      
+      // polygon = PS::simplify(polygon, cost, Stop_count_ratio(0.5));
+
+      cgal_polygon = PS::simplify(cgal_polygon, cost, Stop_cost(threshold_stop_cost));
+      
+      vec3f footprint_vec3f;
+      for (auto v = cgal_polygon.vertices_begin(); v!=cgal_polygon.vertices_end(); v++){
+        footprint_vec3f.push_back({float(v->x()),float(v->y()),0});
+      }
+      auto bv = cgal_polygon.vertices_begin(); // repeat first pt as last
+      footprint_vec3f.push_back({float(bv->x()),float(bv->y()),0});
+      polygons_out.push_back(footprint_vec3f);
+    }
+    set_value("polygons_simp", polygons_out);
   }
 };

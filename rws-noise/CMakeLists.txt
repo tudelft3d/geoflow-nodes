@@ -6,7 +6,7 @@ include_directories(
   ../thirdparty/geoflow/thirdparty/imgui
   ../thirdparty/geoflow/thirdparty/imgui/examples)
 
-add_executable(hoogtelijnen hoogtelijnen.cpp ../src/tinsimp.cpp)
+add_executable(hoogtelijnen hoogtelijnen.cpp ../src/tinsimp.cpp ../src/linesimp.cpp)
 target_link_libraries( hoogtelijnen 
   point_edge_lib 
   flowchart-gui
