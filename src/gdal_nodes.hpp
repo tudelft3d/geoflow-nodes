@@ -230,8 +230,8 @@ class OGRWriterNode:public Node {
     
     
     OGRWriterNode(NodeManager& manager):Node(manager) {
-        add_input("features", TT_any); // struct with 'type' attrubute and a std::vector of vectors of coordinates
-        // add_input("attributes", TT_any); // unordered map with attribute names as keys and the values as values (similar to python dict)
+        add_input("geometries", {TT_line_string_collection, TT_linear_ring_collection});
+        add_input("attributes", TT_attribute_map_f);
     }
 
     void gui() {
@@ -239,8 +239,8 @@ class OGRWriterNode:public Node {
     }
     
     void process() {
-        // do these getter functions exist? <- yes they are defined in the base class geoflow::Node
-        auto features = inputs("features").get<Feature>();
+        auto geom_term = inputs("geometries");
+        auto attributes = inputs("attributes").get<AttributeMap>();
         // auto attributes = inputs("attributes").get<Attributes>();
         // what about the attributes?
 
@@ -270,10 +270,16 @@ class OGRWriterNode:public Node {
 
         oSRS.importFromEPSG( epsg ); 
         OGRwkbGeometryType wkbType;
-        if (features.type == line_loop) {
+        std::variant<LineStringCollection,LinearRingCollection> geometry_collection;
+        size_t geom_count;
+        if (geom_term.connected_type == TT_linear_ring_collection) {
           wkbType = wkbPolygon;
-        } else if (features.type == line_strip) {
+          geometry_collection = geom_term.get<LinearRingCollection>();
+          geom_count = std::get<LinearRingCollection>(geometry_collection).size();
+        } else if (geom_term.connected_type == TT_line_string_collection) {
           wkbType = wkbLineString25D;
+          geometry_collection = geom_term.get<LineStringCollection>();
+          geom_count = std::get<LineStringCollection>(geometry_collection).size();
         }
         poLayer = poDS->CreateLayer( "geom", &oSRS, wkbType, NULL );
         if( poLayer == NULL )
@@ -282,7 +288,7 @@ class OGRWriterNode:public Node {
             exit( 1 );
         }
 
-        for (auto& attr : features.attr) {
+        for (auto& attr : attributes) {
           OGRFieldDefn oField( attr.first.c_str(), OFTReal );
           if( poLayer->CreateField( &oField ) != OGRERR_NONE )
           {
@@ -291,17 +297,18 @@ class OGRWriterNode:public Node {
           }
         }
         // do the actual geometry conversion and writing here
-        for (std::vector<int>::size_type i = 0; i != features.geom.size(); i++)
+        for (size_t i = 0; i != geom_count; ++i)
         {
             OGRFeature *poFeature;
             poFeature = OGRFeature::CreateFeature( poLayer->GetLayerDefn() );
-            for (auto& attr : features.attr) {
+            for (auto& attr : attributes) {
               poFeature->SetField( attr.first.c_str(), attr.second[i] );
             }
             
-            if (features.type == line_loop) {
+            if (geom_term.connected_type == TT_linear_ring_collection) {
               OGRLinearRing ogrring;
-              for (auto const& g: features.geom[i]) {
+              LinearRingCollection& lr = std::get<LinearRingCollection>(geometry_collection);
+              for (auto const& g: lr[i]) {
                   ogrring.addPoint( g[0]+(*manager.data_offset)[0], g[1]+(*manager.data_offset)[1], g[2]+(*manager.data_offset)[2] );
               }
               ogrring.closeRings();
@@ -309,9 +316,10 @@ class OGRWriterNode:public Node {
               bouwpoly.addRing( &ogrring );
               poFeature->SetGeometry( &bouwpoly );
             }
-            if (features.type == line_strip) {
+            if (geom_term.connected_type == TT_line_string_collection) {
               OGRLineString ogrlinestring;
-              for (auto const& g: features.geom[i]) {
+              LineStringCollection& ls = std::get<LineStringCollection>(geometry_collection);
+              for (auto const& g: ls[i]) {
                   ogrlinestring.addPoint( g[0]+(*manager.data_offset)[0], g[1]+(*manager.data_offset)[1], g[2]+(*manager.data_offset)[2] );
               }
               poFeature->SetGeometry( &ogrlinestring );
