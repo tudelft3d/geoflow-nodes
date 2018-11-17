@@ -59,9 +59,9 @@ class LASLoaderNode:public Node {
     lasreader->close();
     delete lasreader;
 
-    set_value("points", geometry.vertices);
-    set_value("geometry", geometry);
-    set_value("classification", classification);
-    set_value("intensity", intensity);
+    outputs("points").set(geometry.vertices);
+    outputs("geometry").set(geometry);
+    outputs("classification").set(classification);
+    outputs("intensity").set(intensity);
   }
 };

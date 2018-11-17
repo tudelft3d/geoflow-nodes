@@ -66,7 +66,7 @@ class AlphaShapeNode:public Node {
     typedef Triangulation_2::Vertex_handle                       VertexHandle;
 
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto points = std::any_cast<PNL_vector>(get_value("points"));
+    auto points = inputs("points").get<PNL_vector>();
    
     std::unordered_map<int, std::vector<Point>> points_per_segment;
     for (auto& p : points) {
@@ -103,8 +103,8 @@ class AlphaShapeNode:public Node {
       }
     }
     
-    set_value("edge_points", edge_points);
-    set_value("edge_points_vec3f", edge_points_vec3f);
+    outputs("edge_points").set(edge_points);
+    outputs("edge_points_vec3f").set(edge_points_vec3f);
   }
 };
 
@@ -118,8 +118,8 @@ class PolygonExtruderNode:public Node {
   }
 
   void process(){
-    auto polygons = std::any_cast<Feature>(get_value("polygons"));
-    auto point_clouds = std::any_cast<Feature>(get_value("point_clouds"));
+    auto polygons = inputs("polygons").get<Feature>();
+    auto point_clouds = inputs("point_clouds").get<Feature>();
 
     if(polygons.geom.size()!=point_clouds.geom.size()) return;
 
@@ -131,7 +131,7 @@ class PolygonExtruderNode:public Node {
       }
       polygons.attr["height"].push_back(sum_elevation/point_cloud.size());
     }
-    set_value("polygons_extruded", polygons);
+    outputs("polygons_extruded").set(polygons);
   }
 };
 
@@ -144,7 +144,7 @@ class Arr2FeatureNode:public Node {
   }
 
   void process(){
-    auto arr = std::any_cast<Arrangement_2>(get_value("arrangement"));
+    auto arr = inputs("arrangement").get<Arrangement_2>();
 
     Feature decomposed_footprint;
     decomposed_footprint.type=geoflow::line_loop;
@@ -160,7 +160,7 @@ class Arr2FeatureNode:public Node {
         decomposed_footprint.attr["height"].push_back(face->data().elevation_avg);
       }
     }
-    set_value("decomposed_footprint", decomposed_footprint);
+    outputs("decomposed_footprint").set(decomposed_footprint);
   }
 };
 
@@ -182,9 +182,9 @@ class ExtruderNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    // auto polygons = std::any_cast<std::vector<vec2f>>(get_value("polygons"));
-    // auto elevations = std::any_cast<std::vector<float>>(get_value("elevations"));
-    auto arr = std::any_cast<Arrangement_2>(get_value("arrangement"));
+    // auto polygons = std::any_cast<inputs("polygons").get<vec2f>>();
+    // auto elevations = std::any_cast<inputs("elevations").get<float>>();
+    auto arr = inputs("arrangement").get<Arrangement_2>();
 
     vec3f triangles, normals;
     vec1i cell_id_vec1i;
@@ -295,10 +295,10 @@ class ExtruderNode:public Node {
       }
     }
 
-    set_value("normals_vec3f", normals);
-    set_value("cell_id_vec1i", cell_id_vec1i);
-    set_value("triangles_vec3f", triangles);
-    set_value("labels_vec1i", labels);
+    outputs("normals_vec3f").set(normals);
+    outputs("cell_id_vec1i").set(cell_id_vec1i);
+    outputs("triangles_vec3f").set(triangles);
+    outputs("labels_vec1i").set(labels);
   }
 };
 
@@ -324,12 +324,12 @@ class ProcessArrangementNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto points = std::any_cast<PNL_vector>(get_value("points"));
-    auto arr = std::any_cast<Arrangement_2>(get_value("arrangement"));
+    auto points = inputs("points").get<PNL_vector>();
+    auto arr = inputs("arrangement").get<Arrangement_2>();
 
     process_arrangement(points, arr, c);
     
-    set_value("arrangement", arr);
+    outputs("arrangement").set(arr);
   }
 };
 
@@ -351,8 +351,8 @@ class BuildArrangementNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto edge_segments = std::any_cast<std::vector<std::pair<Point,Point>>>(get_value("edge_segments"));
-    auto fp_vec3f = std::any_cast<vec3f>(get_value("footprint_vec3f"));
+    auto edge_segments = inputs("edge_segments").get<std::vector<std::pair<Point,Point>>>();
+    auto fp_vec3f = inputs("footprint_vec3f").get<vec3f>();
 
     bg::model::polygon<point_type> fp;
     for(auto& p : fp_vec3f) {
@@ -395,8 +395,8 @@ class BuildArrangementNode:public Node {
             });
         }
     }
-    set_value("arr_segments_vec3f", polygons);
-    set_value("arrangement", arr);
+    outputs("arr_segments_vec3f").set(polygons);
+    outputs("arrangement").set(arr);
   }
 };
 
@@ -418,10 +418,10 @@ class DetectLinesNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto edge_points = std::any_cast<std::vector<linedect::Point>>(get_value("edge_points"));
+    auto edge_points = inputs("edge_points").get<std::vector<linedect::Point>>();
     std::vector<std::pair<Point,Point>> edge_segments;
     detect_lines(edge_segments, edge_points, c);
-    set_value("edge_segments", edge_segments);
+    outputs("edge_segments").set(edge_segments);
     LineStringCollection edge_segments_c;
     for (auto s : edge_segments){
       edge_segments_c.push_back({{
@@ -434,7 +434,7 @@ class DetectLinesNode:public Node {
         float(s.second.z())
       }});
     }
-    set_value("edge_segments_c", edge_segments_c);
+    outputs("edge_segments_c").set(edge_segments_c);
   }
 };
 
@@ -457,10 +457,10 @@ class ClassifyEdgePointsNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto points = std::any_cast<PNL_vector>(get_value("points"));
+    auto points = inputs("points").get<PNL_vector>();
     std::vector<linedect::Point> edge_points;
     classify_edgepoints(edge_points, points, c);
-    set_value("edge_points", edge_points);
+    outputs("edge_points").set(edge_points);
 
     vec3f edge_points_vec3f;
     for(auto& p : edge_points) {
@@ -471,7 +471,7 @@ class ClassifyEdgePointsNode:public Node {
         }};
         edge_points_vec3f.push_back(a);
       }
-    set_value("edge_points_vec3f", edge_points_vec3f);
+    outputs("edge_points_vec3f").set(edge_points_vec3f);
   }
 };
 
@@ -502,7 +502,7 @@ class ComputeMetricsNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto points = std::any_cast<vec3f>(get_value("points_vec3f"));
+    auto points = inputs("points_vec3f").get<vec3f>();
     PNL_vector pnl_points;
     for (auto& p : points) {
       PNL pv;
@@ -526,13 +526,13 @@ class ComputeMetricsNode:public Node {
             };
       points_c.push_back(a);
     }
-    set_value("points", pnl_points);
-    set_value("points_c", points_c);
-    set_value("plane_id", plane_id);
-    set_value("is_wall", is_wall);
-    set_value("line_dist", line_dist);
-    set_value("jump_count", jump_count);
-    set_value("jump_ele", jump_ele);
+    outputs("points").set(pnl_points);
+    outputs("points_c").set(points_c);
+    outputs("plane_id").set(plane_id);
+    outputs("is_wall").set(is_wall);
+    outputs("line_dist").set(line_dist);
+    outputs("jump_count").set(jump_count);
+    outputs("jump_ele").set(jump_ele);
 
   }
 };
@@ -576,15 +576,15 @@ class LASInPolygonsNode:public Node {
       //   manager.run(*this);
       // } else {
         notify_children();
-        set_value("points_vec3f", point_clouds.geom[footprint_id]);
-        set_value("footprint_vec3f", polygons[footprint_id]);
+        outputs("points_vec3f").set(point_clouds.geom[footprint_id]);
+        outputs("footprint_vec3f").set(polygons[footprint_id]);
         propagate_outputs();
       // }
     }
   }
 
   void process() {
-    polygons = std::any_cast<LinearRingCollection>(get_value("polygons"));
+    polygons = inputs("polygons").get<LinearRingCollection>();
 
     // std::vector<bg::model::polygon<point_type>> boost_polygons;
     std::vector<pGridSet> poly_grids;
@@ -638,9 +638,9 @@ class LASInPolygonsNode:public Node {
     lasreader->close();
     delete lasreader;
 
-    set_value("point_clouds", point_clouds);
-    set_value("points_vec3f", point_clouds.geom[footprint_id]);
-    set_value("footprint_vec3f", polygons[footprint_id]);
+    outputs("point_clouds").set(point_clouds);
+    outputs("points_vec3f").set(point_clouds.geom[footprint_id]);
+    outputs("footprint_vec3f").set(polygons[footprint_id]);
   }
 };
 
@@ -685,10 +685,10 @@ class PointsInFootprintNode:public Node {
         manager.run(*this);
       } else {
         notify_children();
-        set_value("points", points_vec[footprint_id]);
-        set_value("points_vec3f", points_vec3f[footprint_id]);
-        set_value("footprint", footprints[footprint_id]);
-        set_value("footprint_vec3f", footprints_vec3f[footprint_id]);
+        outputs("points").set(points_vec[footprint_id]);
+        outputs("points_vec3f").set(points_vec3f[footprint_id]);
+        outputs("footprint").set(footprints[footprint_id]);
+        outputs("footprint_vec3f").set(footprints_vec3f[footprint_id]);
         propagate_outputs();
       }
     }
@@ -801,10 +801,10 @@ class PointsInFootprintNode:public Node {
         isInitialised = true;
       }
     }
-    set_value("points", points_vec[footprint_id]);
-    set_value("points_vec3f", points_vec3f[footprint_id]);
-    set_value("footprint", footprints[footprint_id]);
-    set_value("footprint_vec3f", footprints_vec3f[footprint_id]);
+    outputs("points").set(points_vec[footprint_id]);
+    outputs("points_vec3f").set(points_vec3f[footprint_id]);
+    outputs("footprint").set(footprints[footprint_id]);
+    outputs("footprint_vec3f").set(footprints_vec3f[footprint_id]);
   }
 };
 
@@ -829,8 +829,8 @@ class RegulariseLinesNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto edges = std::any_cast<std::vector<std::pair<Point,Point>>>(get_value("edge_segments"));
-    auto footprint_vec3f = std::any_cast<vec3f>(get_value("footprint_vec3f"));
+    auto edges = inputs("edge_segments").get<std::vector<std::pair<Point,Point>>>();
+    auto footprint_vec3f = inputs("footprint_vec3f").get<vec3f>();
     typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_2 Point_2;
 
     //compute midpoint and direction for each segment
@@ -864,7 +864,7 @@ class RegulariseLinesNode:public Node {
       if (angle < 0) angle += pi;
       lines.push_back(std::make_tuple(angle,p,0,0, true, angle, l));
     }
-    set_value("tmp_vec3f", tmp_vec3f);
+    outputs("tmp_vec3f").set(tmp_vec3f);
 
     // for (auto line: lines) {
     //   std::cout << std::get<0>(line) << " " << std::get<4>(line) << "\n";
@@ -1012,8 +1012,8 @@ class RegulariseLinesNode:public Node {
       ));
     }
 
-    set_value("edges_out", edges_out);
-    set_value("edges_out_vec3f", edges_out_vec3f);
+    outputs("edges_out").set(edges_out);
+    outputs("edges_out_vec3f").set(edges_out_vec3f);
   }
 };
 
@@ -1032,8 +1032,8 @@ class LOD13GeneratorNode:public Node {
   }
 
   void process(){
-    auto point_clouds = std::any_cast<Feature>(get_value("point_clouds"));
-    auto polygons = std::any_cast<Feature>(get_value("polygons"));
+    auto point_clouds = inputs("point_clouds").get<Feature>();
+    auto polygons = inputs("polygons").get<Feature>();
     
     // for each pair of polygon and point_cloud
       //create nodes and connections
@@ -1057,9 +1057,9 @@ class LOD13GeneratorNode:public Node {
       auto ProcessArrangement_node = std::make_shared<ProcessArrangementNode>(N);
       auto Arr2Feature_node = std::make_shared<Arr2FeatureNode>(N);
 
-      ComputeMetrics_node->inputTerminals["points_vec3f"]->push(points_vec3f);
-      BuildArrangement_node->inputTerminals["footprint_vec3f"]->push(polygon_vec3f);
-      RegulariseLines_node->inputTerminals["footprint_vec3f"]->push(polygon_vec3f);
+      ComputeMetrics_node->inputs("points_vec3f").set(points_vec3f);
+      BuildArrangement_node->inputs("footprint_vec3f").set(polygon_vec3f);
+      RegulariseLines_node->inputs("footprint_vec3f").set(polygon_vec3f);
 
       connect(*ComputeMetrics_node, *AlphaShape_node, "points", "points");
       connect(*ComputeMetrics_node, *ProcessArrangement_node, "points", "points");
@@ -1073,8 +1073,8 @@ class LOD13GeneratorNode:public Node {
       ProcessArrangement_node->c.step_height_threshold = step_threshold;
       N.run(*ComputeMetrics_node);
 
-      auto oTerm = Arr2Feature_node->outputTerminals["decomposed_footprint"];
-      auto polygons_feature = std::any_cast<Feature>(oTerm->cdata);
+      auto oTerm = Arr2Feature_node->outputs("decomposed_footprint");
+      auto polygons_feature = oTerm.get<Feature>();
 
       for (int i=0; i<polygons_feature.geom.size(); i++) {
         // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
@@ -1083,6 +1083,6 @@ class LOD13GeneratorNode:public Node {
         // }
       }
     }
-    set_value("decomposed_polygons", decomposed_polygons);
+    outputs("decomposed_polygons").set(decomposed_polygons);
   }
 };

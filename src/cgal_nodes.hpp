@@ -46,7 +46,7 @@ class CDTNode:public Node {
     typedef CDT::Point													Point;
 
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto lines = std::any_cast<vec3f>(get_value("lines_vec3f"));
+    auto lines = inputs("lines_vec3f").get<vec3f>();
    
     CDT cdt;
 
@@ -73,7 +73,7 @@ class CDTNode:public Node {
     }
 
     // set_value("cgal_CDT", cdt);
-    set_value("triangles_vec3f", triangles_vec3f);
+    outputs("triangles_vec3f").set(triangles_vec3f);
   }
 };
 
@@ -110,7 +110,7 @@ class ComparePointDistanceNode:public Node {
     typedef CGAL::AABB_tree<AABB_triangle_traits> Tree;
 
     // Triangles 1
-    auto trin1 = std::any_cast<vec3f>(get_value("triangles1_vec3f"));
+    auto trin1 = inputs("triangles1_vec3f").get<vec3f>();
     std::list<Triangle> triangles1;
     for(size_t i=0; i< trin1.size()/3; i++){
       auto a = Point(trin1[i*3+0][0], trin1[i*3+0][1], trin1[i*3+0][2]);
@@ -122,7 +122,7 @@ class ComparePointDistanceNode:public Node {
     tree1.accelerate_distance_queries();
 
     // Triangles 2
-    auto trin2 = std::any_cast<vec3f>(get_value("triangles2_vec3f"));
+    auto trin2 = inputs("triangles2_vec3f").get<vec3f>();
     std::list<Triangle> triangles2;
     for(size_t i=0; i< trin2.size()/3; i++){
       auto a = Point(trin2[i*3+0][0], trin2[i*3+0][1], trin2[i*3+0][2]);
@@ -175,10 +175,10 @@ class ComparePointDistanceNode:public Node {
     }
     
 
-    set_value("points", points);
-    set_value("diff", diff);
-    set_value("distances1", distances1);
-    set_value("distances2", distances2);
+    outputs("points").set(points);
+    outputs("diff").set(diff);
+    outputs("distances1").set(distances1);
+    outputs("distances2").set(distances2);
   }
 };
 
@@ -210,7 +210,7 @@ class PointDistanceNode:public Node {
     typedef CGAL::AABB_traits<K, Primitive> AABB_triangle_traits;
     typedef CGAL::AABB_tree<AABB_triangle_traits> Tree;
 
-    auto trin = std::any_cast<vec3f>(get_value("triangles"));
+    auto trin = inputs("triangles").get<vec3f>();
     std::list<Triangle> triangles;
     for(size_t i=0; i< trin.size()/3; i++){
       auto a = Point(trin[i*3+0][0], trin[i*3+0][1], trin[i*3+0][2]);
@@ -250,8 +250,8 @@ class PointDistanceNode:public Node {
     lasreader->close();
     delete lasreader;
 
-    set_value("points", points);
-    set_value("distances", distances);
+    outputs("points").set(points);
+    outputs("distances").set(distances);
   }
 };
 
@@ -294,11 +294,11 @@ class DensifyNode:public Node {
   }
 
   void process(){
-    auto geom_term = inputTerminals["geometries"];
+    auto geom_term = inputs("geometries");
 
-    if (geom_term->connected_type == TT_line_string_collection) {
-      auto lines = geom_term->get_data<geoflow::LineStringCollection>();
-      set_value("dense_linestrings", densify_linestrings(lines, interval));
+    if (geom_term.connected_type == TT_line_string_collection) {
+      auto lines = geom_term.get<geoflow::LineStringCollection>();
+      outputs("dense_linestrings").set(densify_linestrings(lines, interval));
     }
 
   }
@@ -339,15 +339,15 @@ class TinSimpNode:public Node {
   }
 
   void process(){
-    auto geom_term = inputTerminals["geometries"];
+    auto geom_term = inputs("geometries");
     tinsimp::CDT cdt;
 
-    if (geom_term->connected_type == TT_point_collection) {
-      auto points = geom_term->get_data<geoflow::PointCollection>();
+    if (geom_term.connected_type == TT_point_collection) {
+      auto points = geom_term.get<geoflow::PointCollection>();
       build_initial_tin(cdt, points.box());
       tinsimp::greedy_insert(cdt, points, double(thres_error));
-    } else if (geom_term->connected_type == TT_line_string_collection) {
-      auto lines = geom_term->get_data<geoflow::LineStringCollection>();
+    } else if (geom_term.connected_type == TT_line_string_collection) {
+      auto lines = geom_term.get<geoflow::LineStringCollection>();
       build_initial_tin(cdt, lines.box());
       std::vector<size_t> line_counts, selected_line_counts;
       std::vector<float> line_errors, selected_line_errors;
@@ -360,9 +360,9 @@ class TinSimpNode:public Node {
           // selected_line_errors.push_back(line_errors[i]);
         }
       }
-      set_value("selected_lines", selected_lines);
-      // set_value("count", line_counts);
-      // set_value("error", line_errors);
+      outputs("selected_lines").set(selected_lines);
+      // outputs("count").set(line_counts);
+      // outputs("error").set(line_errors);
     }
 
     vec3f triangles_vec3f;
@@ -378,7 +378,7 @@ class TinSimpNode:public Node {
         triangles_vec3f.push_back({float(p2.x()), float(p2.y()), float(p2.z())});
     }
 
-    set_value("triangles_vec3f", triangles_vec3f);
+    outputs("triangles_vec3f").set(triangles_vec3f);
 
   }
 };
@@ -401,14 +401,14 @@ class SimplifyLine3DNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto lines = std::any_cast<LineStringCollection>(get_value("lines"));
+    auto lines = inputs("lines").get<LineStringCollection>();
 
     LineStringCollection simplified_lines;
     for (auto& line_string : lines) {
       simplified_lines.push_back( linesimp::visvalingam(line_string, area_threshold) );
     }
 
-    set_value("lines", simplified_lines);
+    outputs("lines").set(simplified_lines);
   }
 };
 
@@ -431,7 +431,7 @@ class SimplifyLineNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto geometry = std::any_cast<gfGeometry3D>(get_value("lines"));
+    auto geometry = inputs("lines").get<gfGeometry3D>();
     
     namespace PS = CGAL::Polyline_simplification_2;
     typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -479,8 +479,8 @@ class SimplifyLineNode:public Node {
       sum_count += count;
     }
 
-    set_value("lines_vec3f", vertices_vec3f);
-    set_value("lines", geometry_out);
+    outputs("lines_vec3f").set(vertices_vec3f);
+    outputs("lines").set(geometry_out);
   }
 };
 class SimplifyLinesNode:public Node {
@@ -502,7 +502,7 @@ class SimplifyLinesNode:public Node {
 
   void process(){
     // Set up vertex data (and buffer(s)) and attribute pointers
-    auto geometry = std::any_cast<gfGeometry3D>(get_value("lines"));
+    auto geometry = inputs("lines").get<gfGeometry3D>();
     
     namespace PS = CGAL::Polyline_simplification_2;
     typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -556,8 +556,8 @@ class SimplifyLinesNode:public Node {
       sum_count += count;
     }
 
-    set_value("lines_vec3f", vertices_vec3f);
-    set_value("lines", geometry_out);
+    outputs("lines_vec3f").set(vertices_vec3f);
+    outputs("lines").set(geometry_out);
   }
 };
 
@@ -588,7 +588,7 @@ class SimplifyFootprintNode:public Node {
     typedef PS::Stop_above_cost_threshold        Stop_cost;
     typedef PS::Squared_distance_cost            Cost;
 
-    auto polygons = std::any_cast<LinearRingCollection>(get_value("polygons"));
+    auto polygons = inputs("polygons").get<LinearRingCollection>();
 
     LinearRingCollection polygons_out;
     
@@ -613,6 +613,6 @@ class SimplifyFootprintNode:public Node {
       footprint_vec3f.push_back({float(bv->x()),float(bv->y()),0});
       polygons_out.push_back(footprint_vec3f);
     }
-    set_value("polygons_simp", polygons_out);
+    outputs("polygons_simp").set(polygons_out);
   }
 };

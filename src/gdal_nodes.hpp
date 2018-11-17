@@ -119,10 +119,10 @@ class OGRLoaderNode:public Node {
 
     }
     if (geometry_type == wkbLineString25D || geometry_type == wkbLineStringZM) {
-      set_value("line_strings", line_strings);
+      outputs("line_strings").set(line_strings);
       std::cout << "pushed " << line_strings.size() << " line_string features...\n";
     } else if (geometry_type == wkbPolygon || geometry_type == wkbPolygon25D || geometry_type == wkbPolygonZM || geometry_type == wkbPolygonM) {
-      set_value("linear_rings", linear_rings);
+      outputs("linear_rings").set(linear_rings);
       std::cout << "pushed " << linear_rings.size() << " linear_ring features...\n";
     }
   }
@@ -218,8 +218,8 @@ class OGRLoaderNode:public Node {
     
 //     // poLayer = poDS->GetLayerByName( "point" );
 
-//     set_value("lines", lines);
-//     set_value("lines_vec3f", lines_vec3f);
+//     outputs("lines").set(lines);
+//     outputs("lines_vec3f").set(lines_vec3f);
 //   }
 // };
 
@@ -240,8 +240,8 @@ class OGRWriterNode:public Node {
     
     void process() {
         // do these getter functions exist? <- yes they are defined in the base class geoflow::Node
-        auto features = std::any_cast<Feature>(get_value("features"));
-        // auto attributes = std::any_cast<Attributes>(get_value("attributes"));
+        auto features = inputs("features").get<Feature>();
+        // auto attributes = inputs("attributes").get<Attributes>();
         // what about the attributes?
 
         const char *gszDriverName = "ESRI Shapefile";
@@ -365,9 +365,9 @@ class CSVLoaderNode:public Node {
     }
     f_in.close();
 
-    set_value("points", points);
-    set_value("distances1", distances1);
-    set_value("distances2", distances2);
-    set_value("difference", difference);
+    outputs("points").set(points);
+    outputs("distances1").set(distances1);
+    outputs("distances2").set(distances2);
+    outputs("difference").set(difference);
   }
 };
