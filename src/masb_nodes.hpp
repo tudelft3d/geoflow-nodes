@@ -16,8 +16,8 @@ class ComputeMedialAxisNode:public Node {
     add_input("points", TT_point_collection);
     add_input("normals", TT_vec3f);
     add_output("ma_coords", TT_point_collection);
-    add_output("ma_qidx", TT_vec1ui);
-    add_output("ma_is_interior", TT_vec1b);
+    add_output("ma_qidx", TT_vec1i);
+    add_output("ma_is_interior", TT_vec1i);
   }
 
   void gui(){
@@ -54,7 +54,7 @@ class ComputeMedialAxisNode:public Node {
 
     masb::compute_masb_points(params, madata);
 
-    vec1ui ma_qidx;
+    vec1i ma_qidx;
     ma_qidx.reserve(madata.m*2);
     for(size_t i=0 ; i<madata.m*2; ++i) {
       ma_qidx.push_back(madata.ma_qidx[i]);
@@ -66,8 +66,8 @@ class ComputeMedialAxisNode:public Node {
       ma_coords.push_back({c[0], c[1], c[2]});
     }
 
-    vec1b ma_is_interior(madata.m*2, false);
-    std::fill_n(ma_is_interior.begin(), madata.m, true);
+    vec1i ma_is_interior(madata.m*2, 0);
+    std::fill_n(ma_is_interior.begin(), madata.m, 1);
 
     outputs("ma_coords").set(ma_coords);
     outputs("ma_qidx").set(ma_qidx);
