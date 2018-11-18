@@ -36,6 +36,11 @@ endif()
 # LASlib
 add_subdirectory(thirdparty/LAStools/LASlib/src)
 
+# masbcpp
+add_subdirectory(thirdparty/masbcpp)
+include_directories(thirdparty/masbcpp/src)
+include_directories(thirdparty/masbcpp/thirdparty/vrui)
+
 # include helper file
 include( ${CGAL_USE_FILE} )
 

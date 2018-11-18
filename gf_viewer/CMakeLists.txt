@@ -4,7 +4,9 @@ include_directories(
   ../thirdparty/geoflow/src/viewer
   ../thirdparty/geoflow/thirdparty/glad/include 
   ../thirdparty/geoflow/thirdparty/imgui
-  ../thirdparty/geoflow/thirdparty/imgui/examples)
+  ../thirdparty/geoflow/thirdparty/imgui/examples
+  ../thirdparty/masbcpp/thirdparty
+  )
 
 add_executable(gf_viewer main.cpp ../src/tinsimp.cpp)
 target_link_libraries( gf_viewer 
@@ -13,6 +15,7 @@ target_link_libraries( gf_viewer
   Boost::program_options
   ${GDAL_LIBRARY}
   ptinpoly_lib
+  masbcpp
 )
 if(NOT MSVC)
   target_link_libraries(gf_viewer c++fs)

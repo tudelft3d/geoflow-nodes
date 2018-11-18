@@ -8,6 +8,7 @@
 #include "../src/gdal_nodes.hpp"
 #include "../src/las_nodes.hpp"
 #include "../src/cgal_nodes.hpp"
+#include "../src/masb_nodes.hpp"
 #include <array>
 
 // #include <boost/program_options.hpp>
@@ -44,7 +45,7 @@ int main(int ac, const char * av[])
     N.register_node<PointsInFootprintNode>("PointsInFootprint");
     N.register_node<RegulariseLinesNode>("RegulariseLines");
     N.register_node<AlphaShapeNode>("AlphaShape");
-    N.register_node<Arr2FeatureNode>("Arr2Feature");
+    N.register_node<Arr2LinearRingsNode>("Arr2LinearRings");
     N.register_node<PolygonExtruderNode>("PolygonExtruder");
     
     //gdal nodes
@@ -56,6 +57,8 @@ int main(int ac, const char * av[])
     N.register_node<ComparePointDistanceNode>("ComparePointDistance");
     N.register_node<CSVLoaderNode>("CSVLoader");
     N.register_node<TinSimpNode>("TinSimp");
+
+    N.register_node<ComputeNormalsNode>("ComputeNormals");
 
     a->draw_that(on_draw);
 
