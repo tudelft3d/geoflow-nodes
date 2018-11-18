@@ -49,10 +49,11 @@ int main(int ac, const char * av[])
     std::strcpy(ogr_loader->filepath, footprints_file.c_str());
     std::strcpy(las_in_poly->las_filepath, las_file.c_str());
 
-    geoflow::connect(*ogr_loader->outputTerminals["features"].get(), *las_in_poly->inputTerminals["polygons"].get());
-    geoflow::connect(*ogr_loader->outputTerminals["features"].get(), *lod13generator->inputTerminals["polygons"].get());
-    geoflow::connect(*las_in_poly->outputTerminals["point_clouds"].get(), *lod13generator->inputTerminals["point_clouds"].get());
-    geoflow::connect(*lod13generator->outputTerminals["decomposed_polygons"].get(), *ogr_writer->inputTerminals["features"].get());
+    geoflow::connect(ogr_loader->outputs("features"), las_in_poly->inputs("polygons"));
+    geoflow::connect(ogr_loader->outputs("features"), lod13generator->inputs("polygons"));
+    geoflow::connect(las_in_poly->outputs("point_clouds"), lod13generator->inputs("point_clouds"));
+    geoflow::connect(lod13generator->outputs("decomposed_footprints"), ogr_writer->inputs("geometries"));
+    geoflow::connect(lod13generator->outputs("attributes"), ogr_writer->inputs("attributes"));
 
     bool init = false;
     for (float step_threshold : {1.0, 2.0, 3.0, 4.0}) {

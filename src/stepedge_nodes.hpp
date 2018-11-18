@@ -135,19 +135,20 @@ class PolygonExtruderNode:public Node {
   }
 };
 
-class Arr2FeatureNode:public Node {
+class Arr2LinearRingsNode:public Node {
 
   public:
-  Arr2FeatureNode(NodeManager& manager):Node(manager) {
+  Arr2LinearRingsNode(NodeManager& manager):Node(manager) {
     add_input("arrangement", TT_any);
-    add_output("decomposed_footprint", TT_any);
+    add_output("linear_rings", TT_linear_ring_collection);
+    add_output("attributes", TT_attribute_map_f);
   }
 
   void process(){
     auto arr = inputs("arrangement").get<Arrangement_2>();
 
-    Feature decomposed_footprint;
-    decomposed_footprint.type=geoflow::line_loop;
+    LinearRingCollection linear_rings;
+    AttributeMap attributes;
     for (auto face: arr.face_handles()){
       if(face->data().is_finite) {
         vec2f polygon, face_triangles;
@@ -156,11 +157,12 @@ class Arr2FeatureNode:public Node {
         for (auto& p : polygon) {
           polygon3d.push_back({p[0],p[1],0});
         }
-        decomposed_footprint.geom.push_back(polygon3d);
-        decomposed_footprint.attr["height"].push_back(face->data().elevation_avg);
+        linear_rings.push_back(polygon3d);
+        attributes["height"].push_back(face->data().elevation_avg);
       }
     }
-    outputs("decomposed_footprint").set(decomposed_footprint);
+    outputs("linear_rings").set(linear_rings);
+    outputs("attributes").set(attributes);
   }
 };
 
@@ -1024,7 +1026,8 @@ class LOD13GeneratorNode:public Node {
   LOD13GeneratorNode(NodeManager& manager):Node(manager) {
     add_input("point_clouds", TT_any);
     add_input("polygons", TT_any);
-    add_output("decomposed_polygons", TT_any);
+    add_output("decomposed_footprints", TT_linear_ring_collection);
+    add_output("attributes", TT_attribute_map_f);
   }
 
   void gui(){
@@ -1040,8 +1043,8 @@ class LOD13GeneratorNode:public Node {
       //run the thing
     if (point_clouds.geom.size()!=polygons.geom.size()) return;
 
-    Feature decomposed_polygons;
-    decomposed_polygons.type=geoflow::line_loop;
+    LinearRingCollection all_cells;
+    AttributeMap all_attributes;
     
     for(int i=0; i<point_clouds.geom.size(); i++) {
       auto& points_vec3f = point_clouds.geom[i];
@@ -1055,7 +1058,7 @@ class LOD13GeneratorNode:public Node {
       auto RegulariseLines_node = std::make_shared<RegulariseLinesNode>(N);
       auto BuildArrangement_node = std::make_shared<BuildArrangementNode>(N);
       auto ProcessArrangement_node = std::make_shared<ProcessArrangementNode>(N);
-      auto Arr2Feature_node = std::make_shared<Arr2FeatureNode>(N);
+      auto Arr2LinearRings_node = std::make_shared<Arr2LinearRingsNode>(N);
 
       ComputeMetrics_node->inputs("points_vec3f").set(points_vec3f);
       BuildArrangement_node->inputs("footprint_vec3f").set(polygon_vec3f);
@@ -1067,22 +1070,23 @@ class LOD13GeneratorNode:public Node {
       connect(*DetectLines_node, *RegulariseLines_node, "edge_segments", "edge_segments");
       connect(*RegulariseLines_node, *BuildArrangement_node, "edges_out", "edge_segments");
       connect(*BuildArrangement_node, *ProcessArrangement_node, "arrangement", "arrangement");
-      connect(*ProcessArrangement_node, *Arr2Feature_node, "arrangement", "arrangement");
+      connect(*ProcessArrangement_node, *Arr2LinearRings_node, "arrangement", "arrangement");
 
       // config and run
       ProcessArrangement_node->c.step_height_threshold = step_threshold;
       N.run(*ComputeMetrics_node);
 
-      auto oTerm = Arr2Feature_node->outputs("decomposed_footprint");
-      auto polygons_feature = oTerm.get<Feature>();
+      auto cells = Arr2LinearRings_node->outputs("linear_rings").get<LinearRingCollection>();
+      auto attributes = Arr2LinearRings_node->outputs("attributes").get<AttributeMap>();
 
-      for (int i=0; i<polygons_feature.geom.size(); i++) {
+      for (int i=0; i<cells.size(); i++) {
         // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
-          decomposed_polygons.geom.push_back(polygons_feature.geom[i]);
-          decomposed_polygons.attr["height"].push_back(polygons_feature.attr["height"][i]);
+          all_cells.push_back(cells[i]);
+          all_attributes["height"].push_back(attributes["height"][i]);
         // }
       }
     }
-    outputs("decomposed_polygons").set(decomposed_polygons);
+    outputs("decomposed_footprints").set(all_cells);
+    outputs("attributes").set(all_attributes);
   }
 };
