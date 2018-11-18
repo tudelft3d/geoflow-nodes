@@ -7,3 +7,6 @@
 [submodule "thirdparty/LAStools"]
 	path = thirdparty/LAStools
 	url = https://github.com/LAStools/LAStools.git
+[submodule "thirdparty/masbcpp"]
+	path = thirdparty/masbcpp
+	url = https://github.com/tudelft3d/masbcpp.git
