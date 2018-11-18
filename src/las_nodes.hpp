@@ -12,8 +12,7 @@ class LASLoaderNode:public Node {
   bool use_thin = true;
 
   LASLoaderNode(NodeManager& manager):Node(manager) {
-    add_output("geometry", TT_geometry);
-    add_output("points", TT_vec3f);
+    add_output("points", TT_point_collection);
     add_output("classification", TT_vec1i);
     add_output("intensity", TT_vec1f);
     GDALAllRegister();
@@ -25,9 +24,7 @@ class LASLoaderNode:public Node {
   }
 
   void process(){
-    gfGeometry3D geometry;
-    geometry.type = geoflow::points;
-    geometry.format = geoflow::simple;
+    PointCollection points;
     vec1i classification;
     vec1f intensity;
 
@@ -37,10 +34,10 @@ class LASLoaderNode:public Node {
     if (!lasreader)
       return;
 
-    geometry.bounding_box.set(
-      {float(lasreader->get_min_x()), float(lasreader->get_min_y()), float(lasreader->get_min_z())},
-      {float(lasreader->get_max_x()), float(lasreader->get_max_y()), float(lasreader->get_max_z())}
-    );
+    // geometry.bounding_box.set(
+    //   {float(lasreader->get_min_x()), float(lasreader->get_min_y()), float(lasreader->get_min_z())},
+    //   {float(lasreader->get_max_x()), float(lasreader->get_max_y()), float(lasreader->get_max_z())}
+    // );
 
     size_t i=0;
     while (lasreader->read_point()) {
@@ -48,7 +45,7 @@ class LASLoaderNode:public Node {
       if (i++ % thin_nth == 0) {
         classification.push_back(lasreader->point.get_classification());
         intensity.push_back(float(lasreader->point.get_intensity()));
-        geometry.vertices.push_back({
+        points.push_back({
           float(lasreader->point.get_x()), 
           float(lasreader->point.get_y()), 
           float(lasreader->point.get_z())}
@@ -59,8 +56,7 @@ class LASLoaderNode:public Node {
     lasreader->close();
     delete lasreader;
 
-    outputs("points").set(geometry.vertices);
-    outputs("geometry").set(geometry);
+    outputs("points").set(points);
     outputs("classification").set(classification);
     outputs("intensity").set(intensity);
   }

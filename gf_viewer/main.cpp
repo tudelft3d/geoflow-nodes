@@ -59,6 +59,7 @@ int main(int ac, const char * av[])
     N.register_node<TinSimpNode>("TinSimp");
 
     N.register_node<ComputeNormalsNode>("ComputeNormals");
+    N.register_node<ComputeMedialAxisNode>("ComputeMedialAxis");
 
     a->draw_that(on_draw);
 
