@@ -4,10 +4,9 @@
 #include "imgui.h"
 #include "app_povi.h"
 #include "nodes.h"
-#include "../src/stepedge_nodes.hpp"
-#include "../src/gdal_nodes.hpp"
-#include "../src/las_nodes.hpp"
-#include "../src/cgal_nodes.hpp"
+#include <stepedge_nodes.hpp>
+#include <gdal_nodes.hpp>
+#include <las_nodes.hpp>
 #include <array>
 
 // #include <boost/program_options.hpp>
@@ -40,11 +39,6 @@ int main(int ac, const char * av[])
     N.register_node<OGRWriterNode>("OGRWriter");
 
     N.register_node<LASLoaderNode>("LASLoader");
-    N.register_node<CDTNode>("CDT");
-    N.register_node<PointDistanceNode>("PointDistance");
-    N.register_node<ComparePointDistanceNode>("ComparePointDistance");
-    N.register_node<CSVLoaderNode>("CSVLoader");
-    N.register_node<TinSimpNode>("TinSimp");
     
     N.register_node<LASInPolygonsNode>("LASInPolygons");
     N.register_node<LOD13GeneratorNode>("LOD13Generator");

@@ -9,71 +9,98 @@ cmake_minimum_required (VERSION 3.10)
 #   link_directories("/usr/local/opt/llvm/lib")
 # endif()
 
-project( edge_detect )
-
-
-# Boost
-find_package( Boost REQUIRED COMPONENTS program_options)
-if ( NOT Boost_FOUND )
-  message(SEND_ERROR "edge_detect requires the Boost library")
-  return()  
-endif()
-INCLUDE_DIRECTORIES( ${Boost_INCLUDE_DIR} )
-
-# GDAL
-find_package( GDAL )
-if ( NOT GDAL_FOUND )
-  message(SEND_ERROR "edge_detect requires the GDAL library")
-endif()
-
-# CGAL
-find_package( CGAL QUIET COMPONENTS  )
-if ( NOT CGAL_FOUND )
-  message(SEND_ERROR "edge_detect requires the CGAL library")
-  return()  
-endif()
-
-# LASlib
-add_subdirectory(thirdparty/LAStools/LASlib/src)
-
-# masbcpp
-add_subdirectory(thirdparty/masbcpp)
-include_directories(thirdparty/masbcpp/src)
-include_directories(thirdparty/masbcpp/thirdparty/vrui)
-
-# include helper file
-include( ${CGAL_USE_FILE} )
+project( geoflow_nodes )
 
 if (MSVC)
   add_definitions(-DNOMINMAX)
 endif()
 
-add_definitions(
-  -DGLM_FORCE_CTOR_INIT # FIXME: get rid of this (by doing proper initialisation of glm objects, especially the quaternions)
-)
-include_directories( src thirdparty ${CGAL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${GDAL_INCLUDE_DIR} thirdparty/LAStools/LASlib/inc thirdparty/LAStools/LASzip/inc thirdparty/LAStools/LASzip/src thirdparty/geoflow/thirdparty/glm thirdparty/ptinpoly)
+# Boost
+find_package( Boost REQUIRED COMPONENTS program_options)
+INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
 
-add_library(point_edge_lib STATIC src/point_edge.cpp src/region_growing.cpp src/region_growing_plane.cpp)
-target_link_libraries(point_edge_lib ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} LASlib)
-set_target_properties(
-  point_edge_lib
-  PROPERTIES CXX_STANDARD 17
+# GDAL
+find_package( GDAL )
+include_directories(${GDAL_INCLUDE_DIR})
+
+# CGAL
+find_package( CGAL QUIET COMPONENTS  )
+include_directories(${CGAL_INCLUDE_DIR})
+
+# LASlib
+add_subdirectory(thirdparty/LAStools/LASlib/src)
+include_directories(
+  thirdparty/LAStools/LASlib/inc 
+  thirdparty/LAStools/LASzip/inc 
+  thirdparty/LAStools/LASzip/src
 )
 
-add_library(ptinpoly_lib STATIC thirdparty/ptinpoly/ptinpoly.c)
+# masbcpp
+add_subdirectory(thirdparty/masbcpp)
+include_directories(
+  thirdparty/masbcpp/src
+  thirdparty/masbcpp/thirdparty
+  thirdparty/masbcpp/thirdparty/vrui
+)
+
+# ptinpoly
+add_library(ptinpoly STATIC thirdparty/ptinpoly/ptinpoly.c)
 set_target_properties(
-  ptinpoly_lib
+  ptinpoly
   PROPERTIES C_STANDARD 11
 )
-# Creating entries for target
+include_directories(thirdparty/ptinpoly)
 
+# geoflow
 add_subdirectory(thirdparty/geoflow)
+include_directories(
+  thirdparty/geoflow/src/flowchart
+  thirdparty/geoflow/src/viewer
+  thirdparty/geoflow/thirdparty/glad/include 
+  thirdparty/geoflow/thirdparty/imgui
+  thirdparty/geoflow/thirdparty/imgui/examples
+  thirdparty/geoflow/thirdparty/glm
+)
 
-add_subdirectory(point-based)
-add_subdirectory(raster-based)
+# MODULES
 
+if (CGAL_FOUND)
+  # include helper file
+  include( ${CGAL_USE_FILE} )
+  add_subdirectory(modules/cgal)
+  include_directories(modules/cgal)
+endif()
 
-add_subdirectory(viewer)
-add_subdirectory(gf_viewer)
-add_subdirectory(point_distance)
-add_subdirectory(rws-noise)
+if (GDAL_FOUND AND Boost_FOUND)
+  # include helper file
+  add_subdirectory(modules/gdal)
+  include_directories(modules/gdal)
+endif()
+
+add_subdirectory(modules/las)
+include_directories(modules/las)
+
+add_subdirectory(modules/masb)
+include_directories(modules/masb)
+
+if (CGAL_FOUND AND Boost_FOUND)
+  add_subdirectory(modules/stepedge)
+  include_directories(modules/stepedge)
+endif()
+
+# APPS
+
+if (CGAL_FOUND)
+  add_subdirectory(apps/gf_viewer)
+endif()
+
+if (CGAL_FOUND AND Boost_FOUND AND GDAL_FOUND)
+  add_subdirectory(apps/rws-noise)
+endif()
+
+add_subdirectory(apps/mat)
+
+# add_subdirectory(point-based)
+# add_subdirectory(raster-based)
+# add_subdirectory(viewer)
+# add_subdirectory(point_distance)
