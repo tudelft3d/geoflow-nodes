@@ -24,14 +24,14 @@ find_package( GDAL )
 include_directories(${GDAL_INCLUDE_DIR})
 
 # CGAL
-find_package( CGAL QUIET COMPONENTS  )
+find_package( CGAL QUIET COMPONENTS )
 include_directories(${CGAL_INCLUDE_DIR})
 
 # LASlib
 add_subdirectory(thirdparty/LAStools/LASlib/src)
 include_directories(
-  thirdparty/LAStools/LASlib/inc 
-  thirdparty/LAStools/LASzip/inc 
+  thirdparty/LAStools/LASlib/inc
+  thirdparty/LAStools/LASzip/inc
   thirdparty/LAStools/LASzip/src
 )
 

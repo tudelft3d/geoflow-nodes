@@ -6,6 +6,7 @@ External dependencies:
 1. GDAL [requires version 2.3+]
 1. Boost [tested with version 1.68]
 
+The build system will try to automatically detect these dependencies and build only the geoflow nodes whose dependencies have been found.
 
 To build checkout the submodules and run cmake/make:
 ```
