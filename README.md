@@ -19,4 +19,4 @@ cmake ..
 make -G <generator>
 ```
 
-The `-G <generator>` flag can be ommitted on linux and macOS systems. For windows you need Microsoft Visual Studion (community edition is fine) and you should use `-G "Visual Studio 15 2017 Win64"`.
+The `-G <generator>` flag can be ommitted on linux and macOS systems. For windows you need Microsoft Visual Studio 2017 you should use `-G "Visual Studio 15 2017 Win64"`.
