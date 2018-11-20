@@ -6,7 +6,7 @@ External dependencies:
 1. GDAL [requires version 2.3+]
 1. Boost [tested with version 1.68]
 
-Windows 10 instructions on how to install these dependencies as well as cmake (the build system) can be found on (this wiki)[https://github.com/tudelft3d/3dfier/wiki/Building-on-Windows-10], see sections 1 and 2.
+Windows 10 instructions on how to install these dependencies as well as cmake (the build system) can be found on [this wiki](https://github.com/tudelft3d/3dfier/wiki/Building-on-Windows-10), see sections 1 and 2.
 
 The build system will try to automatically detect these dependencies and build only the geoflow nodes whose dependencies have been found.
 
