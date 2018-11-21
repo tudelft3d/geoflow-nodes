@@ -401,3 +401,20 @@ void CSVLoaderNode::process(){
   outputs("distances2").set(distances2);
   outputs("difference").set(difference);
 }
+
+void CSVWriterNode::process() {
+  auto points = inputs("points").get<PointCollection>();
+  auto distances = inputs("distances").get<vec1f>();
+  
+  std::ofstream f_out(filepath);
+  f_out << std::fixed << std::setprecision(2);
+  f_out << "x y z distance";
+  for (size_t i=0; i< points.size(); ++i) {
+    f_out 
+    << points[i][0] << " " 
+    << points[i][1] << " " 
+    << points[i][2] << " "
+    << distances[i] << "\n";
+  }
+  f_out.close();
+}

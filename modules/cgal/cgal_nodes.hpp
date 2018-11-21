@@ -7,16 +7,51 @@ class CDTNode:public Node {
   public:
   CDTNode(NodeManager& manager):Node(manager) {
     // add_input("points", TT_any);
-    add_input("lines_vec3f", TT_vec3f);
+    add_input("lines", TT_line_string_collection);
     add_output("cgal_CDT", TT_any);
-    add_output("normals_vec3f", TT_vec3f);
-    add_output("triangles_vec3f", TT_vec3f);
+    // add_output("normals_vec3f", TT_vec3f);
+    add_output("triangles", TT_triangle_collection);
   }
   void process();
 };
 
-// class ComparePointDistanceNode:public Node{};
-// class PointDistanceNode:public Node{};
+class ComparePointDistanceNode:public Node {
+  public:
+  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+  char log_filepath[256] = "ComparePointDistanceNode.out";
+  int thin_nth = 20;
+
+  ComparePointDistanceNode(NodeManager& manager):Node(manager) {
+    add_input("triangles1_vec3f", TT_vec3f);
+    add_input("triangles2_vec3f", TT_vec3f);
+    add_output("points", TT_vec3f);
+    add_output("distances1", TT_vec1f);
+    add_output("distances2", TT_vec1f);
+    add_output("diff", TT_vec1f);
+  }
+  void gui(){
+    ImGui::InputText("LAS file path", las_filepath, IM_ARRAYSIZE(las_filepath));
+    ImGui::SliderInt("Thin nth", &thin_nth, 0, 100);
+  }
+  void process();
+};
+
+class PointDistanceNode:public Node{
+  public:
+  char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+  int thin_nth = 5;
+
+  PointDistanceNode(NodeManager& manager):Node(manager) {
+    add_input("triangles", TT_triangle_collection);
+    add_output("points", TT_point_collection);
+    add_output("distances", TT_vec1f);
+  }
+  void gui(){
+    ImGui::InputText("LAS file path", filepath, IM_ARRAYSIZE(filepath));
+    ImGui::SliderInt("Thin nth", &thin_nth, 0, 100);
+  }
+  void process();
+};
 
 class DensifyNode:public Node {
   public:

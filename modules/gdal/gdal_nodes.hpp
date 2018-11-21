@@ -73,10 +73,23 @@ class CSVLoaderNode:public Node {
     add_output("distances2", TT_vec1f);
     add_output("difference", TT_vec1f);
   }
-
   void gui(){
     ImGui::InputText("CSV file path", filepath, IM_ARRAYSIZE(filepath));
     ImGui::SliderInt("Thin nth", &thin_nth, 0, 100);
+  }
+  void process();
+};
+
+class CSVWriterNode:public Node {
+  public:
+  char filepath[256] = "/Users/ravi/git/heightjump-detect/build/csv.out";
+
+  CSVWriterNode(NodeManager& manager):Node(manager) {
+    add_output("points", TT_point_collection);
+    add_output("distances", TT_vec1f);
+  }
+  void gui(){
+    ImGui::InputText("CSV file path", filepath, IM_ARRAYSIZE(filepath));
   }
   void process();
 };

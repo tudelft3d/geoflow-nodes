@@ -27,6 +27,10 @@ include_directories(${GDAL_INCLUDE_DIR})
 find_package( CGAL QUIET COMPONENTS )
 include_directories(${CGAL_INCLUDE_DIR})
 
+add_definitions(
+  -DGLM_FORCE_CTOR_INIT # FIXME: get rid of this (by doing proper initialisation of glm objects, especially the quaternions)
+)
+
 # LASlib
 add_subdirectory(thirdparty/LAStools/LASlib/src)
 include_directories(
