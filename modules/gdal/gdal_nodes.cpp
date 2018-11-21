@@ -408,12 +408,12 @@ void CSVWriterNode::process() {
   
   std::ofstream f_out(filepath);
   f_out << std::fixed << std::setprecision(2);
-  f_out << "x y z distance";
+  f_out << "x y z distance\n";
   for (size_t i=0; i< points.size(); ++i) {
     f_out 
-    << points[i][0] << " " 
-    << points[i][1] << " " 
-    << points[i][2] << " "
+    << points[i][0] + (*manager.data_offset)[0] << " " 
+    << points[i][1] + (*manager.data_offset)[1] << " " 
+    << points[i][2] + (*manager.data_offset)[2] << " "
     << distances[i] << "\n";
   }
   f_out.close();

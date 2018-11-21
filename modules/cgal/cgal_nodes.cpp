@@ -191,17 +191,18 @@ void PointDistanceNode::process(){
   vec1f distances;
   PointCollection points;
   size_t i=0;
+  auto offset = manager.data_offset.value_or(std::array<double,3>({0,0,0}));
   while (lasreader->read_point()) {
     if (lasreader->point.get_classification() == 2){
 
       if (i++ % thin_nth == 0){
-        auto q = Point(lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z());
+        auto q = Point(lasreader->point.get_x() - offset[0], lasreader->point.get_y() - offset[1], lasreader->point.get_z() - offset[2]);
         FT sqd = tree.squared_distance(q);
         distances.push_back(sqd);
         points.push_back({
-          float(lasreader->point.get_x()), 
-          float(lasreader->point.get_y()), 
-          float(lasreader->point.get_z())}
+          float(lasreader->point.get_x() - offset[0]), 
+          float(lasreader->point.get_y() - offset[1]), 
+          float(lasreader->point.get_z() - offset[2])}
         );
       }
       if(i%10000==0) std::cout << "Read " << i << " points...\n";

@@ -85,8 +85,8 @@ class CSVWriterNode:public Node {
   char filepath[256] = "/Users/ravi/git/heightjump-detect/build/csv.out";
 
   CSVWriterNode(NodeManager& manager):Node(manager) {
-    add_output("points", TT_point_collection);
-    add_output("distances", TT_vec1f);
+    add_input("points", TT_point_collection);
+    add_input("distances", TT_vec1f);
   }
   void gui(){
     ImGui::InputText("CSV file path", filepath, IM_ARRAYSIZE(filepath));
