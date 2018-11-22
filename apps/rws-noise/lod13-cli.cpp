@@ -23,12 +23,14 @@ int main(int ac, const char * av[])
     std::string footprints_file = "/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bgt_singleparts.gpkg";
     std::string las_file = "/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las";
     std::string decomposed_footprints_file = "out.shp";
+    float step_threshold = 1.0;
     
     po::options_description desc("Allowed options");
     desc.add_options()
     ("help", "produce help message")
     ("las", po::value<std::string>(&las_file), "Point cloud ")
     ("footprints", po::value<std::string>(&footprints_file), "Footprints")
+    ("step_threshold", po::value<float>(&step_threshold), "Step threshold")
     ;
     po::variables_map vm;
     po::store(po::parse_command_line(ac, av, desc), vm);
@@ -54,15 +56,21 @@ int main(int ac, const char * av[])
     geoflow::connect(lod13generator->outputs("decomposed_footprints"), ogr_writer->inputs("geometries"));
     geoflow::connect(lod13generator->outputs("attributes"), ogr_writer->inputs("attributes"));
 
-    bool init = false;
-    for (float step_threshold : {1.0, 2.0, 3.0, 4.0}) {
-      std::string out_file = "out_" + std::to_string(step_threshold) + ".shp";
-      std::strcpy(ogr_writer->filepath, out_file.c_str());
-      lod13generator->step_threshold = step_threshold;
-      if(!init){
-        N.run(*ogr_loader);
-        init=true;
-      } else 
-        N.run(*lod13generator);
-    }
+    std::string out_file = "out_" + std::to_string(step_threshold) + ".shp";
+    std::strcpy(ogr_writer->filepath, out_file.c_str());
+    lod13generator->step_threshold = step_threshold;
+    N.run(*ogr_loader);
+
+    // FIXME: accept multiple stepedge_thresholds from cli argument...
+    // bool init = false;
+    // for (float step_threshold : {1.0, 2.0, 3.0, 4.0}) {
+    //   std::string out_file = "out_" + std::to_string(step_threshold) + ".shp";
+    //   std::strcpy(ogr_writer->filepath, out_file.c_str());
+    //   lod13generator->step_threshold = step_threshold;
+    //   if(!init){
+    //     N.run(*ogr_loader);
+    //     init=true;
+    //   } else 
+    //     N.run(*lod13generator);
+    // }
 }
