@@ -77,7 +77,7 @@ void compute_metrics(PNL_vector &points, config c) {
     boost::get<8>(p) = i++;
   }
 
-  auto PD = planedect::PlaneDetector(points_vec, normals_vec);
+  planedect::PlaneDetector PD(points_vec, normals_vec);
   PD.dist_thres = c.metrics_plane_epsilon * c.metrics_plane_epsilon;
   PD.normal_thres = c.metrics_plane_normal_threshold;
   PD.min_segment_count = c.metrics_plane_min_points;
@@ -217,7 +217,7 @@ void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &
 
 void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, config c) {
   // line fitting in set of candidate edgepoints
-  auto LD = linedect::LineDetector(edge_points);
+  linedect::LineDetector LD(edge_points);
   LD.dist_thres = c.linedetect_dist_threshold * c.linedetect_dist_threshold;
   LD.min_segment_count = c.linedetect_min_segment_count;
   LD.N = c.linedetect_k;
