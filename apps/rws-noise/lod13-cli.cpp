@@ -1,9 +1,6 @@
 #include <iostream>
 #include <fstream>
 
-#include "imgui.h"
-#include "app_povi.h"
-#include "nodes.h"
 #include <stepedge_nodes.hpp>
 #include <gdal_nodes.hpp>
 #include <las_nodes.hpp>
