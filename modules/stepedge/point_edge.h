@@ -6,6 +6,7 @@
 #include <lasreader.hpp>
 #include <laswriter.hpp>
 
+#include <boost/tuple/tuple.hpp>
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/point_xy.hpp>
 #include <boost/geometry/geometries/linestring.hpp>
