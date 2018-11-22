@@ -16,9 +16,10 @@ int main(int ac, const char * av[])
     // /Users/ravi/surfdrive/Data/step-edge-detector/C_31HZ1_clip.LAZ
     // /Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las
     // /Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_0.gpkg
-
-    std::string footprints_file = "/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bgt_singleparts.gpkg";
-    std::string las_file = "/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las";
+    // /Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bgt_singleparts.gpkg
+    // /Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las
+    std::string footprints_file;
+    std::string las_file;
     std::string decomposed_footprints_file = "out.shp";
     float step_threshold = 1.0;
     
@@ -27,6 +28,7 @@ int main(int ac, const char * av[])
     ("help", "produce help message")
     ("las", po::value<std::string>(&las_file), "Point cloud ")
     ("footprints", po::value<std::string>(&footprints_file), "Footprints")
+    ("output", po::value<std::string>(&decomposed_footprints_file), "Decomposed footprints")
     ("step_threshold", po::value<float>(&step_threshold), "Step threshold")
     ;
     po::variables_map vm;
@@ -47,14 +49,13 @@ int main(int ac, const char * av[])
     std::strcpy(ogr_loader->filepath, footprints_file.c_str());
     std::strcpy(las_in_poly->las_filepath, las_file.c_str());
 
-    geoflow::connect(ogr_loader->outputs("features"), las_in_poly->inputs("polygons"));
-    geoflow::connect(ogr_loader->outputs("features"), lod13generator->inputs("polygons"));
+    geoflow::connect(ogr_loader->outputs("linear_rings"), las_in_poly->inputs("polygons"));
+    geoflow::connect(ogr_loader->outputs("linear_rings"), lod13generator->inputs("polygons"));
     geoflow::connect(las_in_poly->outputs("point_clouds"), lod13generator->inputs("point_clouds"));
     geoflow::connect(lod13generator->outputs("decomposed_footprints"), ogr_writer->inputs("geometries"));
     geoflow::connect(lod13generator->outputs("attributes"), ogr_writer->inputs("attributes"));
 
-    std::string out_file = "out_" + std::to_string(step_threshold) + ".shp";
-    std::strcpy(ogr_writer->filepath, out_file.c_str());
+    std::strcpy(ogr_writer->filepath, decomposed_footprints_file.c_str());
     lod13generator->step_threshold = step_threshold;
     N.run(*ogr_loader);
 

@@ -815,19 +815,19 @@ void RegulariseLinesNode::process(){
 
 void LOD13GeneratorNode::process(){
   auto point_clouds = inputs("point_clouds").get<Feature>();
-  auto polygons = inputs("polygons").get<Feature>();
+  auto polygons = inputs("polygons").get<LinearRingCollection>();
   
   // for each pair of polygon and point_cloud
     //create nodes and connections
     //run the thing
-  if (point_clouds.geom.size()!=polygons.geom.size()) return;
+  if (point_clouds.geom.size()!=polygons.size()) return;
 
   LinearRingCollection all_cells;
   AttributeMap all_attributes;
   
   for(int i=0; i<point_clouds.geom.size(); i++) {
     auto& points_vec3f = point_clouds.geom[i];
-    auto& polygon_vec3f = polygons.geom[i];
+    auto& polygon_vec3f = polygons[i];
 
     NodeManager N = NodeManager();
 

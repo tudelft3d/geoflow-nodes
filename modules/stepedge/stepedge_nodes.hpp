@@ -221,7 +221,7 @@ class LOD13GeneratorNode:public Node {
   float step_threshold = 1.0;
   LOD13GeneratorNode(NodeManager& manager):Node(manager) {
     add_input("point_clouds", TT_any);
-    add_input("polygons", TT_any);
+    add_input("polygons", TT_linear_ring_collection);
     add_output("decomposed_footprints", TT_linear_ring_collection);
     add_output("attributes", TT_attribute_map_f);
   }
