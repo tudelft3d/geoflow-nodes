@@ -212,10 +212,10 @@ struct config {
   float step_height_threshold = 1.0;
   float zrange_threshold = 0.2;
   bool merge_segid = true;
-  bool merge_zrange = true;
-  bool merge_step_height = true;
+  bool merge_zrange = false;
+  bool merge_step_height = false;
   bool merge_unsegmented = false;
-  bool merge_dangling_egdes = true;
+  bool merge_dangling_egdes = false;
 };
 
 typedef std::vector<std::array<float,2>> vec2f;

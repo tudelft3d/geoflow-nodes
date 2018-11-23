@@ -36,7 +36,7 @@ int main(int ac, const char * av[])
     
     //gdal nodes
     N.register_node<OGRLoaderNode>("OGRLoader");
-    N.register_node<OGRWriterNode>("OGRWriter");
+    N.register_node<OGRWriterNoAttributesNode>("OGRWriter");
 
     N.register_node<LASLoaderNode>("LASLoader");
     
@@ -55,10 +55,10 @@ int main(int ac, const char * av[])
     nodes_.PreloadNodes(ns);
 
     ImGui::LinkStore ls;
-    ls.push_back(std::make_tuple("TheOGRLoader", "TheLASInPolygons", "features", "polygons"));
-    ls.push_back(std::make_tuple("TheOGRLoader", "TheLOD13Generator", "features", "polygons"));
+    ls.push_back(std::make_tuple("TheOGRLoader", "TheLASInPolygons", "linear_rings", "polygons"));
+    ls.push_back(std::make_tuple("TheOGRLoader", "TheLOD13Generator", "linear_rings", "polygons"));
     ls.push_back(std::make_tuple("TheLASInPolygons", "TheLOD13Generator", "point_clouds", "point_clouds"));
-    ls.push_back(std::make_tuple("TheLOD13Generator", "TheOGRWriter", "decomposed_polygons", "features"));
+    ls.push_back(std::make_tuple("TheLOD13Generator", "TheOGRWriter", "decomposed_footprints", "geometries"));
     nodes_.PreloadLinks(ls);
 
     a->run();
