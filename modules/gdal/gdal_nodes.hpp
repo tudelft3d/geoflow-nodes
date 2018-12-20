@@ -68,14 +68,11 @@ class CSVLoaderNode:public Node {
   int thin_nth = 5;
 
   CSVLoaderNode(NodeManager& manager):Node(manager) {
-    add_output("points", TT_vec3f);
-    add_output("distances1", TT_vec1f);
-    add_output("distances2", TT_vec1f);
-    add_output("difference", TT_vec1f);
+    add_output("points", TT_point_collection);
   }
   void gui(){
     ImGui::InputText("CSV file path", filepath, IM_ARRAYSIZE(filepath));
-    ImGui::SliderInt("Thin nth", &thin_nth, 0, 100);
+    ImGui::SliderInt("Thin nth", &thin_nth, 1, 100);
   }
   void process();
 };

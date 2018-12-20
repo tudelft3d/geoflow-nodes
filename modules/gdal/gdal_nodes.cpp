@@ -378,28 +378,21 @@ void OGRWriterNoAttributesNode::process() {
 }
 
 void CSVLoaderNode::process(){
-  vec3f points;
-  vec1f distances1;
-  vec1f distances2;
-  vec1f difference;
+  PointCollection points;
   
   std::ifstream f_in(filepath);
-  float px, py, pz, d1, d2, df;
+  float px, py, pz;
   size_t i=0;
-  while(f_in >> px >> py >> pz >> d1 >> d2 >> df) {
+  std::string header;
+  std::getline(f_in, header);
+  while(f_in >> px >> py >> pz) {
     if(i++%thin_nth==0) {
       points.push_back({px,py,pz});
-      distances1.push_back(d1);
-      distances2.push_back(d2);
-      difference.push_back(df);
     }
   }
   f_in.close();
 
-  outputs("points").set(points);
-  outputs("distances1").set(distances1);
-  outputs("distances2").set(distances2);
-  outputs("difference").set(difference);
+  outputs("points").set(points);\
 }
 
 void CSVWriterNode::process() {

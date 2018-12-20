@@ -81,8 +81,11 @@ class TinSimpNode:public Node {
     // add_output("error", TT_vec1f);
   }
   void gui(){
-    ImGui::SliderFloat("Error threshold", &thres_error, 0, 100);
-    ImGui::SliderFloat("Line densify", &densify_interval, 0, 100);
+    if (ImGui::SliderFloat("Error threshold", &thres_error, 0, 100)) {
+      manager.run(*this);
+    }
+    if (inputs("geometries").connected_type == TT_line_string_collection) 
+      ImGui::SliderFloat("Line densify", &densify_interval, 0, 100);
   }
   void process();
 };
