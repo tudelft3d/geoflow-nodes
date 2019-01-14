@@ -51,6 +51,7 @@ int main(int ac, const char * av[])
     N.register_node<OGRLoaderNode>("OGRLoader");
     N.register_node<OGRWriterNode>("OGRWriter");
     N.register_node<LASLoaderNode>("LASLoader");
+    N.register_node<PLWriterNode>("PLWriter");
     N.register_node<CDTNode>("CDT");
     N.register_node<PointDistanceNode>("PointDistance");
     // N.register_node<ComparePointDistanceNode>("ComparePointDistance");
@@ -78,7 +79,7 @@ int main(int ac, const char * av[])
 
     ImGui::LinkStore ls;
     // ls.push_back(std::make_tuple("TheOGRLoader", "TheLASInPolygons", "linear_rings", "polygons"));
-    ls.push_back(std::make_tuple("TheLASInPolygons", "TheComputeMetrics", "points_vec3f", "points_vec3f"));
+    ls.push_back(std::make_tuple("TheLASInPolygons", "TheComputeMetrics", "points", "points"));
     ls.push_back(std::make_tuple("TheLASInPolygons", "TheBuildArrangement", "footprint_vec3f", "footprint_vec3f"));
     ls.push_back(std::make_tuple("TheLASInPolygons", "TheRegulariseLines", "footprint_vec3f", "footprint_vec3f"));
     ls.push_back(std::make_tuple("TheComputeMetrics", "TheAlphaShape", "points", "points"));

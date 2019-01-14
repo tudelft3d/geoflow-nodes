@@ -350,7 +350,7 @@ void ClassifyEdgePointsNode::process(){
 
 void ComputeMetricsNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto points = inputs("points_vec3f").get<vec3f>();
+  auto points = inputs("points").get<PointCollection>();
   PNL_vector pnl_points;
   for (auto& p : points) {
     PNL pv;
@@ -425,9 +425,7 @@ void LASInPolygonsNode::process() {
   lasreadopener.set_file_name(las_filepath);
   LASreader* lasreader = lasreadopener.open();
 
-  point_clouds = Feature();
-  point_clouds.type = geoflow::points;
-  point_clouds.geom.resize(polygons.size());
+  point_clouds.resize(polygons.size());
 
   while (lasreader->read_point()) {
     if (lasreader->point.get_classification() == 6) {
@@ -436,7 +434,7 @@ void LASInPolygonsNode::process() {
       
       for (auto& poly_grid:poly_grids) {
         if (GridTest(poly_grid, point)) {
-          point_clouds.geom[i].push_back({
+          point_clouds[i].push_back({
             float(lasreader->point.get_x()-(*manager.data_offset)[0]), 
             float(lasreader->point.get_y()-(*manager.data_offset)[1]),
             float(lasreader->point.get_z()-(*manager.data_offset)[2])
@@ -456,7 +454,7 @@ void LASInPolygonsNode::process() {
   delete lasreader;
 
   outputs("point_clouds").set(point_clouds);
-  outputs("points_vec3f").set(point_clouds.geom[footprint_id]);
+  outputs("points").set(PointCollection(point_clouds[footprint_id]));
   outputs("footprint_vec3f").set(polygons[footprint_id]);
 }
 
@@ -814,19 +812,19 @@ void RegulariseLinesNode::process(){
 }
 
 void LOD13GeneratorNode::process(){
-  auto point_clouds = inputs("point_clouds").get<Feature>();
+  auto point_clouds = inputs("point_clouds").get<std::vector<PointCollection>>();
   auto polygons = inputs("polygons").get<LinearRingCollection>();
   
   // for each pair of polygon and point_cloud
     //create nodes and connections
     //run the thing
-  if (point_clouds.geom.size()!=polygons.size()) return;
+  if (point_clouds.size()!=polygons.size()) return;
 
   LinearRingCollection all_cells;
   AttributeMap all_attributes;
   
-  for(int i=0; i<point_clouds.geom.size(); i++) {
-    auto& points_vec3f = point_clouds.geom[i];
+  for(int i=0; i<point_clouds.size(); i++) {
+    auto& points_vec3f = point_clouds[i];
     auto& polygon_vec3f = polygons[i];
 
     NodeManager N = NodeManager();
@@ -839,7 +837,7 @@ void LOD13GeneratorNode::process(){
     auto ProcessArrangement_node = std::make_shared<ProcessArrangementNode>(N);
     auto Arr2LinearRings_node = std::make_shared<Arr2LinearRingsNode>(N);
 
-    ComputeMetrics_node->inputs("points_vec3f").set(points_vec3f);
+    ComputeMetrics_node->inputs("points").set(points_vec3f);
     BuildArrangement_node->inputs("footprint_vec3f").set(polygon_vec3f);
     RegulariseLines_node->inputs("footprint_vec3f").set(polygon_vec3f);
 
@@ -868,3 +866,51 @@ void LOD13GeneratorNode::process(){
   outputs("decomposed_footprints").set(all_cells);
   outputs("attributes").set(all_attributes);
 }
+
+// void PlaneDetectorNode::process() {
+//   auto points = inputs("point_clouds").get<Feature>();
+
+//   planedect::PlaneDetector PD(points_vec, normals_vec);
+//   PD.dist_thres = c.metrics_plane_epsilon * c.metrics_plane_epsilon;
+//   PD.normal_thres = c.metrics_plane_normal_threshold;
+//   PD.min_segment_count = c.metrics_plane_min_points;
+//   PD.N = c.metrics_normal_k;
+//   PD.detect();
+//   std::cout << PD.segment_shapes.size() << " shapes detected." << std::endl;
+
+//   // // Instantiates shape detection engine.
+//   // Region_growing shape_detection;
+
+//   // // Sets parameters for shape detection.
+//   // Region_growing::Parameters parameters;
+//   // // Sets probability to miss the largest primitive at each iteration.
+//   // // parameters.probability = 0.05;
+//   // // Detect shapes with at least 500 points.
+//   // parameters.min_points = c.metrics_plane_min_points;
+//   // // Sets maximum Euclidean distance between a point and a shape.
+//   // parameters.epsilon = c.metrics_plane_epsilon;
+//   // // Sets maximum Euclidean distance between points to be clustered.
+//   // // parameters.cluster_epsilon = 0.01;
+//   // // Sets maximum normal deviation.
+//   // // 0.9 < dot(surface_normal, point_normal); 
+//   // parameters.normal_threshold = c.metrics_plane_normal_threshold;
+
+//   // // Provides the input data.
+//   // shape_detection.set_input(points);
+//   // // Registers planar shapes via template method.
+//   // shape_detection.add_shape_factory<SCPlane>();
+//   // // Detects registered shapes with parameters.
+//   // std::cout << "points.size: " << points.size() << "\n";
+//   // shape_detection.detect(parameters);
+//   // // Prints number of detected shapes.
+//   // std::cout << shape_detection.shapes().end() - shape_detection.shapes().begin() << " shapes detected." << std::endl;
+
+//   i=1;
+//   for(auto seg: PD.segment_shapes){
+//     auto& plane = seg.second;
+//     auto plane_idx = PD.get_point_indices(seg.first);
+//   }
+
+//   outputs("decomposed_footprints").set(all_cells);
+//   outputs("attributes").set(all_attributes);
+// }

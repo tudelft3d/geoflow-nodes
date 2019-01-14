@@ -24,6 +24,10 @@
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Constrained_triangulation_plus_2.h>
 
+// PLY writing
+#include <CGAL/property_map.h>
+#include <CGAL/IO/write_ply_points.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -484,4 +488,36 @@ void SimplifyFootprintNode::process(){
     polygons_out.push_back(footprint_vec3f);
   }
   outputs("polygons_simp").set(polygons_out);
+}
+
+void PLWriterNode::process() {
+  typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
+  typedef Kernel::Point_3 Point;
+  typedef CGAL::cpp11::tuple<Point, int> PL;
+  typedef CGAL::Nth_of_tuple_property_map<0, PL> Point_map;
+  // typedef CGAL::Nth_of_tuple_property_map<1, PL> Normal_map;
+  typedef CGAL::Nth_of_tuple_property_map<1, PL> Label_map;
+  typedef std::vector<PL>                        PL_vector;
+
+  auto points = inputs("points").get<PointCollection>();
+  auto labels = inputs("labels").get<vec1i>();
+  
+  PL_vector pl_points;
+  pl_points.resize(points.size());
+  for (size_t i=0; i<points.size(); ++i) {
+    pl_points[i].get<0>()=Point(points[i][0]+(*manager.data_offset)[0], points[i][1]+(*manager.data_offset)[1], points[i][2]+(*manager.data_offset)[2]);
+    pl_points[i].get<1>()=labels[i];
+  }
+
+  std::ofstream f(filepath);
+  // CGAL::set_binary_mode(f); // The PLY file will be written in the binary format
+  f << std::fixed << std::setprecision(2);
+
+  CGAL::write_ply_points_with_properties
+    (f, pl_points,
+     CGAL::make_ply_point_writer (Point_map()),
+    //  CGAL::make_ply_normal_writer (Normal_map()),
+     std::make_pair (Label_map(), CGAL::PLY_property<int>("segment_id"))
+    );
+  f.close();
 }

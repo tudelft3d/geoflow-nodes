@@ -155,3 +155,17 @@ class SimplifyFootprintNode:public Node {
   }
   void process();
 };
+
+class PLWriterNode:public Node {
+  public:
+  char filepath[256] = "/Users/ravi/out.ply";
+
+  PLWriterNode(NodeManager& manager):Node(manager) {
+    add_input("points", TT_point_collection);
+    add_input("labels", TT_vec1i);
+  }
+  void gui(){
+    ImGui::InputText("File path", filepath, IM_ARRAYSIZE(filepath));
+  }
+  void process();
+};

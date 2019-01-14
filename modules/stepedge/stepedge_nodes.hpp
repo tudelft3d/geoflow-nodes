@@ -142,7 +142,7 @@ class ComputeMetricsNode:public Node {
   public:
   ComputeMetricsNode(NodeManager& manager):Node(manager) {
     add_output("points", TT_any);
-    add_input("points_vec3f", TT_vec3f); // change to Feature
+    add_input("points", TT_point_collection); // change to Feature
     add_output("plane_id", TT_vec1i);
     add_output("is_wall", TT_vec1i);
     add_output("line_dist", TT_vec1f);
@@ -165,7 +165,7 @@ class ComputeMetricsNode:public Node {
 };
 
 class LASInPolygonsNode:public Node {
-  Feature point_clouds;
+  std::vector<PointCollection> point_clouds;
   LinearRingCollection polygons;
 
   public:
@@ -175,7 +175,7 @@ class LASInPolygonsNode:public Node {
   LASInPolygonsNode(NodeManager& manager):Node(manager) {
     add_input("polygons", TT_linear_ring_collection);
     add_output("point_clouds", TT_any);
-    add_output("points_vec3f", TT_vec3f);
+    add_output("points", TT_point_collection);
     add_output("footprint_vec3f", TT_vec3f);
   }
 
@@ -186,7 +186,7 @@ class LASInPolygonsNode:public Node {
       //   manager.run(*this);
       // } else {
         notify_children();
-        outputs("points_vec3f").set(point_clouds.geom[footprint_id]);
+        outputs("points").set(point_clouds[footprint_id]);
         outputs("footprint_vec3f").set(polygons[footprint_id]);
         propagate_outputs();
       // }
