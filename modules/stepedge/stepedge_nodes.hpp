@@ -11,6 +11,7 @@ class AlphaShapeNode:public Node {
   AlphaShapeNode(NodeManager& manager):Node(manager) {
     // add_input("points", TT_any);
     add_input("points", TT_any);
+    add_output("alpha_rings", TT_linear_ring_collection);
     add_output("edge_points", TT_any);
     add_output("edge_points_vec3f", TT_vec3f);
   }

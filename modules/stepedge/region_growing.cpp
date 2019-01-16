@@ -12,7 +12,7 @@ LineDetector::LineDetector(vector<Point> &points) {
   for(auto p: points)
     indexed_points.push_back(std::make_pair(p,i++));
   point_segment_idx.resize(size, 0);
-  point_seed_flags.resize(size, true);
+  // point_seed_flags.resize(size, true);
   tree.insert(indexed_points.begin(), indexed_points.end());
 }
 
@@ -53,7 +53,7 @@ void LineDetector::detect(){
   // region growing from seed points
   while(pq.size()>0){
     auto idx = pq.top().first; pq.pop();
-    // if (point_seed_flags[idx]){
+    if (point_seed_flags[idx]){
     if (point_segment_idx[idx]==0){
       grow_region(idx);
       region_counter++;
@@ -87,7 +87,7 @@ void LineDetector::grow_region(size_t seed_idx){
       auto n_id = neighbor.first.second;
       if (point_segment_idx[n_id]!=0)
         continue;
-      // point_seed_flags[n_id] = false; // this point can no longer be used as seed
+      point_seed_flags[n_id] = false; // this point can no longer be used as seed
       if (valid_candidate(segment_shapes[region_counter], neighbor.first.first)){
         point_segment_idx[n_id] = region_counter;
         candidates.push(n_id);

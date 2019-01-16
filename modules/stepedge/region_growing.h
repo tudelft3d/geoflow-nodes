@@ -28,7 +28,7 @@ namespace linedect {
 
     vector<point_index> indexed_points;
     Tree tree;
-    vector<bool> point_seed_flags;
+    // vector<bool> point_seed_flags;
     size_t region_counter=1;
     
     public:

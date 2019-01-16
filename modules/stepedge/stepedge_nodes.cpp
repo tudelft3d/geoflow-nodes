@@ -45,11 +45,13 @@ void AlphaShapeNode::process(){
   typedef CGAL::Triangulation_data_structure_2<Vb,Fb>          Tds;
   typedef CGAL::Delaunay_triangulation_2<Gt,Tds>               Triangulation_2;
   typedef CGAL::Alpha_shape_2<Triangulation_2>                 Alpha_shape_2;
-  typedef Triangulation_2::Vertex_handle                       VertexHandle;
+  typedef Alpha_shape_2::Vertex_handle                       Vertex_handle;
+  typedef Alpha_shape_2::Vertex_circulator                     Vertex_circulator;
+  typedef Alpha_shape_2::Edge_circulator                     Edge_circulator;
 
-  // Set up vertex data (and buffer(s)) and attribute pointers
   auto points = inputs("points").get<PNL_vector>();
   
+  // collect plane points
   std::unordered_map<int, std::vector<Point>> points_per_segment;
   for (auto& p : points) {
     if (boost::get<2>(p)==0) // unsegmented
@@ -60,6 +62,7 @@ void AlphaShapeNode::process(){
   }
   std::vector<Point> edge_points;
   vec3f edge_points_vec3f;
+  LinearRingCollection alpha_rings;
   for (auto& it : points_per_segment ) {
     auto points = it.second;
     Triangulation_2 T;
@@ -69,14 +72,47 @@ void AlphaShapeNode::process(){
                 Alpha_shape_2::GENERAL);
     // thres_alpha = *A.find_optimal_alpha(1);
     A.set_alpha(FT(thres_alpha));
-    std::vector<std::pair<VertexHandle, VertexHandle>> alpha_edges;
-    for (auto it = A.alpha_shape_edges_begin(); it!=A.alpha_shape_edges_end(); it++) {
-      auto face = (it)->first;
-      auto i = (it)->second;
-      alpha_edges.push_back(std::make_pair(face->vertex(T.cw(i)), face->vertex(T.ccw(i))));
-    }
-    // find connecting edges...
-    // ...
+    // std::vector<std::pair<Vertex_handle, Vertex_handle>> alpha_edges;
+    // for (auto it = A.alpha_shape_edges_begin(); it!=A.alpha_shape_edges_end(); it++) {
+    //   auto face = (it)->first;
+    //   auto i = (it)->second;
+    //   alpha_edges.push_back(std::make_pair(face->vertex(T.cw(i)), face->vertex(T.ccw(i))));
+    // }
+
+    // find edges of outer boundary in order
+    LinearRing ring;
+    // first find a vertex v_start on the boundary
+    auto inf = A.infinite_vertex();
+    Vertex_handle v_start;
+    Vertex_circulator vc(A.incident_vertices(inf)), done(vc);
+    do {
+      if(A.classify(vc) == Alpha_shape_2::REGULAR ) {
+        v_start = vc;
+        break;
+      }
+    } while (++vc != done);
+
+    ring.push_back( {float(v_start->point().x()), float(v_start->point().y()), float(v_start->point().z())} );
+    // secondly, walk along the entire boundary starting from v_start
+    Vertex_handle v_next, v_prev = v_start, v_cur = v_start;
+    do {
+      Edge_circulator ec(A.incident_edges(v_cur)), done(ec);
+      do {
+        // find the vertex on the other side of the incident edge ec
+        auto v = ec->first->vertex(A.cw(ec->second));
+        if (v_cur == v) v = ec->first->vertex(A.ccw(ec->second));
+        // check if the edge is on the boundary of the a-shape and if we are not going backwards
+        if((A.classify(*ec) == Alpha_shape_2::REGULAR)  && (v != v_prev)) {
+          v_next = v;
+          ring.push_back( {float(v_next->point().x()), float(v_next->point().y()), float(v_next->point().z())} );
+          break;
+        }
+      } while (++ec != done);
+      v_prev = v_cur;
+      v_cur = v_next;
+    } while (v_next != v_start);
+    // finally, store the ring 
+    alpha_rings.push_back(ring);
 
     for (auto it = A.alpha_shape_vertices_begin(); it!=A.alpha_shape_vertices_end(); it++) {
       auto p = (*it)->point();
@@ -85,6 +121,7 @@ void AlphaShapeNode::process(){
     }
   }
   
+  outputs("alpha_rings").set(alpha_rings);
   outputs("edge_points").set(edge_points);
   outputs("edge_points_vec3f").set(edge_points_vec3f);
 }
