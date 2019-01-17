@@ -9,12 +9,17 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Search_traits_adapter.h>
 
+#include <geoflow.hpp>
+
 namespace linedect {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel cgal_kernel;
+  typedef cgal_kernel::Vector_3 Vector;
   typedef cgal_kernel::Point_3 Point;
   typedef cgal_kernel::Line_3 Line;
 
   using namespace std;
+
+  typedef vector<vector<size_t>> NeighbourVec;
 
   class LineDetector {
     
@@ -27,8 +32,9 @@ namespace linedect {
     typedef Neighbor_search::Tree Tree;
 
     vector<point_index> indexed_points;
-    Tree tree;
+    // Tree tree;
     // vector<bool> point_seed_flags;
+    NeighbourVec neighbours;
     size_t region_counter=1;
     
     public:
@@ -39,11 +45,13 @@ namespace linedect {
     size_t min_segment_count = 20;
 
     LineDetector(vector<Point> &points);
+    LineDetector(vector<Point> &points, vector<vector<size_t>> neighbours);
     vector<size_t> get_point_indices(size_t shape_id);
+    void get_bounded_edges(geoflow::LineStringCollection& edges);
     void detect();
 
     private:
-    inline Line fit_line(Neighbor_search search_result);
+    inline Line fit_line(vector<size_t>& neighbour_idx);
     inline bool valid_candidate(Line &line, Point &p);
     void grow_region(size_t seed_idx);
   };

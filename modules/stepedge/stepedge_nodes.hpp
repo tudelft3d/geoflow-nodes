@@ -12,8 +12,7 @@ class AlphaShapeNode:public Node {
     // add_input("points", TT_any);
     add_input("points", TT_any);
     add_output("alpha_rings", TT_linear_ring_collection);
-    add_output("edge_points", TT_any);
-    add_output("edge_points_vec3f", TT_vec3f);
+    add_output("edge_points", TT_point_collection);
   }
 
   void gui(){
@@ -103,16 +102,18 @@ class DetectLinesNode:public Node {
   config c;
 
   public:
+  bool use_linear_neighboorhood=false;
+
   DetectLinesNode(NodeManager& manager):Node(manager) {
-    add_input("edge_points", TT_any);
-    add_output("edge_segments_c", TT_line_string_collection);
-    add_output("edge_segments", TT_any);
+    add_input("edge_points", {TT_point_collection, TT_linear_ring_collection});
+    add_output("edge_segments", TT_line_string_collection);
   }
 
   void gui(){
     ImGui::InputFloat("Dist thres", &c.linedetect_dist_threshold, 0.01, 1);
     ImGui::InputInt("Segment cnt min", &c.linedetect_min_segment_count);
     ImGui::InputInt("K", &c.linedetect_k);
+    ImGui::Checkbox("Use linear neighbourhood for ring input", &use_linear_neighboorhood);
   }
   void process();
 };
@@ -186,11 +187,12 @@ class LASInPolygonsNode:public Node {
       // if(run_on_change) {
       //   manager.run(*this);
       // } else {
+      if (footprint_id < polygons.size() && footprint_id >= 0) {
         notify_children();
         outputs("points").set(point_clouds[footprint_id]);
         outputs("footprint_vec3f").set(polygons[footprint_id]);
         propagate_outputs();
-      // }
+      } else { footprint_id = polygons.size()-1; }
     }
   }
   void process();
@@ -203,7 +205,7 @@ class RegulariseLinesNode:public Node {
 
   public:
   RegulariseLinesNode(NodeManager& manager):Node(manager) {
-    add_input("edge_segments", TT_any);
+    add_input("edge_segments", TT_line_string_collection);
     add_input("footprint_vec3f", TT_vec3f);
     add_output("edges_out", TT_any);
     add_output("edges_out_vec3f", TT_vec3f);

@@ -60,8 +60,7 @@ void AlphaShapeNode::process(){
       continue;
     points_per_segment[boost::get<2>(p)].push_back(boost::get<0>(p));
   }
-  std::vector<Point> edge_points;
-  vec3f edge_points_vec3f;
+  PointCollection edge_points;
   LinearRingCollection alpha_rings;
   for (auto& it : points_per_segment ) {
     auto points = it.second;
@@ -116,14 +115,12 @@ void AlphaShapeNode::process(){
 
     for (auto it = A.alpha_shape_vertices_begin(); it!=A.alpha_shape_vertices_end(); it++) {
       auto p = (*it)->point();
-      edge_points.push_back(p);
-      edge_points_vec3f.push_back({float(p.x()), float(p.y()), float(p.z())});
+      edge_points.push_back({float(p.x()), float(p.y()), float(p.z())});
     }
   }
   
   outputs("alpha_rings").set(alpha_rings);
   outputs("edge_points").set(edge_points);
-  outputs("edge_points_vec3f").set(edge_points_vec3f);
 }
 
 void PolygonExtruderNode::process(){
@@ -346,24 +343,67 @@ void BuildArrangementNode::process(){
 }
 
 void DetectLinesNode::process(){
-  // Set up vertex data (and buffer(s)) and attribute pointers
-  auto edge_points = inputs("edge_points").get<std::vector<linedect::Point>>();
-  std::vector<std::pair<Point,Point>> edge_segments;
-  detect_lines(edge_segments, edge_points, c);
-  outputs("edge_segments").set(edge_segments);
-  LineStringCollection edge_segments_c;
-  for (auto s : edge_segments){
-    edge_segments_c.push_back({{
-      float(s.first.x()),
-      float(s.first.y()),
-      float(s.first.z())
-    },{
-      float(s.second.x()),
-      float(s.second.y()),
-      float(s.second.z())
-    }});
+  auto input_geom = inputs("edge_points");
+
+  LineStringCollection edge_segments;
+
+  // line fitting in set of candidate edgepoints
+  if (input_geom.connected_type == TT_point_collection) {
+    std::vector<linedect::Point> cgal_pts;
+    auto points = input_geom.get<PointCollection>();
+    for( auto& p : points ) {
+      cgal_pts.push_back(linedect::Point(p[0], p[1], p[2]));
+    }
+    linedect::LineDetector LD(cgal_pts);
+    LD.dist_thres = c.linedetect_dist_threshold * c.linedetect_dist_threshold;
+    LD.min_segment_count = c.linedetect_min_segment_count;
+    LD.N = c.linedetect_k;
+    LD.detect();
+    LD.get_bounded_edges(edge_segments);
+  } else if (input_geom.connected_type == TT_linear_ring_collection) {
+    auto rings = input_geom.get<LinearRingCollection>();
+    int n = c.linedetect_k;
+    
+    for (auto& ring : rings) {
+      
+      std::vector<linedect::Point> cgal_pts;
+      for( auto& p : ring ) {
+        cgal_pts.push_back(linedect::Point(p[0], p[1], p[2]));
+      }
+
+      if (use_linear_neighboorhood) {
+        int kb = n/2; //backward neighbors
+        int kf = n-kb-1; //forward neighbours
+
+        linedect::NeighbourVec neighbours;
+        for( int i=0; i<ring.size(); ++i ) {
+          std::vector<size_t> idx;
+          for (int j = i-kb; j <= i+kf; ++j) {
+            if (j<0)
+              idx.push_back( n+(j%n) );
+            else
+              idx.push_back( j%n );
+          }
+          neighbours.push_back(idx);
+        }
+        linedect::LineDetector LD(cgal_pts, neighbours);
+        LD.dist_thres = c.linedetect_dist_threshold * c.linedetect_dist_threshold;
+        LD.min_segment_count = c.linedetect_min_segment_count;
+        LD.N = n;
+        LD.detect();
+        LD.get_bounded_edges(edge_segments);
+      } else {
+        linedect::LineDetector LD(cgal_pts);
+        LD.dist_thres = c.linedetect_dist_threshold * c.linedetect_dist_threshold;
+        LD.min_segment_count = c.linedetect_min_segment_count;
+        LD.N = n;
+        LD.detect();
+        LD.get_bounded_edges(edge_segments);
+      }
+    }
   }
-  outputs("edge_segments_c").set(edge_segments_c);
+
+  outputs("edge_segments").set(edge_segments);
 }
 
 void ClassifyEdgePointsNode::process(){
@@ -661,17 +701,20 @@ void LASInPolygonsNode::process() {
 
 void RegulariseLinesNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto edges = inputs("edge_segments").get<std::vector<std::pair<Point,Point>>>();
+  auto edges = inputs("edge_segments").get<LineStringCollection>();
   auto footprint_vec3f = inputs("footprint_vec3f").get<vec3f>();
   typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_2 Point_2;
+  typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_3 Point_3;
 
   //compute midpoint and direction for each segment
   typedef std::tuple<double, Point_2, double, double, bool, double, double> linetype; // new angle, midpoint, distance in angle cluster, elevation, is_footprint, initial angle, squared distance from midpoint to an end point
   std::vector<linetype> lines;
   // add non-footprint lines
   for(auto edge : edges) {
-    auto v = edge.second-edge.first;
-    auto p_ = edge.first + v/2;
+    auto source = Point_3(edge[0][0], edge[0][1], edge[0][2]);
+    auto target = Point_3(edge[1][0], edge[1][1], edge[1][2]);
+    auto v = target-source;
+    auto p_ = source + v/2;
     auto p = Point_2(p_.x(),p_.y());
     auto l = v.squared_length();
     auto angle = std::atan2(v.x(),v.y());

@@ -13,7 +13,27 @@ LineDetector::LineDetector(vector<Point> &points) {
     indexed_points.push_back(std::make_pair(p,i++));
   point_segment_idx.resize(size, 0);
   // point_seed_flags.resize(size, true);
+  Tree tree;
   tree.insert(indexed_points.begin(), indexed_points.end());
+  neighbours.resize(size);
+  for(auto pi : indexed_points){
+    auto p = pi.first;
+    neighbours[pi.second].reserve(N);
+    Neighbor_search search(tree, p, N);
+    for (auto neighbour : search) {
+      neighbours[pi.second].push_back(neighbour.first.second);
+    }
+  }
+}
+
+LineDetector::LineDetector(vector<Point> &points, vector<vector<size_t>> neighbours):neighbours(neighbours) {
+  auto size = points.size();
+  indexed_points.reserve(size);
+  size_t i=0;
+  for(auto p: points)
+    indexed_points.push_back(std::make_pair(p,i++));
+  point_segment_idx.resize(size, 0);
+  // point_seed_flags.resize(size, true);
 }
 
 vector<size_t> LineDetector::get_point_indices(size_t shape_id) {
@@ -26,10 +46,51 @@ vector<size_t> LineDetector::get_point_indices(size_t shape_id) {
   return result;
 }
 
-inline Line LineDetector::fit_line(Neighbor_search search_result){
+void LineDetector::get_bounded_edges(geoflow::LineStringCollection& edges) {
+  for(auto seg: segment_shapes){
+    auto l = seg.second;
+    auto l_idx = get_point_indices(seg.first);
+    // std::cout << l.direction() << ", #Pts: " << l_idx.size() <<std::endl;
+    //find the two extreme points on this line
+    double minpl=1, maxpl=0;
+    size_t j=0;
+    auto point_on_line = l.point(0);
+    auto l_normal = l.to_vector()/CGAL::sqrt(l.to_vector().squared_length());
+    for(auto id : l_idx){
+      // edges_index_map[id] = line_id;
+      // project this_p on l
+      linedect::Point this_p(indexed_points[id].first);
+      const Vector a(point_on_line, this_p);
+      double pl = a*l_normal;
+
+      if (j++==0){
+        minpl = maxpl = pl;
+      } else {
+        if (pl < minpl) 
+          minpl=pl;
+        else if (pl > maxpl) 
+          maxpl=pl;
+      }
+    }
+    Point p0 = (point_on_line + minpl*l_normal);
+    Point p1 = (point_on_line + maxpl*l_normal);
+
+    edges.push_back({{
+      float(p0.x()),
+      float(p0.y()),
+      float(p0.z())
+    },{
+      float(p1.x()),
+      float(p1.y()),
+      float(p1.z())
+    }});
+  }
+}
+inline Line LineDetector::fit_line(vector<size_t>& neighbour_idx){
   vector<Point> neighbor_points;
-  for (auto neighbor: search_result)
-    neighbor_points.push_back(neighbor.first.first);
+  for (auto neighbor_id: neighbour_idx){
+    neighbor_points.push_back(indexed_points[neighbor_id].first);
+  }
   Line line;
   linear_least_squares_fitting_3(neighbor_points.begin(),neighbor_points.end(),line,CGAL::Dimension_tag<0>());
   return line;
@@ -44,8 +105,7 @@ void LineDetector::detect(){
   size_t i=0;
   for(auto pi : indexed_points){
     auto p = pi.first;
-    Neighbor_search search(tree, p, N);
-    auto line = fit_line(search);
+    auto line = fit_line(neighbours[pi.second]);
     auto line_dist = CGAL::squared_distance(line, p);
     pq.push(index_dist_pair(i++, line_dist));
   }
@@ -67,8 +127,16 @@ inline bool LineDetector::valid_candidate(Line &line, Point &p) {
 
 void LineDetector::grow_region(size_t seed_idx){
   auto p = indexed_points[seed_idx];
-  Neighbor_search search_init(tree, p.first, N);
-  auto line = fit_line(search_init);
+  // Neighbor_search search_init(tree, p.first, N);
+  // vector<size_t> search_idx;
+  // for (auto s : search_init){
+  //   std::cout << "p from kd-tree " << float(s.first.first.x()) << " " << float(s.first.first.y()) << " " << float(s.first.first.z()) << "\n";
+  //   std::cout << "p from indexed_points " << float(indexed_points[s.second].first.x()) << " " << float(indexed_points[s.second].first.y()) << " " << float(indexed_points[s.first.second].first.z()) << "\n";
+  //   std::cout << "id from kdtree: " << s.first.second << " ";
+  //   std::cout << "id from indexed_points: " << indexed_points[s.first.second].second << "\n";
+  //   search_idx.push_back(s.first.second);
+  // }
+  auto line = fit_line(neighbours[seed_idx]);
   segment_shapes[region_counter] = line;
 
   vector<Point> points_in_region;
@@ -80,18 +148,16 @@ void LineDetector::grow_region(size_t seed_idx){
   idx_in_region.push_back(p.second); 
   
   while (candidates.size()>0){
-    auto seed_id = candidates.top(); candidates.pop();
-    auto cp = indexed_points[seed_id].first;
-    Neighbor_search search(tree, cp, N);
-    for (auto neighbor: search){
-      auto n_id = neighbor.first.second;
+    auto candidate_id = candidates.top(); candidates.pop();
+    auto cp = indexed_points[candidate_id].first;
+    for (auto n_id: neighbours[candidate_id]){
       if (point_segment_idx[n_id]!=0)
         continue;
       // point_seed_flags[n_id] = false; // this point can no longer be used as seed
-      if (valid_candidate(segment_shapes[region_counter], neighbor.first.first)){
+      if (valid_candidate(segment_shapes[region_counter], indexed_points[n_id].first)){
         point_segment_idx[n_id] = region_counter;
         candidates.push(n_id);
-        points_in_region.push_back(neighbor.first.first);
+        points_in_region.push_back(indexed_points[n_id].first);
         idx_in_region.push_back(n_id);
         Line line;
         linear_least_squares_fitting_3(points_in_region.begin(),points_in_region.end(),line,CGAL::Dimension_tag<0>());
