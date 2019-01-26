@@ -51,7 +51,7 @@ class ExtruderNode:public Node {
   ExtruderNode(NodeManager& manager):Node(manager) {
     add_input("arrangement", TT_any);
     add_output("cell_id_vec1i", TT_vec1i);
-    add_output("triangles_vec3f", TT_vec3f);
+    add_output("triangles", TT_triangle_collection);
     add_output("normals_vec3f", TT_vec3f);
     add_output("labels_vec1i", TT_vec1i); // 0==ground, 1==roof, 2==outerwall, 3==innerwall
   }
@@ -88,12 +88,16 @@ class ProcessArrangementNode:public Node {
 class BuildArrangementNode:public Node {
 
   public:
+  bool remove_unsupported=false;
+
   BuildArrangementNode(NodeManager& manager):Node(manager) {
-    add_input("edge_segments", TT_any);
-    add_input("footprint_vec3f", TT_vec3f);
+    add_input("edge_segments", TT_line_string_collection);
+    add_input("footprint", TT_linear_ring);
     add_output("arrangement", TT_any);
-    add_output("features", TT_any);
-    add_output("arr_segments_vec3f", TT_vec3f);
+    add_output("arr_segments", TT_line_string_collection);
+  }
+  void gui() {
+    ImGui::Checkbox("Remove unsupported edges", &remove_unsupported);
   }
   void process();
 };
@@ -173,12 +177,12 @@ class LASInPolygonsNode:public Node {
   public:
   int footprint_id=0;
   // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
-  char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+  char las_filepath[256] = "";
   LASInPolygonsNode(NodeManager& manager):Node(manager) {
     add_input("polygons", TT_linear_ring_collection);
-    add_output("point_clouds", TT_any);
+    add_output("point_clouds", TT_point_collection_list);
     add_output("points", TT_point_collection);
-    add_output("footprint_vec3f", TT_vec3f);
+    add_output("footprint", TT_linear_ring);
   }
 
   void gui() {
@@ -190,7 +194,8 @@ class LASInPolygonsNode:public Node {
       if (footprint_id < polygons.size() && footprint_id >= 0) {
         notify_children();
         outputs("points").set(point_clouds[footprint_id]);
-        outputs("footprint_vec3f").set(polygons[footprint_id]);
+        outputs("point_clouds").set(point_clouds);
+        outputs("footprint").set(polygons[footprint_id]);
         propagate_outputs();
       } else { footprint_id = polygons.size()-1; }
     }
@@ -206,9 +211,8 @@ class RegulariseLinesNode:public Node {
   public:
   RegulariseLinesNode(NodeManager& manager):Node(manager) {
     add_input("edge_segments", TT_line_string_collection);
-    add_input("footprint_vec3f", TT_vec3f);
-    add_output("edges_out", TT_any);
-    add_output("edges_out_vec3f", TT_vec3f);
+    add_input("footprint", TT_linear_ring);
+    add_output("edges_out", TT_line_string_collection);
     add_output("tmp_vec3f", TT_vec3f);
   }
 
@@ -221,16 +225,28 @@ class RegulariseLinesNode:public Node {
 
 class LOD13GeneratorNode:public Node {
   public:
-  float step_threshold = 1.0;
+  float step_height_threshold = 1.0;
+  float zrange_threshold = 0.2;
+  bool merge_segid = true;
+  bool merge_zrange = false;
+  bool merge_step_height = true;
+  bool merge_unsegmented = false;
+  bool merge_dangling_egdes = false;
   LOD13GeneratorNode(NodeManager& manager):Node(manager) {
-    add_input("point_clouds", TT_any);
+    add_input("point_clouds", TT_point_collection_list);
     add_input("polygons", TT_linear_ring_collection);
     add_output("decomposed_footprints", TT_linear_ring_collection);
     add_output("attributes", TT_attribute_map_f);
   }
 
   void gui(){
-    ImGui::InputFloat("Step height", &step_threshold, 0.1, 1);
+    ImGui::InputFloat("Step height", &step_height_threshold, 0.1, 1);
+    ImGui::DragFloat("zrange_threshold", &zrange_threshold, 0.1);
+    ImGui::Checkbox("merge_segid", &merge_segid);
+    ImGui::Checkbox("merge_zrange", &merge_zrange);
+    ImGui::Checkbox("merge_step_height", &merge_step_height);
+    ImGui::Checkbox("merge_unsegmented", &merge_unsegmented);
+    ImGui::Checkbox("merge_dangling_egdes", &merge_dangling_egdes);
   }
   void process();
 };

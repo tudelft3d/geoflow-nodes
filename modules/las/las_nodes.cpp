@@ -1,3 +1,6 @@
+#include <lasreader.hpp>
+#include <laswriter.hpp>
+
 #include "las_nodes.hpp"
 
 using namespace geoflow;
@@ -44,47 +47,65 @@ void LASLoaderNode::process(){
   outputs("intensity").set(intensity);
 }
 
-// void LASWriterNode::process(){
-//   PointCollection points;
-//   vec1i classification;
-//   vec1f intensity;
+void LASWriterNode::write_point_cloud_collection(PointCollection& point_cloud, std::string path) {
 
-//   LASreadOpener lasreadopener;
-//   lasreadopener.set_file_name(filepath);
-//   LASreader* lasreader = lasreadopener.open();
-//   if (!lasreader)
-//     return;
+  LASwriteOpener laswriteopener;
+  laswriteopener.set_file_name(path.c_str());
 
+  LASheader lasheader;
+  lasheader.x_scale_factor = 0.01;
+  lasheader.y_scale_factor = 0.01;
+  lasheader.z_scale_factor = 0.01;
+  lasheader.x_offset = 0.0;
+  lasheader.y_offset = 0.0;
+  lasheader.z_offset = 0.0;
+  lasheader.point_data_format = 0;
+  lasheader.point_data_record_length = 20;
 
-//   // LASwriteOpener laswriteopener;
-//   // laswriteopener.set_file_name("compressed.laz");
-//   // LASwriter* laswriter = laswriteopener.open(&lasreader->header);
+  LASpoint laspoint;
+  laspoint.init(&lasheader, lasheader.point_data_format, lasheader.point_data_record_length, 0);
 
-//   // laswriter->write_point(&lasreader->point);
+  LASwriter* laswriter = laswriteopener.open(&lasheader);
+  if (laswriter == 0)
+  {
+    std::cerr << "ERROR: could not open laswriter\n";
+    return;
+  }
 
-//   bool found_offset = manager.data_offset.has_value();
+  // bool found_offset = manager.data_offset.has_value();
 
-//   size_t i=0;
-//   while (lasreader->read_point()) {
-//     if (!found_offset) {
-//       manager.data_offset = {lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z()};
-//       found_offset = true;
-//     }
-//     if (i++ % thin_nth == 0) {
-//       classification.push_back(lasreader->point.get_classification());
-//       intensity.push_back(float(lasreader->point.get_intensity()));
-//       points.push_back({
-//         float(lasreader->point.get_x() - (*manager.data_offset)[0]), 
-//         float(lasreader->point.get_y() - (*manager.data_offset)[1]), 
-//         float(lasreader->point.get_z() - (*manager.data_offset)[2])}
-//       );
-//       if(i%100000000==0) std::cout << "Read " << i << " points...\n";
-//     }
-//   }
-//   lasreader->close();
-//   delete lasreader;
+  size_t i=0;
+  for (auto& p : point_cloud) {
+    laspoint.set_x(p[0] + (*manager.data_offset)[0]);
+    laspoint.set_y(p[1] + (*manager.data_offset)[1]);
+    laspoint.set_z(p[2] + (*manager.data_offset)[2]);
 
-//   outputs("points").set(points);
-//   outputs("classification").set(classification);
-//   outputs("intensity").set(intensity);
-// }
+    laswriter->write_point(&laspoint);
+    laswriter->update_inventory(&laspoint);
+    
+    if((++i)%100000000==0) std::cout << "Wrtten " << i << " points...\n";
+  } 
+
+  laswriter->update_header(&lasheader, TRUE);
+  laswriter->close();
+  delete laswriter;
+}
+
+void LASWriterNode::process(){
+  auto input_geom = inputs("point_clouds");
+
+  if (input_geom.connected_type == TT_point_collection) {
+    auto point_cloud = input_geom.get<PointCollection>();
+    write_point_cloud_collection(point_cloud, std::string(filepath));
+
+  } else if (input_geom.connected_type == TT_point_collection_list) {
+    auto point_clouds = input_geom.get< std::vector<PointCollection> >();
+
+    int i=0;
+    for (auto point_cloud : point_clouds) {
+      std::string fp (filepath);
+      fp += "." + std::to_string(i++) + ".las";
+      write_point_cloud_collection(point_cloud, fp);
+    }
+  }
+}

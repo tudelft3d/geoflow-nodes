@@ -46,11 +46,13 @@ int main(int ac, const char * av[])
     N.register_node<AlphaShapeNode>("AlphaShape");
     N.register_node<Arr2LinearRingsNode>("Arr2LinearRings");
     N.register_node<PolygonExtruderNode>("PolygonExtruder");
+    N.register_node<LOD13GeneratorNode>("LOD13Generator");
     
     //gdal nodes
     N.register_node<OGRLoaderNode>("OGRLoader");
     N.register_node<OGRWriterNode>("OGRWriter");
     N.register_node<LASLoaderNode>("LASLoader");
+    N.register_node<LASWriterNode>("LASWriter");
     N.register_node<PLWriterNode>("PLWriter");
     N.register_node<CDTNode>("CDT");
     N.register_node<PointDistanceNode>("PointDistance");
@@ -80,11 +82,11 @@ int main(int ac, const char * av[])
     ImGui::LinkStore ls;
     // ls.push_back(std::make_tuple("TheOGRLoader", "TheLASInPolygons", "linear_rings", "polygons"));
     ls.push_back(std::make_tuple("TheLASInPolygons", "TheComputeMetrics", "points", "points"));
-    ls.push_back(std::make_tuple("TheLASInPolygons", "TheBuildArrangement", "footprint_vec3f", "footprint_vec3f"));
-    ls.push_back(std::make_tuple("TheLASInPolygons", "TheRegulariseLines", "footprint_vec3f", "footprint_vec3f"));
+    ls.push_back(std::make_tuple("TheLASInPolygons", "TheBuildArrangement", "footprint", "footprint"));
+    ls.push_back(std::make_tuple("TheLASInPolygons", "TheRegulariseLines", "footprint", "footprint"));
     ls.push_back(std::make_tuple("TheComputeMetrics", "TheAlphaShape", "points", "points"));
     ls.push_back(std::make_tuple("TheComputeMetrics", "TheProcessArrangement", "points", "points"));
-    ls.push_back(std::make_tuple("TheAlphaShape", "TheDetectLines", "edge_points", "edge_points"));
+    ls.push_back(std::make_tuple("TheAlphaShape", "TheDetectLines", "alpha_rings", "edge_points"));
     ls.push_back(std::make_tuple("TheDetectLines", "TheRegulariseLines", "edge_segments", "edge_segments"));
     ls.push_back(std::make_tuple("TheRegulariseLines", "TheBuildArrangement", "edges_out", "edge_segments"));
     ls.push_back(std::make_tuple("TheBuildArrangement", "TheProcessArrangement", "arrangement", "arrangement"));

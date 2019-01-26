@@ -159,13 +159,17 @@ class SimplifyFootprintNode:public Node {
 class PLWriterNode:public Node {
   public:
   char filepath[256] = "/Users/ravi/out.ply";
+  bool multiple_files = true;
+  bool write_binary = false;
 
   PLWriterNode(NodeManager& manager):Node(manager) {
-    add_input("points", TT_point_collection);
+    add_input("points", TT_point_collection); //TT_point_collection_list
     add_input("labels", TT_vec1i);
   }
   void gui(){
     ImGui::InputText("File path", filepath, IM_ARRAYSIZE(filepath));
+    // ImGui::Checkbox("Write multiple files in case of point cloud list", &multiple_files);
+    ImGui::Checkbox("Write binary output", &write_binary);
   }
   void process();
 };

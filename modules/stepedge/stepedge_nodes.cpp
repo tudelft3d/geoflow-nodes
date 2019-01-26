@@ -78,6 +78,12 @@ void AlphaShapeNode::process(){
     //   alpha_edges.push_back(std::make_pair(face->vertex(T.cw(i)), face->vertex(T.ccw(i))));
     // }
 
+    for (auto it = A.alpha_shape_vertices_begin(); it!=A.alpha_shape_vertices_end(); it++) {
+      auto p = (*it)->point();
+      edge_points.push_back({float(p.x()), float(p.y()), float(p.z())});
+    }
+    size_t n_edge_pts = edge_points.size();
+
     // find edges of outer boundary in order
     LinearRing ring;
     // first find a vertex v_start on the boundary
@@ -94,6 +100,7 @@ void AlphaShapeNode::process(){
     ring.push_back( {float(v_start->point().x()), float(v_start->point().y()), float(v_start->point().z())} );
     // secondly, walk along the entire boundary starting from v_start
     Vertex_handle v_next, v_prev = v_start, v_cur = v_start;
+    size_t v_cntr = 0;
     do {
       Edge_circulator ec(A.incident_edges(v_cur)), done(ec);
       do {
@@ -102,21 +109,24 @@ void AlphaShapeNode::process(){
         if (v_cur == v) v = ec->first->vertex(A.ccw(ec->second));
         // check if the edge is on the boundary of the a-shape and if we are not going backwards
         if((A.classify(*ec) == Alpha_shape_2::REGULAR)  && (v != v_prev)) {
-          v_next = v;
-          ring.push_back( {float(v_next->point().x()), float(v_next->point().y()), float(v_next->point().z())} );
-          break;
+          // check if we are not on a dangling edge
+          if (A.classify(ec->first)==Alpha_shape_2::INTERIOR || A.classify(ec->first->neighbor(ec->second))==Alpha_shape_2::INTERIOR ) {
+            v_next = v;
+            ring.push_back( {float(v_next->point().x()), float(v_next->point().y()), float(v_next->point().z())} );
+            break;
+          }
         }
       } while (++ec != done);
       v_prev = v_cur;
       v_cur = v_next;
+      
+      // if (++v_cntr <= n_edge_pts) {
+      //   std::cout << "this ring is non-manifold, breaking alpha-ring iteration\n";
+      //   break;
+      // }
     } while (v_next != v_start);
     // finally, store the ring 
     alpha_rings.push_back(ring);
-
-    for (auto it = A.alpha_shape_vertices_begin(); it!=A.alpha_shape_vertices_end(); it++) {
-      auto p = (*it)->point();
-      edge_points.push_back({float(p.x()), float(p.y()), float(p.z())});
-    }
   }
   
   outputs("alpha_rings").set(alpha_rings);
@@ -167,7 +177,8 @@ void ExtruderNode::process(){
   // auto elevations = std::any_cast<inputs("elevations").get<float>>();
   auto arr = inputs("arrangement").get<Arrangement_2>();
 
-  vec3f triangles, normals;
+  TriangleCollection triangles;
+  vec3f normals;
   vec1i cell_id_vec1i;
   vec1i labels;
   using N = uint32_t;
@@ -177,26 +188,34 @@ void ExtruderNode::process(){
     for (auto face: arr.face_handles()){
       if(face->data().is_finite) {
         cell_id++;
-        vec2f polygon, face_triangles;
+        vec2f polygon, vertices;
         arrangementface_to_polygon(face, polygon);
         std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
         for(auto i : indices) {
-          face_triangles.push_back({polygon[i]});
+          vertices.push_back({polygon[i]});
         }
-        for (auto& vertex : face_triangles) {
-          //add to ground face
-          triangles.push_back({vertex[0], vertex[1], 0});
-          labels.push_back(0);
-          normals.push_back({0,0,-1});
-          cell_id_vec1i.push_back(cell_id);
-        } 
-        for (auto& vertex : face_triangles) {
-          //add to elevated (roof) face
-          triangles.push_back({vertex[0], vertex[1], face->data().elevation_avg});
-          labels.push_back(1);
-          normals.push_back({0,0,1});
-          cell_id_vec1i.push_back(cell_id);
-        } 
+        // floor triangles
+        for (size_t i=0; i<indices.size()/3; ++i) {
+          Triangle triangle;
+          for (size_t j=0; j<3; ++j) {
+            triangle[j] = {vertices[i*3+j][0], vertices[i*3+j][1], 0};
+            labels.push_back(0);
+            normals.push_back({0,0,-1});
+            cell_id_vec1i.push_back(cell_id);
+          }
+          triangles.push_back(triangle);
+        }
+        // roof triangles
+        for (size_t i=0; i<indices.size()/3; ++i) {
+          Triangle triangle;
+          for (size_t j=0; j<3; ++j) {
+            triangle[j] = {vertices[i*3+j][0], vertices[i*3+j][1], face->data().elevation_avg};
+            labels.push_back(1);
+            normals.push_back({0,0,1});
+            cell_id_vec1i.push_back(cell_id);
+          }
+          triangles.push_back(triangle);
+        }
       }
     }
   }
@@ -240,11 +259,11 @@ void ExtruderNode::process(){
         };
 
         // 1st triangle
-        triangles.push_back(u1);
+        triangles.push_back({u1,l2,l1});
         labels.push_back(wall_label);
-        triangles.push_back(l2);
+        // triangles.push_back(l2);
         labels.push_back(wall_label);
-        triangles.push_back(l1);
+        // triangles.push_back(l1);
         labels.push_back(wall_label);
 
         n = get_normal(u1,l2,l1);
@@ -257,11 +276,11 @@ void ExtruderNode::process(){
         cell_id_vec1i.push_back(0);
 
         // 2nd triangle
-        triangles.push_back(u1);
+        triangles.push_back({u1,u2,l2});
         labels.push_back(wall_label);
-        triangles.push_back(u2);
+        // triangles.push_back(u2);
         labels.push_back(wall_label);
-        triangles.push_back(l2);
+        // triangles.push_back(l2);
         labels.push_back(wall_label);
 
         n = get_normal(u1,u2,l2);
@@ -278,7 +297,7 @@ void ExtruderNode::process(){
 
   outputs("normals_vec3f").set(normals);
   outputs("cell_id_vec1i").set(cell_id_vec1i);
-  outputs("triangles_vec3f").set(triangles);
+  outputs("triangles").set(triangles);
   outputs("labels_vec1i").set(labels);
 }
 
@@ -294,51 +313,53 @@ void ProcessArrangementNode::process(){
 
 void BuildArrangementNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto edge_segments = inputs("edge_segments").get<std::vector<std::pair<Point,Point>>>();
-  auto fp_vec3f = inputs("footprint_vec3f").get<vec3f>();
+  auto edge_segments = inputs("edge_segments").get<LineStringCollection>();
+  auto footprint = inputs("footprint").get<LinearRing>();
 
   bg::model::polygon<point_type> fp;
-  for(auto& p : fp_vec3f) {
+  for(auto& p : footprint) {
       bg::append(fp.outer(), point_type(p[0], p[1]));
     }
 
   Arrangement_2 arr;
   arr.clear();
-  build_arrangement(fp, edge_segments, arr);
-  vec3f polygons;
+  build_arrangement(fp, edge_segments, arr, remove_unsupported);
+  LineStringCollection segments;
   for (auto face: arr.face_handles()){
       if(face->data().is_finite){
           auto he = face->outer_ccb();
           auto first = he;
 
           while(true){
-              polygons.push_back({
-                float(CGAL::to_double(he->source()->point().x())),
-                float(CGAL::to_double(he->source()->point().y())),
-                0
-              });
-              polygons.push_back({
-                float(CGAL::to_double(he->target()->point().x())),
-                float(CGAL::to_double(he->target()->point().y())),
-                0
+              segments.push_back({
+                {
+                  float(CGAL::to_double(he->source()->point().x())),
+                  float(CGAL::to_double(he->source()->point().y())),
+                  0
+                },{
+                  float(CGAL::to_double(he->target()->point().x())),
+                  float(CGAL::to_double(he->target()->point().y())),
+                  0
+                }
               });
 
               he = he->next();
               if (he==first) break;
           }
-          polygons.push_back({
-            float(CGAL::to_double(he->source()->point().x())),
-            float(CGAL::to_double(he->source()->point().y())),
-            0
-          });
-          polygons.push_back({
-            float(CGAL::to_double(he->target()->point().x())),
-            float(CGAL::to_double(he->target()->point().y())),
-            0
+          segments.push_back({
+            {
+              float(CGAL::to_double(he->source()->point().x())),
+              float(CGAL::to_double(he->source()->point().y())),
+              0
+            },{
+              float(CGAL::to_double(he->target()->point().x())),
+              float(CGAL::to_double(he->target()->point().y())),
+              0
+            }
           });
       }
   }
-  outputs("arr_segments_vec3f").set(polygons);
+  outputs("arr_segments").set(segments);
   outputs("arrangement").set(arr);
 }
 
@@ -532,7 +553,7 @@ void LASInPolygonsNode::process() {
 
   outputs("point_clouds").set(point_clouds);
   outputs("points").set(PointCollection(point_clouds[footprint_id]));
-  outputs("footprint_vec3f").set(polygons[footprint_id]);
+  outputs("footprint").set(polygons[footprint_id]);
 }
 
 // class PointsInFootprintNode:public Node {
@@ -702,7 +723,7 @@ void LASInPolygonsNode::process() {
 void RegulariseLinesNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto edges = inputs("edge_segments").get<LineStringCollection>();
-  auto footprint_vec3f = inputs("footprint_vec3f").get<vec3f>();
+  auto footprint = inputs("footprint").get<LinearRing>();
   typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_2 Point_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_3 Point_3;
 
@@ -722,11 +743,11 @@ void RegulariseLinesNode::process(){
     lines.push_back(std::make_tuple(angle,p,0,p_.z(), false, angle, l));
   }
   // add footprint edges
-  // footprint_vec3f.push_back(footprint_vec3f[0]); //repeat first point as last
+  // footprint.push_back(footprint[0]); //repeat first point as last
   vec3f tmp_vec3f;
-  for(size_t i=0; i<footprint_vec3f.size()-1; i++) {
-    auto p_first = Point_2(footprint_vec3f[i+0][0], footprint_vec3f[i+0][1]);
-    auto p_second = Point_2(footprint_vec3f[i+1][0], footprint_vec3f[i+1][1]);
+  for(size_t i=0; i<footprint.size()-1; i++) {
+    auto p_first = Point_2(footprint[i+0][0], footprint[i+0][1]);
+    auto p_second = Point_2(footprint[i+1][0], footprint[i+1][1]);
     auto v = p_second - p_first;
 
     tmp_vec3f.push_back({float(p_first.x()), float(p_first.y()), 0});
@@ -838,8 +859,8 @@ void RegulariseLinesNode::process(){
   // }
 
   // compute one line per dist cluster => the one with the highest elevation
-  vec3f edges_out_vec3f;
-  std::vector<std::pair<Point,Point>> edges_out;
+  LineStringCollection edges_out;
+  // std::vector<std::pair<Point,Point>> edges_out;
   for(auto& cluster : dist_clusters) {
     //try to find a footprint line
     linetype best_line;
@@ -879,16 +900,13 @@ void RegulariseLinesNode::process(){
     auto p_center = p0;// + average_dist*n;
     auto p_begin = p_center + halfdist*l;
     auto p_end = p_center - halfdist*l;
-    edges_out_vec3f.push_back({float(p_begin.x()), float(p_begin.y()), 0});
-    edges_out_vec3f.push_back({float(p_end.x()), float(p_end.y()), 0});
-    edges_out.push_back(std::make_pair(
-      Point(float(p_begin.x()), float(p_begin.y()), 0),
-      Point(float(p_end.x()), float(p_end.y()), 0)
-    ));
+    edges_out.push_back({
+      {float(p_begin.x()), float(p_begin.y()), 0},
+      {float(p_end.x()), float(p_end.y()), 0}
+    });
   }
 
   outputs("edges_out").set(edges_out);
-  outputs("edges_out_vec3f").set(edges_out_vec3f);
 }
 
 void LOD13GeneratorNode::process(){
@@ -904,8 +922,8 @@ void LOD13GeneratorNode::process(){
   AttributeMap all_attributes;
   
   for(int i=0; i<point_clouds.size(); i++) {
-    auto& points_vec3f = point_clouds[i];
-    auto& polygon_vec3f = polygons[i];
+    auto& points = point_clouds[i];
+    auto& polygon = polygons[i];
 
     NodeManager N = NodeManager();
 
@@ -917,20 +935,27 @@ void LOD13GeneratorNode::process(){
     auto ProcessArrangement_node = std::make_shared<ProcessArrangementNode>(N);
     auto Arr2LinearRings_node = std::make_shared<Arr2LinearRingsNode>(N);
 
-    ComputeMetrics_node->inputs("points").set(points_vec3f);
-    BuildArrangement_node->inputs("footprint_vec3f").set(polygon_vec3f);
-    RegulariseLines_node->inputs("footprint_vec3f").set(polygon_vec3f);
+    ComputeMetrics_node->inputs("points").set(points);
+    BuildArrangement_node->inputs("footprint").set(polygon);
+    RegulariseLines_node->inputs("footprint").set(polygon);
 
     connect(*ComputeMetrics_node, *AlphaShape_node, "points", "points");
     connect(*ComputeMetrics_node, *ProcessArrangement_node, "points", "points");
-    connect(*AlphaShape_node, *DetectLines_node, "edge_points", "edge_points");
+    connect(*AlphaShape_node, *DetectLines_node, "alpha_rings", "edge_points");
     connect(*DetectLines_node, *RegulariseLines_node, "edge_segments", "edge_segments");
     connect(*RegulariseLines_node, *BuildArrangement_node, "edges_out", "edge_segments");
     connect(*BuildArrangement_node, *ProcessArrangement_node, "arrangement", "arrangement");
     connect(*ProcessArrangement_node, *Arr2LinearRings_node, "arrangement", "arrangement");
 
     // config and run
-    ProcessArrangement_node->c.step_height_threshold = step_threshold;
+    ProcessArrangement_node->c.step_height_threshold = step_height_threshold;
+    ProcessArrangement_node->c.zrange_threshold = zrange_threshold;
+    ProcessArrangement_node->c.merge_segid = merge_segid;
+    ProcessArrangement_node->c.merge_zrange = merge_zrange;
+    ProcessArrangement_node->c.merge_step_height = merge_step_height;
+    ProcessArrangement_node->c.merge_unsegmented = merge_unsegmented;
+    ProcessArrangement_node->c.merge_dangling_egdes = merge_dangling_egdes;
+    
     N.run(*ComputeMetrics_node);
 
     auto cells = Arr2LinearRings_node->outputs("linear_rings").get<LinearRingCollection>();

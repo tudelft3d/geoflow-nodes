@@ -109,7 +109,13 @@ struct FaceInfo {
   float segid_coverage;
   float segid_count;
 };
-typedef CGAL::Arr_face_extended_dcel<Traits_2, FaceInfo>   Dcel;
+struct EdgeInfo {
+  bool is_touched=false;
+  bool is_footprint=false;
+  Kernel::Point_2 c;
+  double halfdist_sq;
+};
+typedef CGAL::Arr_extended_dcel<Traits_2, bool, EdgeInfo, FaceInfo>   Dcel;
 typedef CGAL::Arrangement_2<Traits_2, Dcel>           Arrangement_2;
 typedef Arrangement_2::Vertex_handle                  Vertex_handle;
 typedef Arrangement_2::Halfedge_handle                Halfedge_handle;
@@ -213,7 +219,7 @@ struct config {
   float zrange_threshold = 0.2;
   bool merge_segid = true;
   bool merge_zrange = false;
-  bool merge_step_height = false;
+  bool merge_step_height = true;
   bool merge_unsegmented = false;
   bool merge_dangling_egdes = false;
 };
@@ -224,6 +230,6 @@ void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<po
 void compute_metrics(PNL_vector &points, config = config()) ;
 void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &points, config = config()) ;
 void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, config = config()) ;
-void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<std::pair<Point,Point>> & edge_segments, Arrangement_2 &arr);
+void build_arrangement(bg::model::polygon<point_type> &footprint, geoflow::LineStringCollection & edge_segments, Arrangement_2 &arr, bool remove_unsupported);
 void process_arrangement(PNL_vector& points, Arrangement_2& arr, config = config());
 void arrangementface_to_polygon(Face_handle face, vec2f& polygons);

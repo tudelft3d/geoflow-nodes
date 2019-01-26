@@ -14,7 +14,7 @@ class OGRLoaderNode:public Node {
 
   public:
   // char filepath[256] = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_dgmr_.gpkg";
-  char filepath[256] = "/Users/ravi/surfdrive/Data/step-edge-detector/hoogtelijnen_v01_simp_dp1m_subset.gpkg";
+  char filepath[256] = "";
   // char filepath[256] = "/Users/ravi/surfdrive/Projects/RWS-Basisbestand-3D-geluid/3D-basisbestand-geluid-v0.1/output/hoogtelijnen/hoogtelijnen_v2/hoogtelijnen_out";
 
   OGRLoaderNode(NodeManager& manager):Node(manager) {
@@ -48,7 +48,7 @@ class OGRWriterNode:public Node {
 };
 class OGRWriterNoAttributesNode:public Node {
   public:
-  char filepath[256] = "blabla.gpkg";
+  char filepath[256] = "out";
   int epsg = 7415;
   
   

@@ -510,8 +510,10 @@ void PLWriterNode::process() {
   }
 
   std::ofstream f(filepath);
-  // CGAL::set_binary_mode(f); // The PLY file will be written in the binary format
-  f << std::fixed << std::setprecision(2);
+  if (write_binary)
+    CGAL::set_binary_mode(f); // The PLY file will be written in the binary format
+  else
+    f << std::fixed << std::setprecision(2);
 
   CGAL::write_ply_points_with_properties
     (f, pl_points,

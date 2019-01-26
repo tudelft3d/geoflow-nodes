@@ -259,7 +259,7 @@ void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vect
   }
 }
 
-void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<std::pair<Point,Point>> & edge_segments, Arrangement_2 &arr){
+void build_arrangement(bg::model::polygon<point_type> &footprint, geoflow::LineStringCollection & edge_segments, Arrangement_2 &arr, bool remove_unsupported){
   Face_index_observer obs (arr);
   // const double s = 100;
 
@@ -273,6 +273,12 @@ void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<st
   // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
   insert_non_intersecting_curves(arr, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
 
+  for (auto edge : arr.edge_handles()) {
+    edge->data().is_touched = true;
+    edge->data().is_footprint = true;
+    edge->twin()->data().is_touched = true;
+    edge->twin()->data().is_footprint = true;
+  }
   // std::cout << arr.number_of_faces() <<std::endl;
   // for (auto face: arr.face_handles()){
   //   if(face->is_unbounded())
@@ -281,19 +287,52 @@ void build_arrangement(bg::model::polygon<point_type> &footprint, std::vector<st
   //     std::cout << "Bounded face, id: " << face->data() << std::endl;
   // }
 
-  // line regularisation
-
 
   // insert step-edge lines
   // std::vector<std::pair<Plane,bool>> wall_planes;
-  std::vector<X_monotone_curve_2> lines;
-  for (auto s : edge_segments){
+  // std::vector<X_monotone_curve_2> lines;
+  for (auto s : edge_segments) {
     // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
-    const Point_2 a(s.first.x(),s.first.y());
-    const Point_2 b(s.second.x(),s.second.y());
-    lines.push_back(Line_2(a, b));
+    const Kernel::Point_2 a(s[0][0],s[0][1]);
+    const Kernel::Point_2 b(s[1][0],s[1][1]);
+    insert(arr, Line_2(Point_2(s[0][0],s[0][1]), Point_2(s[1][0],s[1][1])));
+    
+    if (remove_unsupported) for (auto edge : arr.edge_handles()) {
+      if (!edge->data().is_touched) {
+        auto v = (b-a)/2;
+        edge->data().c = a+v;
+        edge->data().halfdist_sq = v.squared_length();
+        edge->data().is_touched = true;
+        edge->twin()->data().c = a+v;
+        edge->twin()->data().halfdist_sq = v.squared_length();
+        edge->twin()->data().is_touched = true;
+      }
+    }
   }
-  insert(arr, lines.begin(), lines.end());
+
+  // remove edges that do not overlap with their detected edge
+  if (remove_unsupported) {
+    std::vector<Arrangement_2::Halfedge_handle> edges;
+    for (auto edge : arr.edge_handles()) {
+      if (!edge->data().is_footprint && !(edge->source()->is_at_open_boundary() || edge->target()->is_at_open_boundary())) {
+        auto s = Kernel::Point_2(CGAL::to_double(edge->source()->point().x()), CGAL::to_double(edge->source()->point().y()));
+        auto t = Kernel::Point_2(CGAL::to_double(edge->target()->point().x()), CGAL::to_double(edge->target()->point().y()));
+        auto c = edge->data().c;
+        auto d = edge->data().halfdist_sq;
+        
+        auto left = s-c;
+        auto right = t-c;
+        bool partial_overlap = (left.squared_length() < d) || (right.squared_length() < d);
+        bool c_inbetween_st = left*right < 0; //should also check d, but not needed in combination with partial_overlap
+        if (!(partial_overlap || c_inbetween_st)) {
+          edges.push_back(edge);
+        }
+      }
+    }
+    for (auto edge : edges) {
+      arr.remove_edge(edge); 
+    }
+  }
 }
 
 void arrangementface_to_polygon(Face_handle face, vec2f& polygons){

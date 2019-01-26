@@ -61,7 +61,7 @@ void OGRLoaderNode::process(){
         }
         line_strings.push_back(line_string);
 
-      } else if (poGeometry->getGeometryType() == wkbPolygon25D || poGeometry->getGeometryType() == wkbPolygon || poGeometry->getGeometryType() == wkbPolygonZM ||    poGeometry->getGeometryType() == wkbPolygonM ) {
+      } else if (poGeometry->getGeometryType() == wkbPolygon25D || poGeometry->getGeometryType() == wkbPolygon || poGeometry->getGeometryType() == wkbPolygonZM || poGeometry->getGeometryType() == wkbPolygonM ) {
         OGRPolygon *poPolygon = poGeometry->toPolygon();
   
         vec3f ring;
