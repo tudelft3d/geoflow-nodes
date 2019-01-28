@@ -6,11 +6,18 @@ using namespace geoflow;
 class CDTNode:public Node {
   public:
   CDTNode(NodeManager& manager):Node(manager) {
-    // add_input("points", TT_any);
-    add_input("lines", TT_line_string_collection);
-    add_output("cgal_CDT", TT_any);
-    // add_output("normals_vec3f", TT_vec3f);
+    add_input("geometries", { TT_point_collection, TT_line_string_collection });
+    add_output("cgal_cdt", TT_any);
     add_output("triangles", TT_triangle_collection);
+  }
+  void process();
+};
+
+class DTNode:public Node {
+public:
+  DTNode(NodeManager& manager):Node(manager) {
+    add_input("points", TT_point_collection);
+    add_output("cgal_dt", TT_any);
   }
   void process();
 };
@@ -40,6 +47,7 @@ class PointDistanceNode:public Node{
   public:
   char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
   int thin_nth = 5;
+  bool adjustz = false;
 
   PointDistanceNode(NodeManager& manager):Node(manager) {
     add_input("triangles", TT_triangle_collection);
@@ -147,6 +155,40 @@ class SimplifyFootprintNode:public Node {
   }
   void gui(){
     if(ImGui::DragFloat("stop cost", &threshold_stop_cost,0.01)) {
+      manager.run(*this);
+    }
+  }
+  void process();
+};
+
+class IsoLineNode:public Node {
+public:
+  float threshold_stop_cost = 0.1;
+
+  IsoLineNode(NodeManager& manager):Node(manager) {
+    add_input("cgal_cdt", TT_any);
+    add_output("lines", TT_line_string_collection);
+    add_output("attributes", TT_attribute_map_f);
+  }
+  void gui() {
+    if (ImGui::DragFloat("stop cost", &threshold_stop_cost, 0.01)) {
+      manager.run(*this);
+    }
+  }
+  void process();
+};
+
+class IsoLineSlicerNode:public Node {
+public:
+  float threshold_stop_cost = 0.1;
+
+  IsoLineSlicerNode(NodeManager& manager):Node(manager) {
+    add_input("cgal_cdt", TT_any);
+    add_output("lines", TT_line_string_collection);
+    add_output("attributes", TT_attribute_map_f);
+  }
+  void gui() {
+    if (ImGui::DragFloat("stop cost", &threshold_stop_cost, 0.01)) {
       manager.run(*this);
     }
   }

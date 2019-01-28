@@ -51,6 +51,8 @@ int main(int ac, const char * av[])
     ns.push_back(std::make_tuple("TinSimp", "TheTinSimp", ImVec2(375,75)));
     ns.push_back(std::make_tuple("SimplifyLine3D", "TheSimplifyLine3D", ImVec2(675,75)));
     ns.push_back(std::make_tuple("OGRWriterNoAttributes", "TheOGRWriter", ImVec2(1075,75)));
+    ns.push_back(std::make_tuple("LASLoader", "LASLoader6", ImVec2(75,175)));
+
     nodes_.PreloadNodes(ns);
 
     // ImGui::LinkStore ls;

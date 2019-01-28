@@ -2,6 +2,7 @@
 
 #include "tinsimp.hpp"
 #include "linesimp.hpp"
+#include "isolines.hpp"
 
 #include <lasreader.hpp>
 #include <fstream>
@@ -13,6 +14,9 @@
 #include <CGAL/Triangulation_vertex_base_with_id_2.h>
 #include <CGAL/Triangulation_face_base_with_info_2.h>
 
+// DT
+#include <CGAL/Delaunay_triangulation_3.h>
+
 // AABB tree
 #include <CGAL/Simple_cartesian.h>
 #include <CGAL/AABB_tree.h>
@@ -23,6 +27,10 @@
 #include <CGAL/Polyline_simplification_2/simplify.h>
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Constrained_triangulation_plus_2.h>
+
+// iso lines
+#include <CGAL/Polygon_mesh_slicer.h>
+#include <CGAL/IO/Complex_2_in_triangulation_3_file_writer.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -36,24 +44,35 @@ template<typename T> inline std::array<float,3> to_arr3f(T& p) {
 void CDTNode::process(){
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef CGAL::Projection_traits_xy_3<K>								Gt;
-  typedef CGAL::Exact_predicates_tag									Itag;
+  typedef CGAL::Exact_predicates_tag									  Itag;
   typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, CGAL::Default, Itag>	CDT;
-  typedef CDT::Point													Point;
+  typedef CDT::Point													          Point;
 
-  // Set up vertex data (and buffer(s)) and attribute pointers
-  auto lines = inputs("lines").get<LineStringCollection>();
-  
+  auto geom_term = inputs("geometries");
   CDT cdt;
 
-  for (auto& line : lines) {
-    std::vector<Point> cgal_points;
-    cgal_points.reserve(line.size());
-    for (auto& p : line) {
-      cgal_points.push_back(Point(p[0], p[1], p[2]));
+  if (geom_term.connected_type == TT_point_collection) {
+    auto points = geom_term.get<geoflow::PointCollection>();
+    
+    std::cout << "Adding points to CDT\n";
+    for (auto& p : points) {
+      cdt.insert(Point(p[0], p[1], p[2]));
     }
-    cdt.insert_constraint( cgal_points.begin(), cgal_points.end() );
   }
-  
+  else if (geom_term.connected_type == TT_line_string_collection) {
+    auto lines = geom_term.get<geoflow::LineStringCollection>();
+
+    std::cout << "Adding lines to CDT\n";
+    for (auto& line : lines) {
+      std::vector<Point> cgal_points;
+      cgal_points.reserve(line.size());
+      for (auto& p : line) {
+        cgal_points.push_back(Point(p[0], p[1], p[2]));
+      }
+      cdt.insert_constraint(cgal_points.begin(), cgal_points.end());
+    }
+  }
+
   std::cout << "Completed CDT with " << cdt.number_of_faces() << " triangles...\n";
   // assert(cdt.is_valid());
   TriangleCollection triangles;
@@ -71,8 +90,27 @@ void CDTNode::process(){
     });
   }
 
-  // set_value("cgal_CDT", cdt);
+  outputs("cgal_cdt").set(cdt);
   outputs("triangles").set(triangles);
+}
+
+void DTNode::process() {
+  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+  typedef CGAL::Delaunay_triangulation_3<K>	            DT;
+  typedef K::Point_3													          Point;
+
+  // Set up vertex data (and buffer(s)) and attribute pointers
+  auto points = inputs("points").get<PointCollection>();
+
+
+  std::cout << "Adding points to DT\n";
+  DT dt;
+  for (auto& point : points) {
+    dt.insert(Point(point[0], point[1], point[2]));
+  }
+
+  std::cout << "Completed DT with " << dt.number_of_finite_facets() << " triangles...\n";
+  outputs("cgal_dt").set(dt);
 }
 
 void ComparePointDistanceNode::process(){
@@ -199,13 +237,22 @@ void PointDistanceNode::process(){
         auto q = Point(lasreader->point.get_x() - offset[0], lasreader->point.get_y() - offset[1], lasreader->point.get_z() - offset[2]);
         FT sqd = tree.squared_distance(q);
         distances.push_back(sqd);
-        points.push_back({
-          float(lasreader->point.get_x() - offset[0]), 
-          float(lasreader->point.get_y() - offset[1]), 
-          float(lasreader->point.get_z() - offset[2])}
-        );
+        if (adjustz) {
+          points.push_back({
+            float(lasreader->point.get_x() - offset[0]),
+            float(lasreader->point.get_y() - offset[1]),
+            float(sqrt(sqd)) }
+          );
+        }
+        else {
+          points.push_back({
+            float(lasreader->point.get_x() - offset[0]),
+            float(lasreader->point.get_y() - offset[1]),
+            float(lasreader->point.get_z() - offset[2]) }
+          );
+        }
       }
-      if(i%10000==0) std::cout << "Read " << i << " points...\n";
+      if(i%100000==0) std::cout << "Read " << i << " points...\n";
       // laswriter->write_point(&lasreader->point);
     }
   }
@@ -432,9 +479,9 @@ void SimplifyLinesNode::process(){
     size_t sum_count=0,count=0;
     for(auto vit = vit_begin; vit != vit_end; ++vit) {
       auto p = (*vit)->point();
-      if(vit!=vit_begin && vit!=vit_end)
-        vertices_vec3f.push_back({float(p.x()), float(p.y()), 0});
-      vertices_vec3f.push_back({float(p.x()), float(p.y()), 0});
+      //if(vit!=vit_begin && vit!=vit_end)
+      //  vertices_vec3f.push_back({float(p.x()), float(p.y()), 0});
+      //vertices_vec3f.push_back({float(p.x()), float(p.y()), 0});
       geometry_out.vertices.push_back({float(p.x()), float(p.y()), 0});
       count++;
     }
@@ -484,4 +531,157 @@ void SimplifyFootprintNode::process(){
     polygons_out.push_back(footprint_vec3f);
   }
   outputs("polygons_simp").set(polygons_out);
+}
+
+void IsoLineNode::process() {
+  auto cdt = inputs("cgal_cdt").get<isolines::CDT>();
+  //auto heights = inputs("heights").get<vec1f>();
+
+  vec1f heights;
+  heights.push_back(-3);
+  heights.push_back(-2);
+  //heights.push_back(-1);
+  //heights.push_back(1);
+  heights.push_back(2);
+  heights.push_back(3);
+  heights.push_back(4);
+
+  LineStringCollection lines;
+  AttributeMap attributes;
+  std::map< double, std::vector< CGAL::Segment_3<isolines::K> > > segmentVec;
+
+  for (auto isoDepth : heights) {
+    // faceCache is used to ensure line segments are outputted only once. It will contain faces that have an edge exactly on the contouring depth.
+    std::set<isolines::Face_handle> faceCache;
+
+    // iterate over all triangle faces
+    for (isolines::Face_iterator ib = cdt.finite_faces_begin();
+      ib != cdt.finite_faces_end(); ++ib) {
+
+      // shorthand notations for the 3 triangle vertices and their position w.r.t. the contouring depth
+      isolines::Vertex_handle v0 = ib->vertex(0);
+      isolines::Vertex_handle v1 = ib->vertex(1);
+      isolines::Vertex_handle v2 = ib->vertex(2);
+      int v0_ = isolines::cntrEvalVertex(v0, isoDepth);
+      int v1_ = isolines::cntrEvalVertex(v1, isoDepth);
+      int v2_ = isolines::cntrEvalVertex(v2, isoDepth);
+
+      // following is a big if-else-if statement to identify the basic triangle configuration (wrt the contouring depth)
+
+      //its on a horizontal plane: skip it
+      if (v0_ == v1_ && v1_ == v2_)
+        continue;
+
+      //one edge is equal to isodepth: extract that edge. Use faceCache to check if this segment hasn't been extracted earlier.
+      else if (v0_ == 0 && v1_ == 0) {
+        faceCache.insert(ib);
+        if (faceCache.find(ib->neighbor(2)) == faceCache.end())
+          segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(v0->point(), v1->point()));
+      }
+      else if (v1_ == 0 && v2_ == 0) {
+        faceCache.insert(ib);
+        if (faceCache.find(ib->neighbor(0)) == faceCache.end())
+          segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(v1->point(), v2->point()));
+      }
+      else if (v2_ == 0 && v0_ == 0) {
+        faceCache.insert(ib);
+        if (faceCache.find(ib->neighbor(1)) == faceCache.end())
+          segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(v2->point(), v0->point()));
+
+        //there is an intersecting line segment in between the interiors of 2 edges: calculate intersection points and extract that edge
+      }
+      else if ((v0_ == -1 && v1_ == 1 && v2_ == 1) || (v0_ == 1 && v1_ == -1 && v2_ == -1)) {
+        isolines::Point p1 = isolines::cntrIntersectEdge(v0, v1, isoDepth);
+        isolines::Point p2 = isolines::cntrIntersectEdge(v0, v2, isoDepth);
+        segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(p1, p2));
+      }
+      else if ((v0_ == 1 && v1_ == -1 && v2_ == 1) || (v0_ == -1 && v1_ == 1 && v2_ == -1)) {
+        isolines::Point p1 = isolines::cntrIntersectEdge(v1, v0, isoDepth);
+        isolines::Point p2 = isolines::cntrIntersectEdge(v1, v2, isoDepth);
+        segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(p1, p2));
+      }
+      else if ((v0_ == 1 && v1_ == 1 && v2_ == -1) || (v0_ == -1 && v1_ == -1 && v2_ == 1)) {
+        isolines::Point p1 = isolines::cntrIntersectEdge(v2, v0, isoDepth);
+        isolines::Point p2 = isolines::cntrIntersectEdge(v2, v1, isoDepth);
+        segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(p1, p2));
+
+        // one vertex is on the isodepth the others are above and below: return segment, consisting out of the vertex on the isodepth and the intersection on the opposing edge
+      }
+      else if (v0_ == 0 && v1_ != v2_) {
+        isolines::Point p = isolines::cntrIntersectEdge(v1, v2, isoDepth);
+        segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(v0->point(), p));
+      }
+      else if (v1_ == 0 && v0_ != v2_) {
+        isolines::Point p = isolines::cntrIntersectEdge(v0, v2, isoDepth);
+        segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(v1->point(), p));
+      }
+      else if (v2_ == 0 && v0_ != v1_) {
+        isolines::Point p = isolines::cntrIntersectEdge(v0, v1, isoDepth);
+        segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(v2->point(), p));
+      }
+    }
+    for (auto s : segmentVec[isoDepth]) {
+      vec3f line_vec3f;
+      line_vec3f.push_back({ float(s.start().x()),float(s.start().y()), isoDepth });
+      line_vec3f.push_back({ float(s.end().x()),float(s.end().y()), isoDepth });
+      lines.push_back(line_vec3f);
+      attributes["height"].push_back(isoDepth);
+    }
+  }
+
+  outputs("lines").set(lines);
+  outputs("attributes").set(attributes);
+}
+
+void IsoLineSlicerNode::process() {
+  //typedef CGAL::Simple_cartesian<double> K;
+  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+  typedef K::Point_3 Point;
+  typedef K::Plane_3 Plane;
+  typedef CGAL::Surface_mesh<K::Point_3> Mesh;
+
+  auto cdt = inputs("cgal_cdt").get<isolines::CDT>();
+  //auto heights = inputs("heights").get<vec1f>();
+  //TODO get iso line seperation distance, get min/max height and create list of heights
+  vec1f heights;
+  heights.push_back(-3);
+  heights.push_back(-2);
+  //heights.push_back(-1);
+  //heights.push_back(1);
+  heights.push_back(2);
+  heights.push_back(3);
+  heights.push_back(4);
+
+  std::cout << "Transforming CDT to Surface Mesh\n";
+  LineStringCollection lines;
+  AttributeMap attributes;
+
+  Mesh mesh;
+  isolines::link_cdt_to_face_graph(cdt, mesh);
+
+  //std::ofstream out("D:\\Projects\\3D Geluid\\Hoogtelijnen\\surface.off");
+  //CGAL::write_off(out, mesh);
+  
+  std::cout << "Start slicing\n";
+  CGAL::Polygon_mesh_slicer<Mesh, K> slicer(mesh);
+  for (auto h : heights) {
+    std::cout << "Slicing ISO line at height "<< h << "\n";
+    std::vector< std::vector< Point > > polylines;
+    slicer(Plane(0, 0, 1, -h), std::back_inserter(polylines));
+
+    std::cout << "At z = " << h << ", the slicer intersects "
+      << polylines.size() << " polylines" << std::endl;
+    
+    // transform polylines to vec3f
+    for (auto& p : polylines) {
+      vec3f line_vec3f;
+      for (auto v = p.begin(); v != p.end(); v++) {
+        line_vec3f.push_back({ float(v->x()),float(v->y()), h });
+      }
+      lines.push_back(line_vec3f);
+      attributes["height"].push_back(h);
+    }
+  }
+  outputs("lines").set(lines);
+  outputs("attributes").set(attributes);
 }
