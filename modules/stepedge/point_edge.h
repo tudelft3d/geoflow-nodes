@@ -230,6 +230,6 @@ void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<po
 void compute_metrics(PNL_vector &points, config = config()) ;
 void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &points, config = config()) ;
 void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, config = config()) ;
-void build_arrangement(bg::model::polygon<point_type> &footprint, geoflow::LineStringCollection & edge_segments, Arrangement_2 &arr, bool remove_unsupported);
+void build_arrangement(geoflow::LinearRing &footprint, geoflow::LineStringCollection & edge_segments, Arrangement_2 &arr, bool remove_unsupported);
 void process_arrangement(PNL_vector& points, Arrangement_2& arr, config = config());
 void arrangementface_to_polygon(Face_handle face, vec2f& polygons);

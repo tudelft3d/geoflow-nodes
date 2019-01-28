@@ -259,19 +259,19 @@ void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vect
   }
 }
 
-void build_arrangement(bg::model::polygon<point_type> &footprint, geoflow::LineStringCollection & edge_segments, Arrangement_2 &arr, bool remove_unsupported){
+void build_arrangement(geoflow::LinearRing &footprint, geoflow::LineStringCollection & edge_segments, Arrangement_2 &arr, bool remove_unsupported){
   Face_index_observer obs (arr);
   // const double s = 100;
 
   // insert footprint segments
   std::vector<Point_2> footprint_pts;
-  for (auto p : footprint.outer()) {
-    footprint_pts.push_back(Point_2(bg::get<0>(p), bg::get<1>(p)));
+  for (auto p : footprint) {
+    footprint_pts.push_back(Point_2(p[0], p[1]));
   }
-  footprint_pts.pop_back(); // get rid of repeated vertex in boost polygon
+  // footprint_pts.pop_back(); // get rid of repeated vertex in boost polygon
   Polygon_2 cgal_footprint(footprint_pts.begin(), footprint_pts.end());
   // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
-  insert_non_intersecting_curves(arr, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
+  insert(arr, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
 
   for (auto edge : arr.edge_handles()) {
     edge->data().is_touched = true;

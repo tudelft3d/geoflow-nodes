@@ -8,15 +8,18 @@ using namespace geoflow;
 class AlphaShapeNode:public Node {
   public:
   float thres_alpha = 0.7;
+  bool extract_alpha_rings = false;
   AlphaShapeNode(NodeManager& manager):Node(manager) {
     // add_input("points", TT_any);
     add_input("points", TT_any);
     add_output("alpha_rings", TT_linear_ring_collection);
     add_output("edge_points", TT_point_collection);
+    add_output("alpha_edges", TT_line_string_collection);
   }
 
   void gui(){
     ImGui::InputFloat("Alpha", &thres_alpha, 0.01, 1);
+    ImGui::Checkbox("extract_alpha_rings", &extract_alpha_rings);
   }
   void process();
 };

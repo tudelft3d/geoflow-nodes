@@ -61,6 +61,7 @@ void AlphaShapeNode::process(){
     points_per_segment[boost::get<2>(p)].push_back(boost::get<0>(p));
   }
   PointCollection edge_points;
+  LineStringCollection alpha_edges;
   LinearRingCollection alpha_rings;
   for (auto& it : points_per_segment ) {
     auto points = it.second;
@@ -82,54 +83,69 @@ void AlphaShapeNode::process(){
       auto p = (*it)->point();
       edge_points.push_back({float(p.x()), float(p.y()), float(p.z())});
     }
-    size_t n_edge_pts = edge_points.size();
+    for (auto it = A.alpha_shape_edges_begin(); it!=A.alpha_shape_edges_end(); it++) {
+      auto p1 = it->first->vertex(A.cw(it->second))->point();
+      auto p2 = it->first->vertex(A.ccw(it->second))->point();
 
-    // find edges of outer boundary in order
-    LinearRing ring;
-    // first find a vertex v_start on the boundary
-    auto inf = A.infinite_vertex();
-    Vertex_handle v_start;
-    Vertex_circulator vc(A.incident_vertices(inf)), done(vc);
-    do {
-      if(A.classify(vc) == Alpha_shape_2::REGULAR ) {
-        v_start = vc;
-        break;
-      }
-    } while (++vc != done);
+      alpha_edges.push_back({
+        {float(p1.x()), float(p1.y()), float(p1.z())},
+        {float(p2.x()), float(p2.y()), float(p2.z())}
+      });
+    }
 
-    ring.push_back( {float(v_start->point().x()), float(v_start->point().y()), float(v_start->point().z())} );
-    // secondly, walk along the entire boundary starting from v_start
-    Vertex_handle v_next, v_prev = v_start, v_cur = v_start;
-    size_t v_cntr = 0;
-    do {
-      Edge_circulator ec(A.incident_edges(v_cur)), done(ec);
+    if (extract_alpha_rings) {
+      size_t n_edge_pts = edge_points.size();
+
+      // find edges of outer boundary in order
+      LinearRing ring;
+      // first find a vertex v_start on the boundary
+      auto inf = A.infinite_vertex();
+      Vertex_handle v_start;
+      Vertex_circulator vc(A.incident_vertices(inf)), done(vc);
       do {
-        // find the vertex on the other side of the incident edge ec
-        auto v = ec->first->vertex(A.cw(ec->second));
-        if (v_cur == v) v = ec->first->vertex(A.ccw(ec->second));
-        // check if the edge is on the boundary of the a-shape and if we are not going backwards
-        if((A.classify(*ec) == Alpha_shape_2::REGULAR)  && (v != v_prev)) {
-          // check if we are not on a dangling edge
-          if (A.classify(ec->first)==Alpha_shape_2::INTERIOR || A.classify(ec->first->neighbor(ec->second))==Alpha_shape_2::INTERIOR ) {
-            v_next = v;
-            ring.push_back( {float(v_next->point().x()), float(v_next->point().y()), float(v_next->point().z())} );
-            break;
-          }
+        if(A.classify(vc) == Alpha_shape_2::REGULAR ) {
+          v_start = vc;
+          break;
         }
-      } while (++ec != done);
-      v_prev = v_cur;
-      v_cur = v_next;
-      
-      // if (++v_cntr <= n_edge_pts) {
-      //   std::cout << "this ring is non-manifold, breaking alpha-ring iteration\n";
-      //   break;
-      // }
-    } while (v_next != v_start);
-    // finally, store the ring 
-    alpha_rings.push_back(ring);
+      } while (++vc != done);
+
+      ring.push_back( {float(v_start->point().x()), float(v_start->point().y()), float(v_start->point().z())} );
+      // secondly, walk along the entire boundary starting from v_start
+      Vertex_handle v_next, v_prev = v_start, v_cur = v_start;
+      size_t v_cntr = 0;
+      do {
+        Edge_circulator ec(A.incident_edges(v_cur)), done(ec);
+        do {
+          // find the vertex on the other side of the incident edge ec
+          auto v = ec->first->vertex(A.cw(ec->second));
+          if (v_cur == v) v = ec->first->vertex(A.ccw(ec->second));
+          // check if the edge is on the boundary of the a-shape and if we are not going backwards
+          if((A.classify(*ec) == Alpha_shape_2::REGULAR)  && (v != v_prev)) {
+            // check if we are not on a dangling edge
+            if (A.classify(ec->first)==Alpha_shape_2::INTERIOR || A.classify(ec->first->neighbor(ec->second))==Alpha_shape_2::INTERIOR ) {
+              v_next = v;
+              ring.push_back( {float(v_next->point().x()), float(v_next->point().y()), float(v_next->point().z())} );
+              break;
+            }
+          }
+        } while (++ec != done);
+        v_prev = v_cur;
+        v_cur = v_next;
+        
+        // if (++v_cntr <= n_edge_pts) {
+        //   std::cout << "this ring is non-manifold, breaking alpha-ring iteration\n";
+        //   break;
+        // }
+      } while (v_next != v_start);
+      // finally, store the ring 
+      alpha_rings.push_back(ring);
+    }
   }
   
-  outputs("alpha_rings").set(alpha_rings);
+  if (extract_alpha_rings) {
+    outputs("alpha_rings").set(alpha_rings);
+  }
+  outputs("alpha_edges").set(alpha_edges);
   outputs("edge_points").set(edge_points);
 }
 
@@ -316,14 +332,14 @@ void BuildArrangementNode::process(){
   auto edge_segments = inputs("edge_segments").get<LineStringCollection>();
   auto footprint = inputs("footprint").get<LinearRing>();
 
-  bg::model::polygon<point_type> fp;
-  for(auto& p : footprint) {
-      bg::append(fp.outer(), point_type(p[0], p[1]));
-    }
+  // bg::model::polygon<point_type> fp;
+  // for(auto& p : footprint) {
+  //     bg::append(fp.outer(), point_type(p[0], p[1]));
+  //   }
 
   Arrangement_2 arr;
   arr.clear();
-  build_arrangement(fp, edge_segments, arr, remove_unsupported);
+  build_arrangement(footprint, edge_segments, arr, remove_unsupported);
   LineStringCollection segments;
   for (auto face: arr.face_handles()){
       if(face->data().is_finite){
@@ -491,7 +507,7 @@ pGridSet build_grid(vec3f& ring) {
   }
   pGridSet grid_set = new GridSet();
   // skip last point in the ring, ie the repetition of the first vertex
-  GridSetup(&pgon[0], pgon.size()-1, Grid_Resolution, grid_set);
+  GridSetup(&pgon[0], pgon.size(), Grid_Resolution, grid_set);
   for (int i = 0; i < size; i++) {
     delete pgon[i];
   }
@@ -499,6 +515,8 @@ pGridSet build_grid(vec3f& ring) {
 }
 
 void LASInPolygonsNode::process() {
+  polygons.clear();
+  point_clouds.clear();
   polygons = inputs("polygons").get<LinearRingCollection>();
 
   // std::vector<bg::model::polygon<point_type>> boost_polygons;
