@@ -271,7 +271,7 @@ void build_arrangement(geoflow::LinearRing &footprint, geoflow::LineStringCollec
   // footprint_pts.pop_back(); // get rid of repeated vertex in boost polygon
   Polygon_2 cgal_footprint(footprint_pts.begin(), footprint_pts.end());
   // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
-  insert(arr, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
+  insert_non_intersecting_curves(arr, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
 
   for (auto edge : arr.edge_handles()) {
     edge->data().is_touched = true;
