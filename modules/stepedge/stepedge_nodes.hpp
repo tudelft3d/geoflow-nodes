@@ -221,7 +221,7 @@ class RegulariseLinesNode:public Node {
 
   void gui(){
     ImGui::DragFloat("Distance threshold", &dist_threshold, 0.1, 0);
-    ImGui::DragFloat("Angle threshold", &angle_threshold, 0.1, 0.0, pi);
+    ImGui::DragFloat("Angle threshold", &angle_threshold, 0.01, 0.01, pi);
   }
   void process();
 };
