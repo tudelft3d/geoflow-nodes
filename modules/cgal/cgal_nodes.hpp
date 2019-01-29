@@ -47,7 +47,7 @@ class PointDistanceNode:public Node{
   public:
   char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
   int thin_nth = 5;
-  bool adjustz = false;
+  bool overwritez = false;
 
   PointDistanceNode(NodeManager& manager):Node(manager) {
     add_input("triangles", TT_triangle_collection);
@@ -186,6 +186,24 @@ public:
     add_input("cgal_cdt", TT_any);
     add_output("lines", TT_line_string_collection);
     add_output("attributes", TT_attribute_map_f);
+  }
+  void gui() {
+    if (ImGui::DragFloat("stop cost", &threshold_stop_cost, 0.01)) {
+      manager.run(*this);
+    }
+  }
+  void process();
+};
+
+class LineHeightNode:public Node {
+public:
+  float threshold_stop_cost = 0.1;
+  char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+  int thin_nth = 5;
+
+  LineHeightNode(NodeManager& manager):Node(manager) {
+    add_input("lines", TT_line_string_collection);
+    add_output("lines", TT_line_string_collection);
   }
   void gui() {
     if (ImGui::DragFloat("stop cost", &threshold_stop_cost, 0.01)) {

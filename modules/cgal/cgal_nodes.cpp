@@ -35,6 +35,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+// line height calculator
+#include <CGAL/Orthogonal_k_neighbor_search.h>
+#include <CGAL/Search_traits_2.h>
+
 using namespace geoflow;
 
 template<typename T> inline std::array<float,3> to_arr3f(T& p) {
@@ -42,6 +46,7 @@ template<typename T> inline std::array<float,3> to_arr3f(T& p) {
 }
 
 void CDTNode::process(){
+  //typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef CGAL::Projection_traits_xy_3<K>								Gt;
   typedef CGAL::Exact_predicates_tag									  Itag;
@@ -198,7 +203,7 @@ void ComparePointDistanceNode::process(){
 }
 
 void PointDistanceNode::process(){
-  typedef CGAL::Simple_cartesian<double> K;
+  typedef CGAL::Simple_cartesian<float> K;
   typedef K::FT FT;
   typedef K::Ray_3 Ray;
   typedef K::Line_3 Line;
@@ -237,7 +242,7 @@ void PointDistanceNode::process(){
         auto q = Point(lasreader->point.get_x() - offset[0], lasreader->point.get_y() - offset[1], lasreader->point.get_z() - offset[2]);
         FT sqd = tree.squared_distance(q);
         distances.push_back(sqd);
-        if (adjustz) {
+        if (overwritez) {
           points.push_back({
             float(lasreader->point.get_x() - offset[0]),
             float(lasreader->point.get_y() - offset[1]),
@@ -538,13 +543,9 @@ void IsoLineNode::process() {
   //auto heights = inputs("heights").get<vec1f>();
 
   vec1f heights;
-  heights.push_back(-3);
-  heights.push_back(-2);
-  //heights.push_back(-1);
-  //heights.push_back(1);
-  heights.push_back(2);
-  heights.push_back(3);
-  heights.push_back(4);
+  for (int i = 1; i < 10; i++) {
+    heights.push_back(i);
+  }
 
   LineStringCollection lines;
   AttributeMap attributes;
@@ -557,7 +558,6 @@ void IsoLineNode::process() {
     // iterate over all triangle faces
     for (isolines::Face_iterator ib = cdt.finite_faces_begin();
       ib != cdt.finite_faces_end(); ++ib) {
-
       // shorthand notations for the 3 triangle vertices and their position w.r.t. the contouring depth
       isolines::Vertex_handle v0 = ib->vertex(0);
       isolines::Vertex_handle v1 = ib->vertex(1);
@@ -634,7 +634,7 @@ void IsoLineNode::process() {
 }
 
 void IsoLineSlicerNode::process() {
-  //typedef CGAL::Simple_cartesian<double> K;
+  //typedef CGAL::Simple_cartesian<float> K;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef K::Point_3 Point;
   typedef K::Plane_3 Plane;
@@ -644,13 +644,9 @@ void IsoLineSlicerNode::process() {
   //auto heights = inputs("heights").get<vec1f>();
   //TODO get iso line seperation distance, get min/max height and create list of heights
   vec1f heights;
-  heights.push_back(-3);
-  heights.push_back(-2);
-  //heights.push_back(-1);
-  //heights.push_back(1);
-  heights.push_back(2);
-  heights.push_back(3);
-  heights.push_back(4);
+  for (int i = 1; i < 10; i++) {
+    heights.push_back(i);
+  }
 
   std::cout << "Transforming CDT to Surface Mesh\n";
   LineStringCollection lines;
@@ -659,7 +655,7 @@ void IsoLineSlicerNode::process() {
   Mesh mesh;
   isolines::link_cdt_to_face_graph(cdt, mesh);
 
-  //std::ofstream out("D:\\Projects\\3D Geluid\\Hoogtelijnen\\surface.off");
+  //std::ofstream out("D:\\Projects\\3D Geluid\\Hoogtelijnen\\surface_difference_small_box.off");
   //CGAL::write_off(out, mesh);
   
   std::cout << "Start slicing\n";
@@ -684,4 +680,47 @@ void IsoLineSlicerNode::process() {
   }
   outputs("lines").set(lines);
   outputs("attributes").set(attributes);
+}
+
+void LineHeightNode::process() {
+  auto lines = inputs("lines").get<LineStringCollection>();
+
+  typedef CGAL::Simple_cartesian<float> K;
+  typedef CGAL::Search_traits_3<K> TreeTraits;
+  typedef CGAL::Orthogonal_k_neighbor_search<TreeTraits> Neighbor_search;
+  typedef Neighbor_search::Tree Tree;
+  typedef Tree::Point_d Point_d;
+
+  Tree tree;
+
+  LASreadOpener lasreadopener;
+  lasreadopener.set_file_name(filepath);
+  LASreader* lasreader = lasreadopener.open();
+
+  LineStringCollection lines_out;
+  size_t i = 0;
+  auto offset = manager.data_offset.value_or(std::array<double, 3>({ 0,0,0 }));
+  while (lasreader->read_point()) {
+    if (lasreader->point.get_classification() == 2) {
+      if (i++ % thin_nth == 0) {
+        tree.insert(Point_d(lasreader->point.get_x() - offset[0], lasreader->point.get_y() - offset[1], lasreader->point.get_z() - offset[2]));
+      }
+      if (i % 100000 == 0) std::cout << "Read " << i << " points...\n";
+    }
+  }
+
+  for (auto& line_string : lines) {
+    vec3f ls;
+    for (auto& p : line_string) {
+      Point_d query(p[0], p[1], p[2]);
+      Neighbor_search search(tree, query, 1);
+      ls.push_back({ p[0], p[1], float(search.begin()->first.z()) });
+    }
+    lines_out.push_back(LineString(ls));
+  }
+
+  lasreader->close();
+  delete lasreader;
+
+  outputs("lines").set(lines_out);
 }
