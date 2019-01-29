@@ -46,7 +46,6 @@ template<typename T> inline std::array<float,3> to_arr3f(T& p) {
 }
 
 void CDTNode::process(){
-  //typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef CGAL::Projection_traits_xy_3<K>								Gt;
   typedef CGAL::Exact_predicates_tag									  Itag;
@@ -203,7 +202,7 @@ void ComparePointDistanceNode::process(){
 }
 
 void PointDistanceNode::process(){
-  typedef CGAL::Simple_cartesian<float> K;
+  typedef CGAL::Simple_cartesian<double> K;
   typedef K::FT FT;
   typedef K::Ray_3 Ray;
   typedef K::Line_3 Line;
@@ -634,7 +633,7 @@ void IsoLineNode::process() {
 }
 
 void IsoLineSlicerNode::process() {
-  //typedef CGAL::Simple_cartesian<float> K;
+  //typedef CGAL::Simple_cartesian<double> K;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef K::Point_3 Point;
   typedef K::Plane_3 Plane;
