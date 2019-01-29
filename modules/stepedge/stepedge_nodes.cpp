@@ -188,6 +188,7 @@ void Arr2LinearRingsNode::process(){
 }
 
 void ExtruderNode::process(){
+  if (!(do_walls || do_roofs)) return;
   // Set up vertex data (and buffer(s)) and attribute pointers
   // auto polygons = std::any_cast<inputs("polygons").get<vec2f>>();
   // auto elevations = std::any_cast<inputs("elevations").get<float>>();
@@ -310,7 +311,7 @@ void ExtruderNode::process(){
       }
     }
   }
-
+  
   outputs("normals_vec3f").set(normals);
   outputs("cell_id_vec1i").set(cell_id_vec1i);
   outputs("triangles").set(triangles);

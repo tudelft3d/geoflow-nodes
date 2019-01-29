@@ -28,6 +28,7 @@
 #include <CGAL/Search_traits_3.h>
 #include <CGAL/linear_least_squares_fitting_3.h>
 #include <CGAL/Arr_linear_traits_2.h>
+#include <CGAL/Arr_segment_traits_2.h>
 #include <CGAL/Arrangement_2.h>
 #include <CGAL/Arr_extended_dcel.h>
 #include <CGAL/Arr_observer.h>
