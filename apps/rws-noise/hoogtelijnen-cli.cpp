@@ -49,17 +49,15 @@ int main(int ac, const char * av[])
     auto add_height_to_lines = std::make_shared<LineHeightNode>(N);
     auto simplify_lines = std::make_shared<SimplifyLine3DNode>(N);
     auto ogr_writer_1 = std::make_shared<OGRWriterNoAttributesNode>(N);
-    //auto ogr_writer_2 = std::make_shared<OGRWriterNode>(N);
 
     std::strcpy(height_difference_calc->filepath, las_file.c_str());
     std::strcpy(ogr_loader->filepath, lines_file_in.c_str());
     std::strcpy(ogr_writer_1->filepath, lines_file_out.c_str());
     std::strcpy(add_height_to_lines->filepath, las_file.c_str());
-    //std::strcpy(ogr_writer_2->filepath, "D:\\Projects\\3D Geluid\\Hoogtelijnen\\test-iso-segmenten.shp");
-
-    height_difference_calc->thin_nth = 100;
+    
+    height_difference_calc->thin_nth = 10;
     height_difference_calc->overwritez = true;
-    add_height_to_lines->thin_nth = 100;
+    add_height_to_lines->thin_nth = 10;
 
     //geoflow::connect(ogr_loader->outputs("line_strings"), tin_simp->inputs("geometries"));
     //geoflow::connect(tin_simp->outputs("selected_lines"), simp_3d->inputs("lines"));
@@ -76,8 +74,7 @@ int main(int ac, const char * av[])
     // add height to lines
     geoflow::connect(iso_lines->outputs("lines"), add_height_to_lines->inputs("lines"));
     //simplify lines
-    //geoflow::connect(add_height_to_lines->outputs("lines"), simplify_lines->inputs("lines"));
-
+    geoflow::connect(add_height_to_lines->outputs("lines"), simplify_lines->inputs("lines"));
     // write lines
     geoflow::connect(add_height_to_lines->outputs("lines"), ogr_writer_1->inputs("geometries"));
 

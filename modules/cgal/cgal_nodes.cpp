@@ -669,12 +669,14 @@ void IsoLineSlicerNode::process() {
     
     // transform polylines to vec3f
     for (auto& p : polylines) {
-      vec3f line_vec3f;
-      for (auto v = p.begin(); v != p.end(); v++) {
-        line_vec3f.push_back({ float(v->x()),float(v->y()), h });
+      if (p.size() > 1) {
+        vec3f line_vec3f;
+        for (auto v = p.begin(); v != p.end(); v++) {
+          line_vec3f.push_back({ float(v->x()),float(v->y()), h });
+        }
+        lines.push_back(line_vec3f);
+        attributes["height"].push_back(h);
       }
-      lines.push_back(line_vec3f);
-      attributes["height"].push_back(h);
     }
   }
   outputs("lines").set(lines);
@@ -715,7 +717,7 @@ void LineHeightNode::process() {
       Neighbor_search search(tree, query, 1);
       ls.push_back({ p[0], p[1], float(search.begin()->first.z()) });
     }
-    lines_out.push_back(LineString(ls));
+    lines_out.push_back(ls);
   }
 
   lasreader->close();
