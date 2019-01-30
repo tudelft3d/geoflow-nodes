@@ -3,6 +3,7 @@
 #include "tinsimp.hpp"
 #include "linesimp.hpp"
 #include "isolines.hpp"
+#include "visvalingam_cost.hpp"
 
 #include <lasreader.hpp>
 #include <fstream>
@@ -438,64 +439,69 @@ void SimplifyLineNode::process(){
   outputs("lines").set(geometry_out);
 }
 
-void SimplifyLinesNode::process(){
+void SimplifyLinesNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto geometry = inputs("lines").get<gfGeometry3D>();
-  
+  auto lines = inputs("lines").get<LineStringCollection>();
+  auto lines2 = inputs("lines2").get<LineStringCollection>();
+
   namespace PS = CGAL::Polyline_simplification_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-  typedef PS::Vertex_base_2<K>  Vb;
-  typedef CGAL::Constrained_triangulation_face_base_2<K> Fb;
-  typedef CGAL::Triangulation_data_structure_2<Vb, Fb> TDS;
-  typedef CGAL::Exact_predicates_tag                          Itag;
-  typedef CGAL::Constrained_Delaunay_triangulation_2<K,TDS, Itag> CDT;
+  typedef CGAL::Projection_traits_xy_3<K>								  Gt;
+  typedef PS::Vertex_base_2<Gt>                           Vb;
+  typedef CGAL::Constrained_triangulation_face_base_2<Gt> Fb;
+  typedef CGAL::Triangulation_data_structure_2<Vb, Fb>    TDS;
+  typedef CGAL::Exact_predicates_tag                      Itag;
+  typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, TDS, Itag> CDT;
   typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
-  typedef PS::Stop_below_count_ratio_threshold Stop_count_ratio;
-  typedef PS::Stop_above_cost_threshold        Stop_cost;
-  typedef PS::Squared_distance_cost            Cost;
+  typedef PS::Stop_above_cost_threshold                   Stop_cost;
+  typedef PS::Visvalingam_cost                            Cost;
 
   Cost cost;
-
   CT ct;
 
-  size_t s_index=0;
-  for (auto c : geometry.counts) {
+  size_t s_index = 0;
+  for (auto& linestring : lines) {
     std::vector<CDT::Point> line;
-    std::cerr << "count: " <<c << "\n";
-    for (size_t i=0; i<c; i++ ) {
-      auto p = geometry.vertices[s_index+i];
-      line.push_back(CDT::Point(p[0], p[1]));
-      std::cerr << "\t "<< p[0] << ", " << p[1] << "\n";
+    for (auto& p : linestring) {
+      line.push_back(CDT::Point(p[0], p[1], p[2]));
     }
-    s_index+=c;
     ct.insert_constraint(line.begin(), line.end());
   }
-  
-  size_t n_removed = PS::simplify(ct, cost, Stop_cost(threshold_stop_cost));
-  
-  gfGeometry3D geometry_out;
-  vec3f vertices_vec3f;
-  for(auto cid = ct.constraints_begin(); cid != ct.constraints_end(); ++cid) {
-    // auto p = (*ct.vertices_in_constraint_begin())->point();
-    // vertices_vec3f.push_back({p.x(), p.y(), 0});
-    auto vit_begin = ct.vertices_in_constraint_begin(*cid);
-    auto vit_end = ct.vertices_in_constraint_end(*cid);
-    size_t sum_count=0,count=0;
-    for(auto vit = vit_begin; vit != vit_end; ++vit) {
-      auto p = (*vit)->point();
-      //if(vit!=vit_begin && vit!=vit_end)
-      //  vertices_vec3f.push_back({float(p.x()), float(p.y()), 0});
-      //vertices_vec3f.push_back({float(p.x()), float(p.y()), 0});
-      geometry_out.vertices.push_back({float(p.x()), float(p.y()), 0});
-      count++;
+  for (auto& linestring : lines2) {
+    std::vector<CDT::Point> line;
+    for (auto& p : linestring) {
+      line.push_back(CDT::Point(p[0], p[1], p[2]));
     }
-    geometry_out.counts.push_back(count);
-    geometry_out.firsts.push_back(sum_count);
-    sum_count += count;
+    ct.insert_constraint(line.begin(), line.end());
   }
 
-  outputs("lines_vec3f").set(vertices_vec3f);
-  outputs("lines").set(geometry_out);
+  size_t n_removed = PS::simplify(ct, cost, Stop_cost(threshold_stop_cost));
+
+  LineStringCollection lines_out;
+
+  for (auto cit = ct.constraints_begin(); cit != ct.constraints_end(); ++cit) {
+    vec3f ls;
+    for (auto vit = ct.points_in_constraint_begin(*cit); vit != ct.points_in_constraint_end(*cit); ++vit) {
+      ls.push_back({ float(vit->x()), float(vit->y()), float(vit->z()) });
+    }
+    lines_out.push_back(ls);
+  }
+
+  //for(auto cid = ct.constraints_begin(); cid != ct.constraints_end(); ++cid) {
+  //  auto vit_begin = ct.vertices_in_constraint_begin(*cid);
+  //  auto vit_end = ct.vertices_in_constraint_end(*cid);
+  //  vec3f ls;
+  //  for(auto vit = vit_begin; vit != vit_end; ++vit) {
+  //    auto p = (*vit)->point();
+  //    ls.push_back({ p.x(), p.y(), p.z() });
+  //    //if(vit!=vit_begin && vit!=vit_end)
+  //    //  vertices_vec3f.push_back({float(p.x()), float(p.y()), 0});
+  //    //vertices_vec3f.push_back({float(p.x()), float(p.y()), 0});
+  //  }
+  //  lines_out.push_back(ls);
+  //}
+
+  outputs("lines").set(lines_out);
 }
 
 void SimplifyFootprintNode::process(){

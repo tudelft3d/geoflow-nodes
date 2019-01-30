@@ -133,9 +133,9 @@ class SimplifyLinesNode:public Node {
   float threshold_stop_cost=0.1;
 
   SimplifyLinesNode(NodeManager& manager):Node(manager) {
-    add_input("lines", TT_geometry);
-    add_output("lines", TT_geometry);
-    add_output("lines_vec3f", TT_vec3f);
+    add_input("lines", TT_line_string_collection);
+    add_input("lines2", TT_line_string_collection);
+    add_output("lines", TT_line_string_collection);
   }
   void gui(){
     if(ImGui::DragFloat("stop cost", &threshold_stop_cost,0.01)) {
@@ -163,41 +163,27 @@ class SimplifyFootprintNode:public Node {
 
 class IsoLineNode:public Node {
 public:
-  float threshold_stop_cost = 0.1;
-
   IsoLineNode(NodeManager& manager):Node(manager) {
     add_input("cgal_cdt", TT_any);
     add_output("lines", TT_line_string_collection);
     add_output("attributes", TT_attribute_map_f);
   }
-  void gui() {
-    if (ImGui::DragFloat("stop cost", &threshold_stop_cost, 0.01)) {
-      manager.run(*this);
-    }
-  }
+
   void process();
 };
 
 class IsoLineSlicerNode:public Node {
 public:
-  float threshold_stop_cost = 0.1;
-
   IsoLineSlicerNode(NodeManager& manager):Node(manager) {
     add_input("cgal_cdt", TT_any);
     add_output("lines", TT_line_string_collection);
     add_output("attributes", TT_attribute_map_f);
-  }
-  void gui() {
-    if (ImGui::DragFloat("stop cost", &threshold_stop_cost, 0.01)) {
-      manager.run(*this);
-    }
   }
   void process();
 };
 
 class LineHeightNode:public Node {
 public:
-  float threshold_stop_cost = 0.1;
   char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
   int thin_nth = 5;
 
@@ -206,9 +192,8 @@ public:
     add_output("lines", TT_line_string_collection);
   }
   void gui() {
-    if (ImGui::DragFloat("stop cost", &threshold_stop_cost, 0.01)) {
-      manager.run(*this);
-    }
+    ImGui::InputText("LAS file path", filepath, IM_ARRAYSIZE(filepath));
+    ImGui::SliderInt("Thin nth", &thin_nth, 0, 100);
   }
   void process();
 };

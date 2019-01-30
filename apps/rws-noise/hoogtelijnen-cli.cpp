@@ -48,16 +48,21 @@ int main(int ac, const char * av[])
     auto iso_lines = std::make_shared<IsoLineSlicerNode>(N);
     auto add_height_to_lines = std::make_shared<LineHeightNode>(N);
     auto simplify_lines = std::make_shared<SimplifyLine3DNode>(N);
+    auto simplify_lines_cdt = std::make_shared<SimplifyLinesNode>(N);
     auto ogr_writer_1 = std::make_shared<OGRWriterNoAttributesNode>(N);
+    auto ogr_writer_2 = std::make_shared<OGRWriterNoAttributesNode>(N);
 
     std::strcpy(height_difference_calc->filepath, las_file.c_str());
     std::strcpy(ogr_loader->filepath, lines_file_in.c_str());
     std::strcpy(ogr_writer_1->filepath, lines_file_out.c_str());
+    std::strcpy(ogr_writer_2->filepath, "D:\\Projects\\3D Geluid\\Hoogtelijnen\\iso_lines_box_small_cdt.shp");
+    std::strcpy(add_height_to_lines->filepath, las_file.c_str());
     std::strcpy(add_height_to_lines->filepath, las_file.c_str());
     
-    height_difference_calc->thin_nth = 10;
+    height_difference_calc->thin_nth = 100;
     height_difference_calc->overwritez = true;
-    add_height_to_lines->thin_nth = 10;
+    add_height_to_lines->thin_nth = 100;
+    simplify_lines_cdt->threshold_stop_cost = simplification_threshold;
 
     //geoflow::connect(ogr_loader->outputs("line_strings"), tin_simp->inputs("geometries"));
     //geoflow::connect(tin_simp->outputs("selected_lines"), simp_3d->inputs("lines"));
@@ -75,8 +80,13 @@ int main(int ac, const char * av[])
     geoflow::connect(iso_lines->outputs("lines"), add_height_to_lines->inputs("lines"));
     //simplify lines
     geoflow::connect(add_height_to_lines->outputs("lines"), simplify_lines->inputs("lines"));
+    
+    geoflow::connect(ogr_loader->outputs("line_strings"), simplify_lines_cdt->inputs("lines"));
+    geoflow::connect(add_height_to_lines->outputs("lines"), simplify_lines_cdt->inputs("lines2"));
+
     // write lines
-    geoflow::connect(add_height_to_lines->outputs("lines"), ogr_writer_1->inputs("geometries"));
+    geoflow::connect(simplify_lines->outputs("lines"), ogr_writer_1->inputs("geometries"));
+    geoflow::connect(simplify_lines_cdt->outputs("lines"), ogr_writer_2->inputs("geometries"));
 
     ////// create height map from height lines + iso lines difference with point cloud
     //// iso line generation
