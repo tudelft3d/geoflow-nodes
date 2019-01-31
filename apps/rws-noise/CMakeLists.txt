@@ -27,11 +27,12 @@ set_target_properties(
 
 add_executable(footprint-simp footprint-simp.cpp)
 target_link_libraries( footprint-simp 
-  point_edge_lib 
   flowchart-gui
   Boost::program_options
   ${GDAL_LIBRARY}
-  ptinpoly_lib
+  stepedge_nodes
+  gdal_nodes
+  las_nodes
   cgal_nodes
 )
 set_target_properties(
