@@ -46,7 +46,7 @@ typedef Kernel::Vector_2 Vector_2;
 typedef Kernel::Plane_3 Plane;
 typedef Kernel::Line_3 Line;
 // Point with normal vector stored in a std::pair.
-typedef boost::tuple<Point, Vector, int, bool, double, int, bool, double, int> PNL;
+typedef std::tuple<Point, Vector, int, bool, double, int, bool, double, int> PNL;
 typedef CGAL::Nth_of_tuple_property_map<0, PNL> Point_map;
 typedef CGAL::Nth_of_tuple_property_map<1, PNL> Normal_map;
 typedef CGAL::Nth_of_tuple_property_map<2, PNL> Label_map;

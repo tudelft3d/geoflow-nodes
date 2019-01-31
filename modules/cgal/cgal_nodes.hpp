@@ -6,11 +6,18 @@ using namespace geoflow;
 class CDTNode:public Node {
   public:
   CDTNode(NodeManager& manager):Node(manager) {
-    // add_input("points", TT_any);
-    add_input("lines", TT_line_string_collection);
-    add_output("cgal_CDT", TT_any);
-    // add_output("normals_vec3f", TT_vec3f);
+    add_input("geometries", { TT_point_collection, TT_line_string_collection });
+    add_output("cgal_cdt", TT_any);
     add_output("triangles", TT_triangle_collection);
+  }
+  void process();
+};
+
+class DTNode:public Node {
+public:
+  DTNode(NodeManager& manager):Node(manager) {
+    add_input("points", TT_point_collection);
+    add_output("cgal_dt", TT_any);
   }
   void process();
 };
@@ -40,6 +47,7 @@ class PointDistanceNode:public Node{
   public:
   char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
   int thin_nth = 5;
+  bool overwritez = false;
 
   PointDistanceNode(NodeManager& manager):Node(manager) {
     add_input("triangles", TT_triangle_collection);
@@ -128,9 +136,9 @@ class SimplifyLinesNode:public Node {
   float threshold_stop_cost=0.1;
 
   SimplifyLinesNode(NodeManager& manager):Node(manager) {
-    add_input("lines", TT_geometry);
-    add_output("lines", TT_geometry);
-    add_output("lines_vec3f", TT_vec3f);
+    add_input("lines", TT_line_string_collection);
+    add_input("lines2", TT_line_string_collection);
+    add_output("lines", TT_line_string_collection);
   }
   void gui(){
     if(ImGui::DragFloat("stop cost", &threshold_stop_cost,0.01)) {
@@ -170,6 +178,43 @@ class PLWriterNode:public Node {
     ImGui::InputText("File path", filepath, IM_ARRAYSIZE(filepath));
     // ImGui::Checkbox("Write multiple files in case of point cloud list", &multiple_files);
     ImGui::Checkbox("Write binary output", &write_binary);
+  }
+  void process();
+};
+
+class IsoLineNode:public Node {
+public:
+  IsoLineNode(NodeManager& manager):Node(manager) {
+    add_input("cgal_cdt", TT_any);
+    add_output("lines", TT_line_string_collection);
+    add_output("attributes", TT_attribute_map_f);
+  }
+
+  void process();
+};
+
+class IsoLineSlicerNode:public Node {
+public:
+  IsoLineSlicerNode(NodeManager& manager):Node(manager) {
+    add_input("cgal_cdt", TT_any);
+    add_output("lines", TT_line_string_collection);
+    add_output("attributes", TT_attribute_map_f);
+  }
+  void process();
+};
+
+class LineHeightNode:public Node {
+public:
+  char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
+  int thin_nth = 5;
+
+  LineHeightNode(NodeManager& manager):Node(manager) {
+    add_input("lines", TT_line_string_collection);
+    add_output("lines", TT_line_string_collection);
+  }
+  void gui() {
+    ImGui::InputText("LAS file path", filepath, IM_ARRAYSIZE(filepath));
+    ImGui::SliderInt("Thin nth", &thin_nth, 0, 100);
   }
   void process();
 };
