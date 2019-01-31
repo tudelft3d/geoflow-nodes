@@ -27,7 +27,7 @@ namespace CGAL {
       boost::optional<typename CDT::Geom_traits::FT>
         operator()(const Constrained_triangulation_plus_2<CDT>& pct,
           typename Constrained_triangulation_plus_2<CDT>::Vertices_in_constraint_iterator vicq) const {
-        typedef typename Constrained_triangulation_plus_2<CDT>     CT;
+        typedef Constrained_triangulation_plus_2<CDT>     CT;
         typedef typename CT::Vertices_in_constraint_iterator Vertices_in_constraint_iterator;
         typedef typename CT::Geom_traits Geom_traits;
         typedef typename Geom_traits::FT                                    FT;
