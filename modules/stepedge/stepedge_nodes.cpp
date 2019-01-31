@@ -54,11 +54,11 @@ void AlphaShapeNode::process(){
   // collect plane points
   std::unordered_map<int, std::vector<Point>> points_per_segment;
   for (auto& p : points) {
-    if (std::get<2>(p)==0) // unsegmented
+    if (boost::get<2>(p)==0) // unsegmented
       continue;
-    if (std::get<3>(p)) // classified as wall
+    if (boost::get<3>(p)) // classified as wall
       continue;
-    points_per_segment[std::get<2>(p)].push_back(std::get<0>(p));
+    points_per_segment[boost::get<2>(p)].push_back(boost::get<0>(p));
   }
   PointCollection edge_points;
   LineStringCollection alpha_edges;
@@ -468,7 +468,7 @@ void ComputeMetricsNode::process(){
   PNL_vector pnl_points;
   for (auto& p : points) {
     PNL pv;
-    CGAL::cpp11::get<0>(pv) = Point(p[0], p[1], p[2]);
+    boost::get<0>(pv) = Point(p[0], p[1], p[2]);
     pnl_points.push_back(pv);
   }
   compute_metrics(pnl_points, c);
@@ -476,15 +476,15 @@ void ComputeMetricsNode::process(){
   vec1i plane_id, is_wall;
   PointCollection points_c;
   for(auto& p : pnl_points){
-    plane_id.push_back(std::get<2>(p));
-    is_wall.push_back(std::get<3>(p));
-    line_dist.push_back(std::get<4>(p));
-    jump_count.push_back(std::get<5>(p));
-    jump_ele.push_back(std::get<7>(p));
+    plane_id.push_back(boost::get<2>(p));
+    is_wall.push_back(boost::get<3>(p));
+    line_dist.push_back(boost::get<4>(p));
+    jump_count.push_back(boost::get<5>(p));
+    jump_ele.push_back(boost::get<7>(p));
     std::array<float,3> a = {
-            float(std::get<0>(p).x()),
-            float(std::get<0>(p).y()),
-            float(std::get<0>(p).z())
+            float(boost::get<0>(p).x()),
+            float(boost::get<0>(p).y()),
+            float(boost::get<0>(p).z())
           };
     points_c.push_back(a);
   }
