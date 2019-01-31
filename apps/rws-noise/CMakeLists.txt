@@ -25,18 +25,31 @@ set_target_properties(
   PROPERTIES CXX_STANDARD 17
 )
 
-# add_executable(footprint-simp footprint-simp.cpp ../src/tinsimp.cpp)
-# target_link_libraries( footprint-simp 
-#   point_edge_lib 
-#   flowchart-gui
-#   Boost::program_options
-#   ${GDAL_LIBRARY}
-#   ptinpoly_lib
-# )
-# set_target_properties(
-#   footprint-simp
-#   PROPERTIES CXX_STANDARD 17
-# )
+add_executable(footprint-simp footprint-simp.cpp)
+target_link_libraries( footprint-simp 
+  point_edge_lib 
+  flowchart-gui
+  Boost::program_options
+  ${GDAL_LIBRARY}
+  ptinpoly_lib
+  cgal_nodes
+)
+set_target_properties(
+  footprint-simp
+  PROPERTIES CXX_STANDARD 17
+)
+
+add_executable(footprint-simp-cli footprint-simp-cli.cpp)
+target_link_libraries( footprint-simp-cli 
+  Boost::program_options
+  ${GDAL_LIBRARY}
+  gdal_nodes
+  cgal_nodes
+)
+set_target_properties(
+  footprint-simp-cli
+  PROPERTIES CXX_STANDARD 17
+)
 
 add_executable(lod13 lod13.cpp)
 target_link_libraries( lod13 
