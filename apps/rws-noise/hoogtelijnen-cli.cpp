@@ -81,6 +81,4 @@ int main(int ac, const char * av[])
     geoflow::connect(simplify_lines_cdt->outputs("lines"), ogr_writer->inputs("geometries"));
 
     N.run(*ogr_loader);
-
-    int stop = 0;
 }
