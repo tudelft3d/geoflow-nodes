@@ -1,6 +1,7 @@
 
 add_library(cgal_nodes STATIC
   cgal_nodes.cpp
+  isolines.cpp
   linesimp.cpp
   tinsimp.cpp
 )
