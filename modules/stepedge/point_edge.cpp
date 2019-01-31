@@ -121,13 +121,16 @@ void compute_metrics(PNL_vector &points, config c) {
     // std::cout << shape->info() << std::endl;
     Vector n = plane.orthogonal_vector();
     // std::cout << n*Vector(0,0,1) << std::endl;
-    bool is_wall = CGAL::abs(n*Vector(0,0,1)) < c.metrics_is_wall_threshold;
+    auto horizontality = CGAL::abs(n*Vector(0,0,1));
+    bool is_wall = horizontality < c.metrics_is_wall_threshold;
+    bool is_horizontal = horizontality > c.metrics_is_horizontal_threshold;
     
     // store cluster id's and is_wall as point attributes
     int label = i++;
     for(auto ind : plane_idx){
       boost::get<2>(points[ind])=label;
       boost::get<3>(points[ind])=is_wall;
+      boost::get<9>(points[ind])=is_horizontal;
       // std::cout <<  << std::endl;
     }
 

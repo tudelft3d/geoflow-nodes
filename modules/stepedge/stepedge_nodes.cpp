@@ -474,11 +474,12 @@ void ComputeMetricsNode::process(){
   }
   compute_metrics(pnl_points, c);
   vec1f line_dist, jump_count, jump_ele;
-  vec1i plane_id, is_wall;
+  vec1i plane_id, is_wall, is_horizontal;
   PointCollection points_c;
   for(auto& p : pnl_points){
     plane_id.push_back(boost::get<2>(p));
     is_wall.push_back(boost::get<3>(p));
+    is_horizontal.push_back(boost::get<9>(p));
     line_dist.push_back(boost::get<4>(p));
     jump_count.push_back(boost::get<5>(p));
     jump_ele.push_back(boost::get<7>(p));
@@ -493,6 +494,7 @@ void ComputeMetricsNode::process(){
   outputs("points_c").set(points_c);
   outputs("plane_id").set(plane_id);
   outputs("is_wall").set(is_wall);
+  outputs("is_horizontal").set(is_horizontal);
   outputs("line_dist").set(line_dist);
   outputs("jump_count").set(jump_count);
   outputs("jump_ele").set(jump_ele);
@@ -581,12 +583,27 @@ void RegulariseLinesNode::process(){
   auto footprint = inputs("footprint").get<LinearRing>();
   typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_2 Point_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_3 Point_3;
+  typedef std::array<float,2> arr3f;
+  std::vector<std::pair<Segment, bool>> input_edges;
 
-  //compute midpoint and direction for each segment
-  typedef std::tuple<double, Point_2, double, double, bool, double, double> linetype; // new angle, midpoint, distance in angle cluster, elevation, is_footprint, initial angle, squared distance from midpoint to an end point
+  // build vector of all input edges
+  for(auto edge : edges) {
+    input_edges.push_back(std::make_pair(Segment({edge[0], edge[1]}), false));
+  }
+  for(size_t i=0; i<footprint.size()-1; ++i) {
+    input_edges.push_back(std::make_pair(Segment({footprint[i], footprint[i+1]}), true));
+  }
+  input_edges.push_back(std::make_pair(Segment({footprint[footprint.size()-1], footprint[0]}), true));
+
+  //compute attributes for each segment
+  typedef std::tuple<double, Point_2, double, double, bool, double, double, size_t> linetype; 
+  // new angle, midpoint, distance in angle cluster, elevation, is_footprint, initial angle, squared distance from midpoint to an end point, id_cntr
   std::vector<linetype> lines;
   // add non-footprint lines
-  for(auto edge : edges) {
+  size_t id_cntr = 0;
+  for(auto& ie : input_edges) {
+    auto& is_footprint = ie.second;
+    auto& edge = ie.first;
     auto source = Point_3(edge[0][0], edge[0][1], edge[0][2]);
     auto target = Point_3(edge[1][0], edge[1][1], edge[1][2]);
     auto v = target-source;
@@ -595,45 +612,31 @@ void RegulariseLinesNode::process(){
     auto l = v.squared_length();
     auto angle = std::atan2(v.x(),v.y());
     if (angle < 0) angle += pi;
-    lines.push_back(std::make_tuple(angle,p,0,p_.z(), false, angle, l));
+    lines.push_back(std::make_tuple(angle,p,0,p_.z(), is_footprint, angle, l, id_cntr++));
   }
-  // add footprint edges
-  // footprint.push_back(footprint[0]); //repeat first point as last
-  vec3f tmp_vec3f;
-  for(size_t i=0; i<footprint.size()-1; i++) {
-    auto p_first = Point_2(footprint[i+0][0], footprint[i+0][1]);
-    auto p_second = Point_2(footprint[i+1][0], footprint[i+1][1]);
-    auto v = p_second - p_first;
-
-    tmp_vec3f.push_back({float(p_first.x()), float(p_first.y()), 0});
-    tmp_vec3f.push_back({float(p_second.x()), float(p_second.y()), 0});
-
-    auto p_ = p_first + v/2;
-    auto p = Point_2(p_.x(),p_.y());
-    auto l = v.squared_length();
-    auto angle = std::atan2(v.x(),v.y());
-    if (angle < 0) angle += pi;
-    lines.push_back(std::make_tuple(angle,p,0,0, true, angle, l));
-  }
-  outputs("tmp_vec3f").set(tmp_vec3f);
 
   // for (auto line: lines) {
   //   std::cout << std::get<0>(line) << " " << std::get<4>(line) << "\n";
   // }
 
   //sort by angle, smallest on top
-  std::sort(lines.begin(), lines.end(), [](linetype a, linetype b) {
-      return std::get<0>(a) < std::get<0>(b);   
+  std::vector<size_t> edge_idx(input_edges.size());
+  for (size_t i=0; i<input_edges.size(); ++i) {
+    edge_idx[i]=i;
+  }
+  std::sort(edge_idx.begin(), edge_idx.end(), [&lines=lines](size_t a, size_t b) {
+    return std::get<0>(lines[a]) < std::get<0>(lines[b]);   
   });
   //cluster by angle difference
-  std::vector<std::vector<linetype>> angle_clusters(1);
-  auto last_angle = std::get<0>(lines[0]);
-  for(auto line : lines ) {
+  std::vector<ValueCluster> angle_clusters(1);
+  auto last_angle = std::get<0>(lines[edge_idx[0]]);
+  for(auto edge_id : edge_idx ) {
+    auto& line = lines[edge_id];
     if((std::get<0>(line) - last_angle) < angle_threshold)
-      angle_clusters.back().push_back(line);
+      angle_clusters.back().idx.push_back(edge_id);
     else {
       angle_clusters.resize(angle_clusters.size()+1);
-      angle_clusters.back().push_back(line);
+      angle_clusters.back().idx.push_back(edge_id);
       }
     last_angle=std::get<0>(line);
   }
@@ -645,20 +648,16 @@ void RegulariseLinesNode::process(){
   //   }
   // }
 
-  // snap to average angle in each cluster
-  vec3f directions_before, directions_after;
-  vec1i angles;
+  // get average angle for each cluster
+  // vec3f directions_before, directions_after;
+  // vec1i angles;
   int cluster_id=0;
-  for(auto& cluster:angle_clusters) {
+  for(auto& cluster : angle_clusters) {
     double sum=0;
-    for(auto& line : cluster) {
-      sum+=std::get<0>(line);
+    for(auto& i : cluster.idx) {
+      sum+=std::get<0>(lines[i]);
     }
-    double average_angle = sum/cluster.size();
-    for(auto& line : cluster) {
-      auto angle = std::get<0>(line);
-      std::get<0>(line)=average_angle;
-    }
+    cluster.value = sum/cluster.idx.size();
     cluster_id++;
   }
 
@@ -670,36 +669,38 @@ void RegulariseLinesNode::process(){
   //   }
   // }
 
-  vec1f distances;
+  // vec1f distances;
   // snap nearby lines that are close
-  std::vector<std::vector<linetype>> dist_clusters;
-  for(auto& cluster:angle_clusters) {
+  std::vector<ValueCluster> dist_clusters;
+  for(auto& cluster : angle_clusters) {
     // compute vec orthogonal to lines in this cluster
-    auto angle = std::get<0>(cluster[0]);
+    auto angle = cluster.value;
     Vector_2 n(-1.0, std::tan(angle));
     n = n/std::sqrt(n.squared_length()); // normalize
     // compute distances along n wrt to first line in cluster
-    auto p = std::get<1>(cluster[0]);
-    for(auto& line : cluster) {
-      auto q = std::get<1>(line);
+    auto p = std::get<1>(lines[cluster.idx[0]]);
+    for(auto& i : cluster.idx) {
+      auto q = std::get<1>(lines[i]);
       auto v = p-q;
-      std::get<2>(line) = v*n;
-      distances.push_back(v*n);
+      std::get<2>(lines[i]) = v*n;
+      // distances.push_back(v*n);
     }
     // sort by distance, ascending
-    std::sort(cluster.begin(), cluster.end(), [](linetype a, linetype b){
-        return std::get<2>(a) < std::get<2>(b);
+    auto sorted_by_dist = cluster.idx;
+    std::sort(sorted_by_dist.begin(), sorted_by_dist.end(), [&lines=lines](size_t a, size_t b){
+        return std::get<2>(lines[a]) < std::get<2>(lines[b]);
     });
     // cluster nearby lines using separation threshold
-    double last_dist = std::get<2>(cluster[0]);
+    double last_dist = std::get<2>(lines[sorted_by_dist[0]]);
     dist_clusters.resize(dist_clusters.size()+1);
-    for(auto& line : cluster) {
+    for(auto& i : sorted_by_dist) {
+      auto& line = lines[i];
       double dist_diff = std::get<2>(line) - last_dist;
       if (dist_diff < dist_threshold) {
-        dist_clusters.back().push_back(line);
+        dist_clusters.back().idx.push_back(i);
       } else {
         dist_clusters.resize(dist_clusters.size()+1);
-        dist_clusters.back().push_back(line);
+        dist_clusters.back().idx.push_back(i);
       }
       last_dist = std::get<2>(line);
     }
@@ -721,7 +722,8 @@ void RegulariseLinesNode::process(){
     linetype best_line;
     double best_angle;
     bool found_fp=false, found_non_fp=false;
-    for(auto& line : cluster) {
+    for(auto& i : cluster.idx) {
+      auto& line = lines[i];
       if(std::get<4>(line)){
         found_fp=true;
         best_line = line;
@@ -736,7 +738,8 @@ void RegulariseLinesNode::process(){
     if(!found_fp){
       double max_z=0;
       linetype high_line;
-      for(auto& line : cluster) {
+      for(auto& i : cluster.idx) {
+      auto& line = lines[i];
         auto z = std::get<3>(line);
         if(z > max_z) {
           max_z = z;
