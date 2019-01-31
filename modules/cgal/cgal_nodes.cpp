@@ -545,7 +545,7 @@ void SimplifyFootprintNode::process(){
 void PLWriterNode::process() {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
   typedef Kernel::Point_3 Point;
-  typedef CGAL::cpp11::tuple<Point, int> PL;
+  typedef boost::tuple<Point, int> PL;
   typedef CGAL::Nth_of_tuple_property_map<0, PL> Point_map;
   // typedef CGAL::Nth_of_tuple_property_map<1, PL> Normal_map;
   typedef CGAL::Nth_of_tuple_property_map<1, PL> Label_map;
