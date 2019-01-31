@@ -476,7 +476,6 @@ void SimplifyLinesNode::process() {
   }
 
   size_t n_removed = PS::simplify(ct, cost, Stop_cost(threshold_stop_cost));
-
   LineStringCollection lines_out;
 
   for (auto cit = ct.constraints_begin(); cit != ct.constraints_end(); ++cit) {
@@ -486,20 +485,6 @@ void SimplifyLinesNode::process() {
     }
     lines_out.push_back(ls);
   }
-
-  //for(auto cid = ct.constraints_begin(); cid != ct.constraints_end(); ++cid) {
-  //  auto vit_begin = ct.vertices_in_constraint_begin(*cid);
-  //  auto vit_end = ct.vertices_in_constraint_end(*cid);
-  //  vec3f ls;
-  //  for(auto vit = vit_begin; vit != vit_end; ++vit) {
-  //    auto p = (*vit)->point();
-  //    ls.push_back({ p.x(), p.y(), p.z() });
-  //    //if(vit!=vit_begin && vit!=vit_end)
-  //    //  vertices_vec3f.push_back({float(p.x()), float(p.y()), 0});
-  //    //vertices_vec3f.push_back({float(p.x()), float(p.y()), 0});
-  //  }
-  //  lines_out.push_back(ls);
-  //}
 
   outputs("lines").set(lines_out);
 }
@@ -649,7 +634,7 @@ void IsoLineSlicerNode::process() {
   //auto heights = inputs("heights").get<vec1f>();
   //TODO get iso line seperation distance, get min/max height and create list of heights
   vec1f heights;
-  for (int i = 1; i < 10; i++) {
+  for (int i = 1; i < 20; i++) {
     heights.push_back(i);
   }
 
