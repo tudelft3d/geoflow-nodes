@@ -47,7 +47,7 @@ typedef Kernel::Vector_2 Vector_2;
 typedef Kernel::Plane_3 Plane;
 typedef Kernel::Line_3 Line;
 // Point with normal vector stored in a std::pair.
-typedef boost::tuple<Point, Vector, int, bool, double, int, bool, double, int> PNL;
+typedef boost::tuple<Point, Vector, int, bool, double, int, bool, double, int, bool> PNL;
 typedef CGAL::Nth_of_tuple_property_map<0, PNL> Point_map;
 typedef CGAL::Nth_of_tuple_property_map<1, PNL> Normal_map;
 typedef CGAL::Nth_of_tuple_property_map<2, PNL> Label_map;
@@ -57,6 +57,7 @@ typedef CGAL::Nth_of_tuple_property_map<5, PNL> JumpCount_map;
 typedef CGAL::Nth_of_tuple_property_map<6, PNL> IsStep_map;
 typedef CGAL::Nth_of_tuple_property_map<7, PNL> JumpEle_map;
 typedef CGAL::Nth_of_tuple_property_map<8, PNL> Id_map;
+typedef CGAL::Nth_of_tuple_property_map<9, PNL> IsHorizontal_map;
 typedef std::vector<PNL>                        PNL_vector;
 // Concurrency
 #ifdef CGAL_LINKED_WITH_TBB
@@ -203,7 +204,8 @@ struct config {
   int metrics_plane_min_points = 25;
   float metrics_plane_epsilon = 0.2;
   float metrics_plane_normal_threshold = 0.75;
-  float metrics_is_wall_threshold = 0.1;
+  float metrics_is_wall_threshold = 0.3;
+  float metrics_is_horizontal_threshold = 0.9;
   int metrics_k_linefit = 15;
   int metrics_k_jumpcnt_elediff = 10;
 

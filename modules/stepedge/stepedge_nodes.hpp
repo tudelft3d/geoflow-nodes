@@ -154,6 +154,7 @@ class ComputeMetricsNode:public Node {
     add_input("points", TT_point_collection); // change to Feature
     add_output("plane_id", TT_vec1i);
     add_output("is_wall", TT_vec1i);
+    add_output("is_horizontal", TT_vec1i);
     add_output("line_dist", TT_vec1f);
     add_output("jump_count", TT_vec1f);
     add_output("jump_ele", TT_vec1f);
@@ -206,6 +207,20 @@ class LASInPolygonsNode:public Node {
   void process();
 };
 
+struct LineCluster {
+  //                source_id, target_id, is_footprint
+  typedef std::tuple<size_t, size_t, bool> SegmentTuple; 
+  Vector_2 ref_vec; // direction of reference line for this cluster (exact_exact arrangent traits)
+  Point_2 ref_point; // extreme point on reference line (ie most left or most right point)
+  vec1f vertices; // stored as distances from ref_point in direction of ref_vec
+  std::vector<SegmentTuple> segments;
+};
+
+struct ValueCluster {
+  double value;
+  std::vector<size_t> idx;
+};
+
 class RegulariseLinesNode:public Node {
   static constexpr double pi = 3.14159265358979323846;
   float dist_threshold = 0.5;
@@ -216,6 +231,9 @@ class RegulariseLinesNode:public Node {
     add_input("edge_segments", TT_line_string_collection);
     add_input("footprint", TT_linear_ring);
     add_output("edges_out", TT_line_string_collection);
+    add_output("cluster_labels", TT_vec1i);
+    add_output("footprint_labels", TT_vec1i);
+    add_output("line_clusters", TT_any); // ie a LineCluster
     add_output("tmp_vec3f", TT_vec3f);
   }
 
