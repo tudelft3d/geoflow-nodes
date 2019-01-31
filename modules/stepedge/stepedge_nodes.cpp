@@ -469,7 +469,7 @@ void ComputeMetricsNode::process(){
   PNL_vector pnl_points;
   for (auto& p : points) {
     PNL pv;
-    CGAL::cpp11::get<0>(pv) = Point(p[0], p[1], p[2]);
+    boost::get<0>(pv) = Point(p[0], p[1], p[2]);
     pnl_points.push_back(pv);
   }
   compute_metrics(pnl_points, c);

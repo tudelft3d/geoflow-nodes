@@ -22,7 +22,7 @@ void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<po
       for (auto footprint:footprints) {
         if (bg::within(p,footprint)){
           PNL pv;
-          CGAL::cpp11::get<0>(pv) = Point(lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z());
+          boost::get<0>(pv) = Point(lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z());
           points_vec[i].push_back(pv);
           break;
           // laswriter->write_point(&lasreader->point);

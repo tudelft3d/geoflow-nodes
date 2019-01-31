@@ -56,7 +56,7 @@ int main(int ac, const char * av[])
     geoflow::connect(lod13generator->outputs("attributes"), ogr_writer->inputs("attributes"));
 
     std::strcpy(ogr_writer->filepath, decomposed_footprints_file.c_str());
-    lod13generator->step_threshold = step_threshold;
+    lod13generator->step_height_threshold = step_threshold;
     N.run(*ogr_loader);
 
     // FIXME: accept multiple stepedge_thresholds from cli argument...
