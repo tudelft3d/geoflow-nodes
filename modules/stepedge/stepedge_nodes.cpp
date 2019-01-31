@@ -188,7 +188,7 @@ void Arr2LinearRingsNode::process(){
 }
 
 void ExtruderNode::process(){
-  if (!(do_walls || do_roofs)) return;
+  // if (!(do_walls || do_roofs)) return;
   // Set up vertex data (and buffer(s)) and attribute pointers
   // auto polygons = std::any_cast<inputs("polygons").get<vec2f>>();
   // auto elevations = std::any_cast<inputs("elevations").get<float>>();
@@ -200,28 +200,29 @@ void ExtruderNode::process(){
   vec1i labels;
   using N = uint32_t;
 
-  if (do_roofs) {
-    size_t cell_id=0;
-    for (auto face: arr.face_handles()){
-      if(face->data().is_finite) {
-        cell_id++;
-        vec2f polygon, vertices;
-        arrangementface_to_polygon(face, polygon);
-        std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
-        for(auto i : indices) {
-          vertices.push_back({polygon[i]});
+  
+  size_t cell_id=0;
+  for (auto face: arr.face_handles()){
+    if(face->data().is_finite) {
+      cell_id++;
+      vec2f polygon, vertices;
+      arrangementface_to_polygon(face, polygon);
+      std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
+      for(auto i : indices) {
+        vertices.push_back({polygon[i]});
+      }
+      // floor triangles
+      for (size_t i=0; i<indices.size()/3; ++i) {
+        Triangle triangle;
+        for (size_t j=0; j<3; ++j) {
+          triangle[j] = {vertices[i*3+j][0], vertices[i*3+j][1], 0};
+          labels.push_back(0);
+          normals.push_back({0,0,-1});
+          cell_id_vec1i.push_back(cell_id);
         }
-        // floor triangles
-        for (size_t i=0; i<indices.size()/3; ++i) {
-          Triangle triangle;
-          for (size_t j=0; j<3; ++j) {
-            triangle[j] = {vertices[i*3+j][0], vertices[i*3+j][1], 0};
-            labels.push_back(0);
-            normals.push_back({0,0,-1});
-            cell_id_vec1i.push_back(cell_id);
-          }
-          triangles.push_back(triangle);
-        }
+        triangles.push_back(triangle);
+      }
+      if (do_roofs) {
         // roof triangles
         for (size_t i=0; i<indices.size()/3; ++i) {
           Triangle triangle;
@@ -609,7 +610,7 @@ void RegulariseLinesNode::process(){
     auto v = target-source;
     auto p_ = source + v/2;
     auto p = Point_2(p_.x(),p_.y());
-    auto l = v.squared_length();
+    auto l = std::sqrt(v.squared_length()/2);
     auto angle = std::atan2(v.x(),v.y());
     if (angle < 0) angle += pi;
     lines.push_back(std::make_tuple(angle,p,0,p_.z(), is_footprint, angle, l, id_cntr++));
@@ -750,7 +751,7 @@ void RegulariseLinesNode::process(){
     }
     // compute vec orthogonal to lines in this cluster
     auto p0 = std::get<1>(best_line);
-    auto halfdist = std::sqrt(std::get<6>(best_line));
+    auto halfdist = std::get<6>(best_line);
     // Vector_2 n(-1.0, std::tan(angle));
     // n = n/std::sqrt(n.squared_length();()); // normalize
     Vector_2 l(std::tan(best_angle),1.0);
