@@ -164,6 +164,22 @@ class SimplifyFootprintNode:public Node {
   void process();
 };
 
+class SimplifyFootprintCDTNode:public Node {
+public:
+  float threshold_stop_cost = 0.1;
+
+  SimplifyFootprintCDTNode(NodeManager& manager):Node(manager) {
+    add_input("polygons", TT_linear_ring_collection);
+    add_output("polygons_simp", TT_linear_ring_collection);
+  }
+  void gui() {
+    if (ImGui::DragFloat("stop cost", &threshold_stop_cost, 0.01)) {
+      manager.run(*this);
+    }
+  }
+  void process();
+};
+
 class PLWriterNode:public Node {
   public:
   char filepath[256] = "/Users/ravi/out.ply";

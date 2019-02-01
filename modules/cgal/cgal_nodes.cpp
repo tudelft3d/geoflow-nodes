@@ -479,7 +479,7 @@ void SimplifyLinesNode::process() {
     ct.insert_constraint(line.begin(), line.end());
   }
 
-  size_t n_removed = PS::simplify(ct, cost, Stop_cost(threshold_stop_cost));
+  size_t n_removed = PS::simplify(ct, cost, Stop_cost(threshold_stop_cost * threshold_stop_cost));
   LineStringCollection lines_out;
 
   for (auto cit = ct.constraints_begin(); cit != ct.constraints_end(); ++cit) {
@@ -539,6 +539,48 @@ void SimplifyFootprintNode::process(){
     // footprint_vec3f.push_back({float(bv->x()),float(bv->y()),0});
     polygons_out.push_back(footprint_vec3f);
   }
+  outputs("polygons_simp").set(polygons_out);
+}
+
+void SimplifyFootprintCDTNode::process(){
+  auto polygons = inputs("polygons").get<LinearRingCollection>();
+
+  namespace PS = CGAL::Polyline_simplification_2;
+  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+  typedef CGAL::Polygon_2<K>                              Polygon_2;
+  typedef PS::Vertex_base_2<K>                            Vb;
+  typedef CGAL::Constrained_triangulation_face_base_2<K>  Fb;
+  typedef CGAL::Triangulation_data_structure_2<Vb, Fb>    TDS;
+  typedef CGAL::Exact_predicates_tag                      Itag;
+  typedef CGAL::Constrained_Delaunay_triangulation_2<K, TDS, Itag> CDT;
+  typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
+  typedef CT::Point                                       Point;
+  typedef CT::Constraint_iterator                         Cit;
+  typedef CT::Points_in_constraint_iterator               Picit;
+  typedef PS::Stop_above_cost_threshold                   Stop_cost;
+  typedef PS::Squared_distance_cost                       Cost;
+
+  CT ct;
+
+  for (auto& linearring : polygons) {
+    Polygon_2 polygon;    
+    for (auto& p : linearring) {
+      polygon.push_back(Point(p[0]+(*manager.data_offset)[0], p[1]+ (*manager.data_offset)[1]));
+    }
+    ct.insert_constraint(polygon);
+  }
+
+  PS::simplify(ct, Cost(), Stop_cost(threshold_stop_cost * threshold_stop_cost));
+  LinearRingCollection polygons_out;
+
+  for (Cit cit = ct.constraints_begin(); cit != ct.constraints_end(); ++cit) {
+    vec3f ls;
+    for (Picit vit = ct.points_in_constraint_begin(*cit); vit != ct.points_in_constraint_end(*cit); ++vit) {
+      ls.push_back({ float(vit->x()-(*manager.data_offset)[0]), float(vit->y()-(*manager.data_offset)[1]) });
+    }
+    polygons_out.push_back(ls);
+  }
+
   outputs("polygons_simp").set(polygons_out);
 }
 
@@ -699,7 +741,7 @@ void IsoLineSlicerNode::process() {
   std::cout << "Start slicing\n";
   CGAL::Polygon_mesh_slicer<Mesh, K> slicer(mesh);
   for (auto h : heights) {
-    std::cout << "Slicing ISO line at height "<< h << "\n";
+    std::cout << "Slicing ISO ring at height "<< h << "\n";
     std::vector< std::vector< Point > > polylines;
     slicer(Plane(0, 0, 1, -h), std::back_inserter(polylines));
 
