@@ -217,7 +217,8 @@ struct LineCluster {
 };
 
 struct ValueCluster {
-  double value;
+  double angle;
+  double distance;
   std::vector<size_t> idx;
 };
 

@@ -652,14 +652,17 @@ void RegulariseLinesNode::process(){
   // get average angle for each cluster
   // vec3f directions_before, directions_after;
   // vec1i angles;
-  int cluster_id=0;
   for(auto& cluster : angle_clusters) {
+    // average angle:
     double sum=0;
     for(auto& i : cluster.idx) {
       sum+=std::get<0>(lines[i]);
     }
-    cluster.value = sum/cluster.idx.size();
-    cluster_id++;
+    cluster.angle = sum/cluster.idx.size();
+
+    // or median angle:
+    // size_t median_id = cluster.idx[cluster.idx.size()/2];
+    // cluster.value = std::get<0>(lines[median_id]);
   }
 
   // std::cout << "\nafter angle snapping...:\n";
@@ -675,7 +678,7 @@ void RegulariseLinesNode::process(){
   std::vector<ValueCluster> dist_clusters;
   for(auto& cluster : angle_clusters) {
     // compute vec orthogonal to lines in this cluster
-    auto angle = cluster.value;
+    auto angle = cluster.angle;
     Vector_2 n(-1.0, std::tan(angle));
     n = n/std::sqrt(n.squared_length()); // normalize
     // compute distances along n wrt to first line in cluster
@@ -719,6 +722,12 @@ void RegulariseLinesNode::process(){
   LineStringCollection edges_out;
   // std::vector<std::pair<Point,Point>> edges_out;
   for(auto& cluster : dist_clusters) {
+    // find average distance
+    double sum=0;
+    for(auto& i : cluster.idx) {
+      sum+=std::get<0>(lines[i]);
+    }
+    cluster.angle = sum/cluster.idx.size();
     //try to find a footprint line
     linetype best_line;
     double best_angle;
@@ -736,7 +745,7 @@ void RegulariseLinesNode::process(){
     // if there are no non-footprint lines, skip this cluster
     if(!found_non_fp) continue;
     // if we didn't find any footprint lines, pick the line with the highest elevation
-    if(!found_fp){
+    if(!found_fp) {
       double max_z=0;
       linetype high_line;
       for(auto& i : cluster.idx) {
