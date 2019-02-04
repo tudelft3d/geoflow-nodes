@@ -12,7 +12,7 @@ typedef bg::model::point<double, 3, bg::cs::cartesian> point_type_3d;
 #include <variant>
 #include <fstream>
 
-using namespace geoflow;
+namespace geoflow::nodes::gdal {
 
 void OGRLoaderNode::process(){
   GDALDatasetUniquePtr poDS(GDALDataset::Open( filepath, GDAL_OF_VECTOR));
@@ -92,10 +92,10 @@ void OGRLoaderNode::process(){
 
   }
   if (geometry_type == wkbLineString25D || geometry_type == wkbLineStringZM) {
-    outputs("line_strings").set(line_strings);
+    output("line_strings").set(line_strings);
     std::cout << "pushed " << line_strings.size() << " line_string features...\n";
   } else if (geometry_type == wkbPolygon || geometry_type == wkbPolygon25D || geometry_type == wkbPolygonZM || geometry_type == wkbPolygonM) {
-    outputs("linear_rings").set(linear_rings);
+    output("linear_rings").set(linear_rings);
     std::cout << "pushed " << linear_rings.size() << " linear_ring features...\n";
   }
 }
@@ -191,15 +191,15 @@ void OGRLoaderNode::process(){
     
 //     // poLayer = poDS->GetLayerByName( "point" );
 
-//     outputs("lines").set(lines);
-//     outputs("lines_vec3f").set(lines_vec3f);
+//     output("lines").set(lines);
+//     output("lines_vec3f").set(lines_vec3f);
 //   }
 // };
 
 void OGRWriterNode::process() {
-    auto geom_term = inputs("geometries");
-    auto attributes = inputs("attributes").get<AttributeMap>();
-    // auto attributes = inputs("attributes").get<Attributes>();
+    auto geom_term = input("geometries");
+    auto attributes = input("attributes").get<AttributeMap>();
+    // auto attributes = input("attributes").get<Attributes>();
     // what about the attributes?
 
     const char *gszDriverName = "ESRI Shapefile";
@@ -294,7 +294,7 @@ void OGRWriterNode::process() {
 }
 
 void OGRWriterNoAttributesNode::process() {
-    auto geom_term = inputs("geometries");
+    auto geom_term = input("geometries");
 
     const char *gszDriverName = "ESRI Shapefile";
     GDALDriver *poDriver;
@@ -392,12 +392,12 @@ void CSVLoaderNode::process(){
   }
   f_in.close();
 
-  outputs("points").set(points);\
+  output("points").set(points);\
 }
 
 void CSVWriterNode::process() {
-  auto points = inputs("points").get<PointCollection>();
-  auto distances = inputs("distances").get<vec1f>();
+  auto points = input("points").get<PointCollection>();
+  auto distances = input("distances").get<vec1f>();
   
   std::ofstream f_out(filepath);
   f_out << std::fixed << std::setprecision(2);
@@ -410,4 +410,5 @@ void CSVWriterNode::process() {
     << distances[i] << "\n";
   }
   f_out.close();
+}
 }

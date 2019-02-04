@@ -1,7 +1,7 @@
 #include <boost/heap/fibonacci_heap.hpp>
 #include <list>
 
-#include "geoflow.hpp"
+#include <geoflow/core/geoflow.hpp>
 
 namespace linesimp {
 

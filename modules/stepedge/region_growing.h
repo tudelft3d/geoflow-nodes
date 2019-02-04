@@ -9,7 +9,7 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Search_traits_adapter.h>
 
-#include <geoflow.hpp>
+#include <geoflow/core/geoflow.hpp>
 
 namespace linedect {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel cgal_kernel;

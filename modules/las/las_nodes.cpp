@@ -3,7 +3,7 @@
 
 #include "las_nodes.hpp"
 
-using namespace geoflow;
+namespace geoflow::nodes::las {
 
 void LASLoaderNode::process(){
   PointCollection points;
@@ -42,9 +42,9 @@ void LASLoaderNode::process(){
   lasreader->close();
   delete lasreader;
 
-  outputs("points").set(points);
-  outputs("classification").set(classification);
-  outputs("intensity").set(intensity);
+  output("points").set(points);
+  output("classification").set(classification);
+  output("intensity").set(intensity);
 }
 
 void LASWriterNode::write_point_cloud_collection(PointCollection& point_cloud, std::string path) {
@@ -92,7 +92,7 @@ void LASWriterNode::write_point_cloud_collection(PointCollection& point_cloud, s
 }
 
 void LASWriterNode::process(){
-  auto input_geom = inputs("point_clouds");
+  auto input_geom = input("point_clouds");
 
   if (input_geom.connected_type == TT_point_collection) {
     auto point_cloud = input_geom.get<PointCollection>();
@@ -108,4 +108,6 @@ void LASWriterNode::process(){
       write_point_cloud_collection(point_cloud, fp);
     }
   }
+}
+
 }

@@ -8,7 +8,7 @@
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/boost/graph/Euler_operations.h>
 
-#include "geoflow.hpp"
+#include <geoflow/core/geoflow.hpp>
 
 namespace isolines {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;

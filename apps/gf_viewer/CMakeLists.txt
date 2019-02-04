@@ -1,6 +1,6 @@
 add_executable(gf_viewer main.cpp)
 target_link_libraries( gf_viewer 
-  flowchart-gui
+  geoflow-gui
   cgal_nodes
   gdal_nodes
   las_nodes

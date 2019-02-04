@@ -11,9 +11,9 @@
 #include <cmath>
 #include <boost/tuple/tuple.hpp>
 
-// #include <filesystem>
 #include <numeric>
 
+// #include <filesystem>
 // namespace fs=std::filesystem;
 
 typedef std::array<float,3> vertex;
@@ -26,13 +26,14 @@ vertex get_normal(vertex v0, vertex v1, vertex v2) {
     return {n.x,n.y,n.z};
 }
 
-
 // 2D alpha shapes
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/Alpha_shape_2.h>
 #include <CGAL/Alpha_shape_vertex_base_2.h>
 #include <CGAL/Alpha_shape_face_base_2.h>
 #include <CGAL/Projection_traits_xy_3.h>
+
+namespace geoflow::nodes::stepedge {
 
 void AlphaShapeNode::process(){
   typedef CGAL::Exact_predicates_inexact_constructions_kernel  K;
@@ -49,7 +50,7 @@ void AlphaShapeNode::process(){
   typedef Alpha_shape_2::Vertex_circulator                     Vertex_circulator;
   typedef Alpha_shape_2::Edge_circulator                     Edge_circulator;
 
-  auto points = inputs("points").get<PNL_vector>();
+  auto points = input("points").get<PNL_vector>();
   
   // collect plane points
   std::unordered_map<int, std::vector<Point>> points_per_segment;
@@ -143,31 +144,32 @@ void AlphaShapeNode::process(){
   }
   
   if (extract_alpha_rings) {
-    outputs("alpha_rings").set(alpha_rings);
+    output("alpha_rings").set(alpha_rings);
   }
-  outputs("alpha_edges").set(alpha_edges);
-  outputs("edge_points").set(edge_points);
+  output("alpha_edges").set(alpha_edges);
+  output("edge_points").set(edge_points);
 }
 
 void PolygonExtruderNode::process(){
-  auto polygons = inputs("polygons").get<Feature>();
-  auto point_clouds = inputs("point_clouds").get<Feature>();
+  auto polygons = input("polygons").get<LinearRingCollection>();
+  auto point_clouds = input("point_clouds").get<std::vector<PointCollection>>();
 
-  if(polygons.geom.size()!=point_clouds.geom.size()) return;
+  if(polygons.size()!=point_clouds.size()) return;
 
-  polygons.attr["height"] = vec1f();
-  for (auto& point_cloud : point_clouds.geom) {
+  vec1f heights;
+  for (auto& point_cloud : point_clouds) {
     double sum_elevation = 0;
     for (auto& p : point_cloud) {
       sum_elevation += p[2];
     }
-    polygons.attr["height"].push_back(sum_elevation/point_cloud.size());
+    heights.push_back(sum_elevation/point_cloud.size());
   }
-  outputs("polygons_extruded").set(polygons);
+  output("polygons_extruded").set(polygons);
+  output("heights").set(heights);
 }
 
 void Arr2LinearRingsNode::process(){
-  auto arr = inputs("arrangement").get<Arrangement_2>();
+  auto arr = input("arrangement").get<Arrangement_2>();
 
   LinearRingCollection linear_rings;
   AttributeMap attributes;
@@ -183,16 +185,16 @@ void Arr2LinearRingsNode::process(){
       attributes["height"].push_back(face->data().elevation_avg);
     }
   }
-  outputs("linear_rings").set(linear_rings);
-  outputs("attributes").set(attributes);
+  output("linear_rings").set(linear_rings);
+  output("attributes").set(attributes);
 }
 
 void ExtruderNode::process(){
   // if (!(do_walls || do_roofs)) return;
   // Set up vertex data (and buffer(s)) and attribute pointers
-  // auto polygons = std::any_cast<inputs("polygons").get<vec2f>>();
-  // auto elevations = std::any_cast<inputs("elevations").get<float>>();
-  auto arr = inputs("arrangement").get<Arrangement_2>();
+  // auto polygons = std::any_cast<input("polygons").get<vec2f>>();
+  // auto elevations = std::any_cast<input("elevations").get<float>>();
+  auto arr = input("arrangement").get<Arrangement_2>();
 
   TriangleCollection triangles;
   vec3f normals;
@@ -313,26 +315,26 @@ void ExtruderNode::process(){
     }
   }
   
-  outputs("normals_vec3f").set(normals);
-  outputs("cell_id_vec1i").set(cell_id_vec1i);
-  outputs("triangles").set(triangles);
-  outputs("labels_vec1i").set(labels);
+  output("normals_vec3f").set(normals);
+  output("cell_id_vec1i").set(cell_id_vec1i);
+  output("triangles").set(triangles);
+  output("labels_vec1i").set(labels);
 }
 
 void ProcessArrangementNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto points = inputs("points").get<PNL_vector>();
-  auto arr = inputs("arrangement").get<Arrangement_2>();
+  auto points = input("points").get<PNL_vector>();
+  auto arr = input("arrangement").get<Arrangement_2>();
 
   process_arrangement(points, arr, c);
   
-  outputs("arrangement").set(arr);
+  output("arrangement").set(arr);
 }
 
 void BuildArrangementNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto edge_segments = inputs("edge_segments").get<LineStringCollection>();
-  auto footprint = inputs("footprint").get<LinearRing>();
+  auto edge_segments = input("edge_segments").get<LineStringCollection>();
+  auto footprint = input("footprint").get<LinearRing>();
 
   // bg::model::polygon<point_type> fp;
   // for(auto& p : footprint) {
@@ -377,12 +379,12 @@ void BuildArrangementNode::process(){
           });
       }
   }
-  outputs("arr_segments").set(segments);
-  outputs("arrangement").set(arr);
+  output("arr_segments").set(segments);
+  output("arrangement").set(arr);
 }
 
 void DetectLinesNode::process(){
-  auto input_geom = inputs("edge_points");
+  auto input_geom = input("edge_points");
 
   LineStringCollection edge_segments;
 
@@ -442,15 +444,15 @@ void DetectLinesNode::process(){
     }
   }
 
-  outputs("edge_segments").set(edge_segments);
+  output("edge_segments").set(edge_segments);
 }
 
 void ClassifyEdgePointsNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto points = inputs("points").get<PNL_vector>();
+  auto points = input("points").get<PNL_vector>();
   std::vector<linedect::Point> edge_points;
   classify_edgepoints(edge_points, points, c);
-  outputs("edge_points").set(edge_points);
+  output("edge_points").set(edge_points);
 
   vec3f edge_points_vec3f;
   for(auto& p : edge_points) {
@@ -461,12 +463,12 @@ void ClassifyEdgePointsNode::process(){
       }};
       edge_points_vec3f.push_back(a);
     }
-  outputs("edge_points_vec3f").set(edge_points_vec3f);
+  output("edge_points_vec3f").set(edge_points_vec3f);
 }
 
-void ComputeMetricsNode::process(){
+void ComputeMetricsNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto points = inputs("points").get<PointCollection>();
+  auto points = input("points").get<PointCollection>();
   PNL_vector pnl_points;
   for (auto& p : points) {
     PNL pv;
@@ -491,14 +493,14 @@ void ComputeMetricsNode::process(){
           };
     points_c.push_back(a);
   }
-  outputs("points").set(pnl_points);
-  outputs("points_c").set(points_c);
-  outputs("plane_id").set(plane_id);
-  outputs("is_wall").set(is_wall);
-  outputs("is_horizontal").set(is_horizontal);
-  outputs("line_dist").set(line_dist);
-  outputs("jump_count").set(jump_count);
-  outputs("jump_ele").set(jump_ele);
+  output("points").set(pnl_points);
+  output("points_c").set(points_c);
+  output("plane_id").set(plane_id);
+  output("is_wall").set(is_wall);
+  output("is_horizontal").set(is_horizontal);
+  output("line_dist").set(line_dist);
+  output("jump_count").set(jump_count);
+  output("jump_ele").set(jump_ele);
 }
 
 pGridSet build_grid(vec3f& ring) {
@@ -521,7 +523,7 @@ pGridSet build_grid(vec3f& ring) {
 void LASInPolygonsNode::process() {
   polygons.clear();
   point_clouds.clear();
-  polygons = inputs("polygons").get<LinearRingCollection>();
+  polygons = input("polygons").get<LinearRingCollection>();
 
   // std::vector<bg::model::polygon<point_type>> boost_polygons;
   std::vector<pGridSet> poly_grids;
@@ -573,15 +575,15 @@ void LASInPolygonsNode::process() {
   lasreader->close();
   delete lasreader;
 
-  outputs("point_clouds").set(point_clouds);
-  outputs("points").set(PointCollection(point_clouds[footprint_id]));
-  outputs("footprint").set(polygons[footprint_id]);
+  output("point_clouds").set(point_clouds);
+  output("points").set(PointCollection(point_clouds[footprint_id]));
+  output("footprint").set(polygons[footprint_id]);
 }
 
 void RegulariseLinesNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto edges = inputs("edge_segments").get<LineStringCollection>();
-  auto footprint = inputs("footprint").get<LinearRing>();
+  auto edges = input("edge_segments").get<LineStringCollection>();
+  auto footprint = input("footprint").get<LinearRing>();
   typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_2 Point_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_3 Point_3;
   typedef std::array<float,2> arr3f;
@@ -774,12 +776,12 @@ void RegulariseLinesNode::process(){
     });
   }
 
-  outputs("edges_out").set(edges_out);
+  output("edges_out").set(edges_out);
 }
 
 void LOD13GeneratorNode::process(){
-  auto point_clouds = inputs("point_clouds").get<std::vector<PointCollection>>();
-  auto polygons = inputs("polygons").get<LinearRingCollection>();
+  auto point_clouds = input("point_clouds").get<std::vector<PointCollection>>();
+  auto polygons = input("polygons").get<LinearRingCollection>();
   
   // for each pair of polygon and point_cloud
     //create nodes and connections
@@ -793,19 +795,28 @@ void LOD13GeneratorNode::process(){
     auto& points = point_clouds[i];
     auto& polygon = polygons[i];
 
+    NodeRegister R("Nodes");
+    R.register_node<ComputeMetricsNode>("ComputeMetrics");
+    R.register_node<AlphaShapeNode>("AlphaShape");
+    R.register_node<DetectLinesNode>("DetectLines");
+    R.register_node<RegulariseLinesNode>("RegulariseLines");
+    R.register_node<BuildArrangementNode>("BuildArrangement");
+    R.register_node<ProcessArrangementNode>("ProcessArrangement");
+    R.register_node<Arr2LinearRingsNode>("Arr2LinearRings");
+
     NodeManager N = NodeManager();
 
-    auto ComputeMetrics_node = std::make_shared<ComputeMetricsNode>(N);
-    auto AlphaShape_node = std::make_shared<AlphaShapeNode>(N);
-    auto DetectLines_node = std::make_shared<DetectLinesNode>(N);
-    auto RegulariseLines_node = std::make_shared<RegulariseLinesNode>(N);
-    auto BuildArrangement_node = std::make_shared<BuildArrangementNode>(N);
-    auto ProcessArrangement_node = std::make_shared<ProcessArrangementNode>(N);
-    auto Arr2LinearRings_node = std::make_shared<Arr2LinearRingsNode>(N);
+    auto ComputeMetrics_node = N.create_node(R, "ComputeMetrics");
+    auto AlphaShape_node = N.create_node(R, "AlphaShape");
+    auto DetectLines_node = N.create_node(R, "DetectLines");
+    auto RegulariseLines_node = N.create_node(R, "RegulariseLines");
+    auto BuildArrangement_node = N.create_node(R, "BuildArrangement");
+    auto ProcessArrangement_node = N.create_node(R, "ProcessArrangement");
+    auto Arr2LinearRings_node = N.create_node(R, "Arr2LinearRings");
 
-    ComputeMetrics_node->inputs("points").set(points);
-    BuildArrangement_node->inputs("footprint").set(polygon);
-    RegulariseLines_node->inputs("footprint").set(polygon);
+    ComputeMetrics_node->input("points").set(points);
+    BuildArrangement_node->input("footprint").set(polygon);
+    RegulariseLines_node->input("footprint").set(polygon);
 
     connect(*ComputeMetrics_node, *AlphaShape_node, "points", "points");
     connect(*ComputeMetrics_node, *ProcessArrangement_node, "points", "points");
@@ -816,18 +827,19 @@ void LOD13GeneratorNode::process(){
     connect(*ProcessArrangement_node, *Arr2LinearRings_node, "arrangement", "arrangement");
 
     // config and run
-    ProcessArrangement_node->c.step_height_threshold = step_height_threshold;
-    ProcessArrangement_node->c.zrange_threshold = zrange_threshold;
-    ProcessArrangement_node->c.merge_segid = merge_segid;
-    ProcessArrangement_node->c.merge_zrange = merge_zrange;
-    ProcessArrangement_node->c.merge_step_height = merge_step_height;
-    ProcessArrangement_node->c.merge_unsegmented = merge_unsegmented;
-    ProcessArrangement_node->c.merge_dangling_egdes = merge_dangling_egdes;
+    auto panode = dynamic_cast<ProcessArrangementNode&>(*ProcessArrangement_node);
+    panode.c.step_height_threshold = step_height_threshold;
+    panode.c.zrange_threshold = zrange_threshold;
+    panode.c.merge_segid = merge_segid;
+    panode.c.merge_zrange = merge_zrange;
+    panode.c.merge_step_height = merge_step_height;
+    panode.c.merge_unsegmented = merge_unsegmented;
+    panode.c.merge_dangling_egdes = merge_dangling_egdes;
     
     N.run(*ComputeMetrics_node);
 
-    auto cells = Arr2LinearRings_node->outputs("linear_rings").get<LinearRingCollection>();
-    auto attributes = Arr2LinearRings_node->outputs("attributes").get<AttributeMap>();
+    auto cells = Arr2LinearRings_node->output("linear_rings").get<LinearRingCollection>();
+    auto attributes = Arr2LinearRings_node->output("attributes").get<AttributeMap>();
 
     for (int i=0; i<cells.size(); i++) {
       // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
@@ -836,12 +848,12 @@ void LOD13GeneratorNode::process(){
       // }
     }
   }
-  outputs("decomposed_footprints").set(all_cells);
-  outputs("attributes").set(all_attributes);
+  output("decomposed_footprints").set(all_cells);
+  output("attributes").set(all_attributes);
 }
 
 // void PlaneDetectorNode::process() {
-//   auto points = inputs("point_clouds").get<Feature>();
+//   auto points = input("point_clouds").get<Feature>();
 
 //   planedect::PlaneDetector PD(points_vec, normals_vec);
 //   PD.dist_thres = c.metrics_plane_epsilon * c.metrics_plane_epsilon;
@@ -884,6 +896,8 @@ void LOD13GeneratorNode::process(){
 //     auto plane_idx = PD.get_point_indices(seg.first);
 //   }
 
-//   outputs("decomposed_footprints").set(all_cells);
-//   outputs("attributes").set(all_attributes);
+//   output("decomposed_footprints").set(all_cells);
+//   output("attributes").set(all_attributes);
 // }
+
+}

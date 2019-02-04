@@ -2,7 +2,7 @@ add_library(masb_nodes STATIC
   masb_nodes.cpp
 )
 target_link_libraries( masb_nodes
-  flowchart-core
+  geoflow-core
   masbcpp
 )
 set_target_properties(

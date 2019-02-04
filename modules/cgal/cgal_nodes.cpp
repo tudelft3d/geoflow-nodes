@@ -44,7 +44,7 @@
 #include <CGAL/Orthogonal_k_neighbor_search.h>
 #include <CGAL/Search_traits_2.h>
 
-using namespace geoflow;
+namespace geoflow::nodes::cgal {
 
 template<typename T> inline std::array<float,3> to_arr3f(T& p) {
   return {float(p.x()), float(p.y()), float(p.z())};
@@ -57,7 +57,7 @@ void CDTNode::process(){
   typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, CGAL::Default, Itag>	CDT;
   typedef CDT::Point													          Point;
 
-  auto geom_term = inputs("geometries");
+  auto geom_term = input("geometries");
   CDT cdt;
 
   if (geom_term.connected_type == TT_point_collection) {
@@ -99,8 +99,8 @@ void CDTNode::process(){
     });
   }
 
-  outputs("cgal_cdt").set(cdt);
-  outputs("triangles").set(triangles);
+  output("cgal_cdt").set(cdt);
+  output("triangles").set(triangles);
 }
 
 void DTNode::process() {
@@ -109,7 +109,7 @@ void DTNode::process() {
   typedef K::Point_3													          Point;
 
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto points = inputs("points").get<PointCollection>();
+  auto points = input("points").get<PointCollection>();
 
 
   std::cout << "Adding points to DT\n";
@@ -119,7 +119,7 @@ void DTNode::process() {
   }
 
   std::cout << "Completed DT with " << dt.number_of_finite_facets() << " triangles...\n";
-  outputs("cgal_dt").set(dt);
+  output("cgal_dt").set(dt);
 }
 
 void ComparePointDistanceNode::process(){
@@ -135,7 +135,7 @@ void ComparePointDistanceNode::process(){
   typedef CGAL::AABB_tree<AABB_triangle_traits> Tree;
 
   // Triangles 1
-  auto trin1 = inputs("triangles1_vec3f").get<vec3f>();
+  auto trin1 = input("triangles1_vec3f").get<vec3f>();
   std::list<Triangle> triangles1;
   for(size_t i=0; i< trin1.size()/3; i++){
     auto a = Point(trin1[i*3+0][0], trin1[i*3+0][1], trin1[i*3+0][2]);
@@ -147,7 +147,7 @@ void ComparePointDistanceNode::process(){
   tree1.accelerate_distance_queries();
 
   // Triangles 2
-  auto trin2 = inputs("triangles2_vec3f").get<vec3f>();
+  auto trin2 = input("triangles2_vec3f").get<vec3f>();
   std::list<Triangle> triangles2;
   for(size_t i=0; i< trin2.size()/3; i++){
     auto a = Point(trin2[i*3+0][0], trin2[i*3+0][1], trin2[i*3+0][2]);
@@ -200,10 +200,10 @@ void ComparePointDistanceNode::process(){
   }
   
 
-  outputs("points").set(points);
-  outputs("diff").set(diff);
-  outputs("distances1").set(distances1);
-  outputs("distances2").set(distances2);
+  output("points").set(points);
+  output("diff").set(diff);
+  output("distances1").set(distances1);
+  output("distances2").set(distances2);
 }
 
 void PointDistanceNode::process(){
@@ -218,7 +218,7 @@ void PointDistanceNode::process(){
   typedef CGAL::AABB_traits<K, Primitive> AABB_triangle_traits;
   typedef CGAL::AABB_tree<AABB_triangle_traits> Tree;
 
-  auto trin = inputs("triangles").get<TriangleCollection>();
+  auto trin = input("triangles").get<TriangleCollection>();
   std::list<Triangle> triangles;
   for(auto& t : trin){
     auto a = Point(t[0][0], t[0][1], t[0][2]);
@@ -268,8 +268,8 @@ void PointDistanceNode::process(){
   lasreader->close();
   delete lasreader;
 
-  outputs("points").set(points);
-  outputs("distances").set(distances);
+  output("points").set(points);
+  output("distances").set(distances);
 }
 
 LineStringCollection densify_linestrings(LineStringCollection line_strings, float interval)
@@ -298,11 +298,11 @@ LineStringCollection densify_linestrings(LineStringCollection line_strings, floa
 }
 
 void DensifyNode::process(){
-  auto geom_term = inputs("geometries");
+  auto geom_term = input("geometries");
 
   if (geom_term.connected_type == TT_line_string_collection) {
     auto lines = geom_term.get<geoflow::LineStringCollection>();
-    outputs("dense_linestrings").set(densify_linestrings(lines, interval));
+    output("dense_linestrings").set(densify_linestrings(lines, interval));
   }
 
 }
@@ -324,7 +324,7 @@ void build_initial_tin(tinsimp::CDT& cdt, geoflow::Box& bbox){
 }
 
 void TinSimpNode::process(){
-  auto geom_term = inputs("geometries");
+  auto geom_term = input("geometries");
   tinsimp::CDT cdt;
 
   if (geom_term.connected_type == TT_point_collection) {
@@ -345,9 +345,9 @@ void TinSimpNode::process(){
         // selected_line_errors.push_back(line_errors[i]);
       }
     }
-    outputs("selected_lines").set(selected_lines);
-    // outputs("count").set(line_counts);
-    // outputs("error").set(line_errors);
+    output("selected_lines").set(selected_lines);
+    // output("count").set(line_counts);
+    // output("error").set(line_errors);
   }
 
   TriangleCollection triangles;
@@ -372,26 +372,26 @@ void TinSimpNode::process(){
     normals.push_back({n.x,n.y,n.z});
   }
 
-  outputs("triangles").set(triangles);
-  outputs("normals").set(normals);
+  output("triangles").set(triangles);
+  output("normals").set(normals);
 
 }
 
 void SimplifyLine3DNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto lines = inputs("lines").get<LineStringCollection>();
+  auto lines = input("lines").get<LineStringCollection>();
 
   LineStringCollection simplified_lines;
   for (auto& line_string : lines) {
     simplified_lines.push_back( linesimp::visvalingam(line_string, area_threshold) );
   }
 
-  outputs("lines").set(simplified_lines);
+  output("lines").set(simplified_lines);
 }
 
 void SimplifyLineNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto geometry = inputs("lines").get<gfGeometry3D>();
+  auto lines = input("lines").get<LineStringCollection>();
   
   namespace PS = CGAL::Polyline_simplification_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -407,46 +407,35 @@ void SimplifyLineNode::process(){
 
   Cost cost;
 
-  size_t s_index=0;
-  size_t sum_count=0,count=0;
-  gfGeometry3D geometry_out;
+  LineStringCollection lines_out;
   vec3f vertices_vec3f;
-  for (auto c : geometry.counts) {
+  for (auto& linestring : lines) {
     std::vector<K::Point_2> line;
-    std::cerr << "count: " <<c << "\n";
-    for (size_t i=0; i<c; i++ ) {
-      auto p = geometry.vertices[s_index+i];
+    for (auto& p : linestring ) {
       line.push_back(K::Point_2(p[0], p[1], p[2]));
-      std::cerr << "\t "<< p[0] << ", " << p[1] << "\n";
     }
-    s_index+=c;
     std::vector <K::Point_2> points_out;
-    points_out.reserve(c);
     PS::simplify(line.begin(), line.end(), cost, Stop_cost(threshold_stop_cost), points_out.begin());
     
     auto points_begin = points_out.begin();
     auto points_end = points_out.end();
     size_t psize = points_out.size();
+    LineString simpline;
     for(auto pit = points_begin; pit != points_end; ++pit) {
       if(pit!=points_begin && pit!=points_end)
         vertices_vec3f.push_back({float(pit->x()), float(pit->y()), 0});
       vertices_vec3f.push_back({float(pit->x()), float(pit->y()), 0});
-      geometry_out.vertices.push_back({float(pit->x()), float(pit->y()), 0});
-      count++;
+      simpline.push_back({float(pit->x()), float(pit->y()), 0});
     }
-    geometry_out.counts.push_back(count);
-    geometry_out.firsts.push_back(sum_count);
-    sum_count += count;
+    lines_out.push_back(simpline);
   }
-
-  outputs("lines_vec3f").set(vertices_vec3f);
-  outputs("lines").set(geometry_out);
+  output("lines").set(lines_out);
 }
 
 void SimplifyLinesNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto lines = inputs("lines").get<LineStringCollection>();
-  auto lines2 = inputs("lines2").get<LineStringCollection>();
+  auto lines = input("lines").get<LineStringCollection>();
+  auto lines2 = input("lines2").get<LineStringCollection>();
 
   namespace PS = CGAL::Polyline_simplification_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -490,7 +479,7 @@ void SimplifyLinesNode::process() {
     lines_out.push_back(ls);
   }
 
-  outputs("lines").set(lines_out);
+  output("lines").set(lines_out);
 }
 
 void SimplifyFootprintNode::process(){
@@ -504,7 +493,7 @@ void SimplifyFootprintNode::process(){
   typedef PS::Stop_above_cost_threshold        Stop_cost;
   typedef PS::Squared_distance_cost            Cost;
 
-  auto polygons = inputs("polygons").get<LinearRingCollection>();
+  auto polygons = input("polygons").get<LinearRingCollection>();
 
   LinearRingCollection polygons_out;
   
@@ -539,7 +528,7 @@ void SimplifyFootprintNode::process(){
     // footprint_vec3f.push_back({float(bv->x()),float(bv->y()),0});
     polygons_out.push_back(footprint_vec3f);
   }
-  outputs("polygons_simp").set(polygons_out);
+  output("polygons_simp").set(polygons_out);
 }
 
 void PLWriterNode::process() {
@@ -551,8 +540,8 @@ void PLWriterNode::process() {
   typedef CGAL::Nth_of_tuple_property_map<1, PL> Label_map;
   typedef std::vector<PL>                        PL_vector;
 
-  auto points = inputs("points").get<PointCollection>();
-  auto labels = inputs("labels").get<vec1i>();
+  auto points = input("points").get<PointCollection>();
+  auto labels = input("labels").get<vec1i>();
   
   PL_vector pl_points;
   pl_points.resize(points.size());
@@ -577,8 +566,8 @@ void PLWriterNode::process() {
 }
 
 void IsoLineNode::process() {
-  auto cdt = inputs("cgal_cdt").get<isolines::CDT>();
-  //auto heights = inputs("heights").get<vec1f>();
+  auto cdt = input("cgal_cdt").get<isolines::CDT>();
+  //auto heights = input("heights").get<vec1f>();
 
   vec1f heights;
   for (int i = 1; i < 10; i++) {
@@ -667,8 +656,8 @@ void IsoLineNode::process() {
     }
   }
 
-  outputs("lines").set(lines);
-  outputs("attributes").set(attributes);
+  output("lines").set(lines);
+  output("attributes").set(attributes);
 }
 
 void IsoLineSlicerNode::process() {
@@ -678,8 +667,8 @@ void IsoLineSlicerNode::process() {
   typedef K::Plane_3 Plane;
   typedef CGAL::Surface_mesh<K::Point_3> Mesh;
 
-  auto cdt = inputs("cgal_cdt").get<isolines::CDT>();
-  //auto heights = inputs("heights").get<vec1f>();
+  auto cdt = input("cgal_cdt").get<isolines::CDT>();
+  //auto heights = input("heights").get<vec1f>();
   //TODO get iso line seperation distance, get min/max height and create list of heights
   vec1f heights;
   for (int i = 1; i < 20; i++) {
@@ -718,12 +707,12 @@ void IsoLineSlicerNode::process() {
       }
     }
   }
-  outputs("lines").set(lines);
-  outputs("attributes").set(attributes);
+  output("lines").set(lines);
+  output("attributes").set(attributes);
 }
 
 void LineHeightNode::process() {
-  auto lines = inputs("lines").get<LineStringCollection>();
+  auto lines = input("lines").get<LineStringCollection>();
 
   typedef CGAL::Simple_cartesian<float> K;
   typedef CGAL::Search_traits_3<K> TreeTraits;
@@ -762,5 +751,7 @@ void LineHeightNode::process() {
   lasreader->close();
   delete lasreader;
 
-  outputs("lines").set(lines_out);
+  output("lines").set(lines_out);
+}
+
 }

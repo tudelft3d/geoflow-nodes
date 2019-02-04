@@ -6,7 +6,7 @@ add_library(cgal_nodes STATIC
   tinsimp.cpp
 )
 target_link_libraries( cgal_nodes
-  flowchart-core
+  geoflow-core
   ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} 
   LASlib
 )
