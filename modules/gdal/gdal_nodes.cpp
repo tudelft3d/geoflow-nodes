@@ -15,7 +15,7 @@ typedef bg::model::point<double, 3, bg::cs::cartesian> point_type_3d;
 namespace geoflow::nodes::gdal {
 
 void OGRLoaderNode::process(){
-  GDALDatasetUniquePtr poDS(GDALDataset::Open( filepath, GDAL_OF_VECTOR));
+  GDALDatasetUniquePtr poDS(GDALDataset::Open( param<std::string>("filepath").c_str(), GDAL_OF_VECTOR));
   if( poDS == nullptr )
   {
       std::cerr<<"Open failed.\n";
@@ -23,15 +23,15 @@ void OGRLoaderNode::process(){
   }
   layer_count = poDS->GetLayerCount();
   std::cout << "Layer count: " << layer_count << "\n";
-  current_layer_id = 0;
+  param<int>("layer_id") = 0;
 
   // Set up vertex data (and buffer(s)) and attribute pointers
   LineStringCollection line_strings;
   LinearRingCollection linear_rings;
 
   OGRLayer  *poLayer;
-  poLayer = poDS->GetLayer( current_layer_id );
-  std::cout << "Layer " << current_layer_id << " feature count: " << poLayer->GetFeatureCount() << "\n";
+  poLayer = poDS->GetLayer( param<int>("layer_id") );
+  std::cout << "Layer " << param<int>("layer_id") << " feature count: " << poLayer->GetFeatureCount() << "\n";
   geometry_type = poLayer->GetGeomType();
   geometry_type_name = OGRGeometryTypeToName(geometry_type);
   std::cout << "Layer geometry type: " << geometry_type_name << "\n";
@@ -216,7 +216,7 @@ void OGRWriterNode::process() {
 
     GDALDataset *poDS;
 
-    poDS = poDriver->Create( filepath, 0, 0, 0, GDT_Unknown, NULL );
+    poDS = poDriver->Create( param<std::string>("filepath").c_str(), 0, 0, 0, GDT_Unknown, NULL );
     if( poDS == NULL )
     {
         printf( "Creation of output file failed.\n" );
@@ -310,7 +310,7 @@ void OGRWriterNoAttributesNode::process() {
 
     GDALDataset *poDS;
 
-    poDS = poDriver->Create( filepath, 0, 0, 0, GDT_Unknown, NULL );
+    poDS = poDriver->Create( param<std::string>("filepath").c_str(), 0, 0, 0, GDT_Unknown, NULL );
     if( poDS == NULL )
     {
         printf( "Creation of output file failed.\n" );
@@ -379,8 +379,9 @@ void OGRWriterNoAttributesNode::process() {
 
 void CSVLoaderNode::process(){
   PointCollection points;
+  auto& thin_nth = param<int>("thin_nth");
   
-  std::ifstream f_in(filepath);
+  std::ifstream f_in(param<std::string>("filepath"));
   float px, py, pz;
   size_t i=0;
   std::string header;
@@ -399,7 +400,7 @@ void CSVWriterNode::process() {
   auto points = input("points").get<PointCollection>();
   auto distances = input("distances").get<vec1f>();
   
-  std::ofstream f_out(filepath);
+  std::ofstream f_out(param<std::string>("filepath"));
   f_out << std::fixed << std::setprecision(2);
   f_out << "x y z distance\n";
   for (size_t i=0; i< points.size(); ++i) {

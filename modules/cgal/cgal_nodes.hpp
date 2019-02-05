@@ -27,10 +27,6 @@ namespace geoflow::nodes::cgal {
 
   class ComparePointDistanceNode:public Node {
     public:
-    char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-    char log_filepath[256] = "ComparePointDistanceNode.out";
-    int thin_nth = 20;
-
     using Node::Node;
     void init() {
       add_input("triangles1_vec3f", TT_vec3f);
@@ -39,52 +35,55 @@ namespace geoflow::nodes::cgal {
       add_output("distances1", TT_vec1f);
       add_output("distances2", TT_vec1f);
       add_output("diff", TT_vec1f);
+
+      add_param("las_filpath", (std::string) "");
+      add_param("log_filpath", (std::string) "");
+      add_param("thin_nth", (int) 20);
     }
-    void gui(){
-      ImGui::InputText("LAS file path", las_filepath, IM_ARRAYSIZE(las_filepath));
-      ImGui::SliderInt("Thin nth", &thin_nth, 0, 100);
+    void gui() {
+      ImGui::InputText("LAS file path", &param<std::string>("las_filepath"));
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 0, 100);
     }
     void process();
   };
 
   class PointDistanceNode:public Node{
     public:
-    char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-    int thin_nth = 5;
-    bool overwritez = false;
-
     using Node::Node;
     void init() {
       add_input("triangles", TT_triangle_collection);
       add_output("points", TT_point_collection);
       add_output("distances", TT_vec1f);
+
+      add_param("filepath", (std::string) "");
+      add_param("thin_nth", (int) 5);
+      add_param("overwritez", (bool) false);
     }
-    void gui(){
-      ImGui::InputText("LAS file path", filepath, IM_ARRAYSIZE(filepath));
-      ImGui::SliderInt("Thin nth", &thin_nth, 0, 100);
+    void gui() {
+      ImGui::InputText("LAS file path", &param<std::string>("filepath"));
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 0, 100);
     }
     void process();
   };
 
   class DensifyNode:public Node {
     public:
-    float interval = 2;
 
     using Node::Node;
     void init() {
       add_input("geometries", {TT_line_string_collection});
       add_output("dense_linestrings", TT_line_string_collection);
+
+      add_param("interval", (int) 2);
     }
-    void gui(){
-      ImGui::SliderFloat("Interval", &interval, 0, 100);
+    void gui() {
+      ImGui::SliderFloat("Interval", &param<float>("interval"), 0, 100);
     }
     void process();
   };
 
   class TinSimpNode:public Node {
     public:
-    float thres_error = 2;
-    float densify_interval = 2;
 
     using Node::Node;
     void init() {
@@ -94,28 +93,31 @@ namespace geoflow::nodes::cgal {
       add_output("selected_lines", TT_line_string_collection);
       // add_output("count", TT_vec1ui);
       // add_output("error", TT_vec1f);
+
+      add_param("thres_error", (float) 2);
+      add_param("densify_interval", (float) 2);
     }
-    void gui(){
-      if (ImGui::SliderFloat("Error threshold", &thres_error, 0, 100)) {
+    void gui() {
+      if (ImGui::SliderFloat("Error threshold", &param<float>("thres_error"), 0, 100)) {
         manager.run(*this);
       }
       if (input("geometries").connected_type == TT_line_string_collection) 
-        ImGui::SliderFloat("Line densify", &densify_interval, 0, 100);
+        ImGui::SliderFloat("Line densify", &param<float>("densify_interval"), 0, 100);
     }
     void process();
   };
 
   class SimplifyLine3DNode:public Node {
     public:
-    float area_threshold=0.1;
-
     using Node::Node;
     void init() {
       add_input("lines", TT_line_string_collection);
       add_output("lines", TT_line_string_collection);
+
+      add_param("area_threshold", (float) 0.1);
     }
-    void gui(){
-      if(ImGui::DragFloat("stop cost", &area_threshold,0.1)) {
+    void gui() {
+      if(ImGui::DragFloat("stop cost", &param<float>("area_threshold"),0.1)) {
         manager.run(*this);
       }
     }
@@ -124,15 +126,15 @@ namespace geoflow::nodes::cgal {
 
   class SimplifyLineNode:public Node {
     public:
-    float threshold_stop_cost=0.1;
-
-      using Node::Node;
+    using Node::Node;
     void init() {
       add_input("lines", TT_line_string_collection);
       add_output("lines", TT_line_string_collection);
+
+      add_param("threshold_stop_cost", (float) 0.1);
     }
-    void gui(){
-      if(ImGui::DragFloat("stop cost", &threshold_stop_cost,0.01)) {
+    void gui() {
+      if(ImGui::DragFloat("stop cost", &param<float>("threshold_stop_cost"),0.01)) {
         manager.run(*this);
       }
     }
@@ -141,16 +143,16 @@ namespace geoflow::nodes::cgal {
 
   class SimplifyLinesNode:public Node {
     public:
-    float threshold_stop_cost=0.1;
-
     using Node::Node;
     void init() {
       add_input("lines", TT_line_string_collection);
       add_input("lines2", TT_line_string_collection);
       add_output("lines", TT_line_string_collection);
+
+      add_param("threshold_stop_cost", (float) 0.1);
     }
-    void gui(){
-      if(ImGui::DragFloat("stop cost", &threshold_stop_cost,0.01)) {
+    void gui() {
+      if(ImGui::DragFloat("stop cost", &param<float>("threshold_stop_cost"),0.01)) {
         manager.run(*this);
       }
     }
@@ -159,36 +161,37 @@ namespace geoflow::nodes::cgal {
 
   class SimplifyFootprintNode:public Node {
     public:
-    float threshold_stop_cost=0.1;
-
     using Node::Node;
     void init() {
       add_input("polygons", TT_linear_ring_collection);
       add_output("polygons_simp", TT_linear_ring_collection);
+
+      add_param("threshold_stop_cost", (float) 0.1);
     }
-    void gui(){
-      if(ImGui::DragFloat("stop cost", &threshold_stop_cost,0.01)) {
+    void gui() {
+      if(ImGui::DragFloat("stop cost", &param<float>("threshold_stop_cost"),0.01)) {
         manager.run(*this);
       }
     }
     void process();
   };
 
-  class PLWriterNode:public Node {
+  class PLYWriterNode:public Node {
     public:
-    char filepath[256] = "/Users/ravi/out.ply";
     bool multiple_files = true;
-    bool write_binary = false;
 
     using Node::Node;
     void init() {
       add_input("points", TT_point_collection); //TT_point_collection_list
       add_input("labels", TT_vec1i);
+
+      add_param("filepath", (std::string) "out.ply");
+      add_param("write_binary", (bool) false);
     }
-    void gui(){
-      ImGui::InputText("File path", filepath, IM_ARRAYSIZE(filepath));
+    void gui() {
+      ImGui::InputText("File path", &param<std::string>("filepath"));
       // ImGui::Checkbox("Write multiple files in case of point cloud list", &multiple_files);
-      ImGui::Checkbox("Write binary output", &write_binary);
+      ImGui::Checkbox("Write binary output", &param<bool>("write_binary"));
     }
     void process();
   };
@@ -218,17 +221,17 @@ namespace geoflow::nodes::cgal {
 
   class LineHeightNode:public Node {
   public:
-    char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/C_31HZ1_clip.LAZ";
-    int thin_nth = 5;
-
     using Node::Node;
     void init() {
       add_input("lines", TT_line_string_collection);
       add_output("lines", TT_line_string_collection);
+
+      add_param("filepath", (std::string) "");
+      add_param("thin_nth", (int) 5);
     }
     void gui() {
-      ImGui::InputText("LAS file path", filepath, IM_ARRAYSIZE(filepath));
-      ImGui::SliderInt("Thin nth", &thin_nth, 0, 100);
+      ImGui::InputText("LAS file path", &param<std::string>("filepath"));
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 0, 100);
     }
     void process();
   };

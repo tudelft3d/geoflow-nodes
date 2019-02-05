@@ -10,14 +10,7 @@
 namespace po = boost::program_options;
 
 int main(int ac, const char * av[])
-{
-    //‎⁨ /Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg
-    //‎⁨ /Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las
-    // /Users/ravi/surfdrive/Data/step-edge-detector/C_31HZ1_clip.LAZ
-    // /Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las
-    // /Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_0.gpkg
-    // /Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bgt_singleparts.gpkg
-    // /Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las
+{   
     std::string footprints_file;
     std::string las_file;
     std::string decomposed_footprints_file = "out.shp";

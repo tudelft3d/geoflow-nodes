@@ -134,6 +134,11 @@ void ComparePointDistanceNode::process(){
   typedef CGAL::AABB_traits<K, Primitive> AABB_triangle_traits;
   typedef CGAL::AABB_tree<AABB_triangle_traits> Tree;
 
+  // params
+  auto las_filepath = param<std::string>("las_filepath").c_str();
+  auto log_filepath = param<std::string>("log_filepath").c_str();
+  auto thin_nth = param<int>("thin_nth");
+
   // Triangles 1
   auto trin1 = input("triangles1_vec3f").get<vec3f>();
   std::list<Triangle> triangles1;
@@ -218,6 +223,10 @@ void PointDistanceNode::process(){
   typedef CGAL::AABB_traits<K, Primitive> AABB_triangle_traits;
   typedef CGAL::AABB_tree<AABB_triangle_traits> Tree;
 
+  auto filepath = param<std::string>("filepath").c_str();
+  auto thin_nth = param<int>("thin_nth");
+  auto overwritez = param<bool>("overwritez");
+
   auto trin = input("triangles").get<TriangleCollection>();
   std::list<Triangle> triangles;
   for(auto& t : trin){
@@ -300,6 +309,8 @@ LineStringCollection densify_linestrings(LineStringCollection line_strings, floa
 void DensifyNode::process(){
   auto geom_term = input("geometries");
 
+  auto interval = param<float>("interval");
+
   if (geom_term.connected_type == TT_line_string_collection) {
     auto lines = geom_term.get<geoflow::LineStringCollection>();
     output("dense_linestrings").set(densify_linestrings(lines, interval));
@@ -325,6 +336,10 @@ void build_initial_tin(tinsimp::CDT& cdt, geoflow::Box& bbox){
 
 void TinSimpNode::process(){
   auto geom_term = input("geometries");
+
+  auto thres_error = param<float>("thres_error");
+  auto densify_interval = param<float>("densify_interval");
+
   tinsimp::CDT cdt;
 
   if (geom_term.connected_type == TT_point_collection) {
@@ -381,6 +396,8 @@ void SimplifyLine3DNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto lines = input("lines").get<LineStringCollection>();
 
+  auto area_threshold = param<float>("area_threshold");
+
   LineStringCollection simplified_lines;
   for (auto& line_string : lines) {
     simplified_lines.push_back( linesimp::visvalingam(line_string, area_threshold) );
@@ -392,6 +409,8 @@ void SimplifyLine3DNode::process(){
 void SimplifyLineNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto lines = input("lines").get<LineStringCollection>();
+
+  auto threshold_stop_cost = param<float>("threshold_stop_cost");
   
   namespace PS = CGAL::Polyline_simplification_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -436,6 +455,8 @@ void SimplifyLinesNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto lines = input("lines").get<LineStringCollection>();
   auto lines2 = input("lines2").get<LineStringCollection>();
+
+  auto threshold_stop_cost = param<float>("threshold_stop_cost");
 
   namespace PS = CGAL::Polyline_simplification_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -495,6 +516,8 @@ void SimplifyFootprintNode::process(){
 
   auto polygons = input("polygons").get<LinearRingCollection>();
 
+  auto threshold_stop_cost = param<float>("threshold_stop_cost");
+
   LinearRingCollection polygons_out;
   
   for (auto& polygon : polygons) {
@@ -531,7 +554,7 @@ void SimplifyFootprintNode::process(){
   output("polygons_simp").set(polygons_out);
 }
 
-void PLWriterNode::process() {
+void PLYWriterNode::process() {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
   typedef Kernel::Point_3 Point;
   typedef boost::tuple<Point, int> PL;
@@ -542,6 +565,9 @@ void PLWriterNode::process() {
 
   auto points = input("points").get<PointCollection>();
   auto labels = input("labels").get<vec1i>();
+
+  auto filepath = param<std::string>("filepath");
+  auto write_binary = param<bool>("write_binary");
   
   PL_vector pl_points;
   pl_points.resize(points.size());
@@ -713,6 +739,9 @@ void IsoLineSlicerNode::process() {
 
 void LineHeightNode::process() {
   auto lines = input("lines").get<LineStringCollection>();
+
+  auto filepath = param<std::string>("filepath").c_str();
+  auto thin_nth = param<int>("thin_nth");
 
   typedef CGAL::Simple_cartesian<float> K;
   typedef CGAL::Search_traits_3<K> TreeTraits;

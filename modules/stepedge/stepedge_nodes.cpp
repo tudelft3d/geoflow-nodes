@@ -33,6 +33,10 @@ vertex get_normal(vertex v0, vertex v1, vertex v2) {
 #include <CGAL/Alpha_shape_face_base_2.h>
 #include <CGAL/Projection_traits_xy_3.h>
 
+// interval skip list
+#include <CGAL/Interval_skip_list.h>
+#include <CGAL/Interval_skip_list_interval.h>
+
 namespace geoflow::nodes::stepedge {
 
 void AlphaShapeNode::process(){
@@ -699,6 +703,7 @@ void RegulariseLinesNode::process(){
     // cluster nearby lines using separation threshold
     double last_dist = std::get<2>(lines[sorted_by_dist[0]]);
     dist_clusters.resize(dist_clusters.size()+1);
+    dist_clusters.back().angle = angle;
     for(auto& i : sorted_by_dist) {
       auto& line = lines[i];
       double dist_diff = std::get<2>(line) - last_dist;
@@ -706,6 +711,7 @@ void RegulariseLinesNode::process(){
         dist_clusters.back().idx.push_back(i);
       } else {
         dist_clusters.resize(dist_clusters.size()+1);
+        dist_clusters.back().angle = angle;
         dist_clusters.back().idx.push_back(i);
       }
       last_dist = std::get<2>(line);
@@ -727,9 +733,10 @@ void RegulariseLinesNode::process(){
     // find average distance
     double sum=0;
     for(auto& i : cluster.idx) {
-      sum+=std::get<0>(lines[i]);
+      sum+=std::get<2>(lines[i]);
     }
-    cluster.angle = sum/cluster.idx.size();
+    cluster.distance = sum/cluster.idx.size();
+    
     //try to find a footprint line
     linetype best_line;
     double best_angle;
@@ -760,6 +767,7 @@ void RegulariseLinesNode::process(){
         }
       }
     }
+
     // compute vec orthogonal to lines in this cluster
     auto p0 = std::get<1>(best_line);
     auto halfdist = std::get<6>(best_line);
@@ -774,6 +782,22 @@ void RegulariseLinesNode::process(){
       {float(p_begin.x()), float(p_begin.y()), 0},
       {float(p_end.x()), float(p_end.y()), 0}
     });
+  }
+
+  typedef CGAL::Interval_skip_list_interval<double> Interval;
+  typedef CGAL::Interval_skip_list<Interval> Interval_skip_list;
+  for(auto& cluster : dist_clusters) {
+    Interval_skip_list isl;
+    std::vector<Interval> intervals;
+    for(auto& i : cluster.idx) {
+      edges[i];
+      // intervals[i] = Interval(i, i);
+    }
+    // sort and find extreme vertex along cluster reference line
+    // build interval skip list (?)
+    // merge non-footprint segments that have an overlap
+    // clip non footprint segments on overlapping footprint segments
+    // output all resulting segments as a LineCluster
   }
 
   output("edges_out").set(edges_out);

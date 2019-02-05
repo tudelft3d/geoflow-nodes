@@ -3,25 +3,14 @@ if (MSVC)
 endif()
 
 add_executable(hoogtelijnen hoogtelijnen.cpp)
-target_link_libraries( hoogtelijnen 
+target_link_libraries( hoogtelijnen
   geoflow-gui
-  gdal_nodes
-  las_nodes
-  cgal_nodes
-)
-set_target_properties(
-  hoogtelijnen
-  PROPERTIES CXX_STANDARD 17
-)
-add_executable(hoogtelijnen-cli hoogtelijnen-cli.cpp)
-target_link_libraries( hoogtelijnen-cli
-  geoflow-core
   Boost::program_options
   gdal_nodes
   cgal_nodes
 )
 set_target_properties(
-  hoogtelijnen-cli
+  hoogtelijnen
   PROPERTIES CXX_STANDARD 17
 )
 
