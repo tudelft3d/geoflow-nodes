@@ -39,7 +39,7 @@ namespace geoflow::nodes::gdal {
         add_input("geometries", {TT_line_string_collection, TT_linear_ring_collection});
         add_input("attributes", TT_attribute_map_f);
         
-        add_param("filepath", (std::string) "");
+        add_param("filepath", (std::string) "out");
     }
     void gui() {
       ImGui::InputText("File path", &param<std::string>("filepath"));
@@ -55,7 +55,7 @@ namespace geoflow::nodes::gdal {
     void init() {
         add_input("geometries", {TT_line_string_collection, TT_linear_ring_collection});
 
-        add_param("filepath", (std::string) "");
+        add_param("filepath", (std::string) "out");
     }
 
     void gui() {
@@ -87,7 +87,7 @@ namespace geoflow::nodes::gdal {
       add_input("points", TT_point_collection);
       add_input("distances", TT_vec1f);
 
-      add_param("filepath", (std::string) "");
+      add_param("filepath", (std::string) "out.csv");
     }
     void gui(){
       ImGui::InputText("CSV file path", &param<std::string>("filepath"));

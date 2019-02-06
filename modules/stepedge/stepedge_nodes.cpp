@@ -187,6 +187,8 @@ void Arr2LinearRingsNode::process(){
       }
       linear_rings.push_back(polygon3d);
       attributes["height"].push_back(face->data().elevation_avg);
+      attributes["rms_error"].push_back(face->data().rms_error_to_avg);
+      attributes["point_count"].push_back(float(face->data().total_coun)t);
     }
   }
   output("linear_rings").set(linear_rings);

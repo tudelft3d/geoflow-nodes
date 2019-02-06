@@ -109,9 +109,9 @@ struct FaceInfo {
   float elevation_min, elevation_max;
   size_t segid=0;
   float segid_coverage;
-  size_t segid_count;
+  float segid_count;
   PNL_vector points;
-  float rms_error_to_avg=-1;
+  float rms_error_to_avg=0;
   size_t total_count;
 };
 struct EdgeInfo {
@@ -162,6 +162,32 @@ public:
     else
       new_face->data().is_finite = false;
     n_faces++;
+  }
+};
+class Face_merge_observer : public CGAL::Arr_observer<Arrangement_2>
+{ 
+  public:
+  Face_merge_observer (Arrangement_2& arr) :
+    CGAL::Arr_observer<Arrangement_2> (arr) {};
+
+  virtual void before_merge_face (Face_handle remaining_face,
+                                 Face_handle discarded_face, Halfedge_handle e )
+  {
+    auto count1 = remaining_face->data().segid_count;
+    auto count2 = discarded_face->data().segid_count;
+    auto sum_count = count1+count2;
+    auto new_elevation = remaining_face->data().elevation_avg * (count1/sum_count) + discarded_face->data().elevation_avg * (count2/sum_count);
+    remaining_face->data().elevation_avg = new_elevation;
+    // and sum the counts
+    remaining_face->data().segid_count = sum_count;
+    remaining_face->data().elevation_min = std::min(remaining_face->data().elevation_min, discarded_face->data().elevation_min);
+    remaining_face->data().elevation_max = std::max(remaining_face->data().elevation_max, discarded_face->data().elevation_max);
+    // merge the point lists
+    if (remaining_face==discarded_face){
+      std::cout << "merging the same face!?\n";
+      return;
+    }
+    remaining_face->data().points.insert(remaining_face->data().points.end(), discarded_face->data().points.begin(), discarded_face->data().points.end() );
   }
 };
 
