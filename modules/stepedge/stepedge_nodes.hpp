@@ -60,6 +60,7 @@ namespace geoflow::nodes::stepedge {
     void init() {
       add_input("arrangement", TT_any);
       add_output("cell_id_vec1i", TT_vec1i);
+      add_output("rms_errors", TT_vec1f);
       add_output("triangles", TT_triangle_collection);
       add_output("normals_vec3f", TT_vec3f);
       add_output("labels_vec1i", TT_vec1i); // 0==ground, 1==roof, 2==outerwall, 3==innerwall
@@ -191,17 +192,19 @@ namespace geoflow::nodes::stepedge {
     public:
     int footprint_id=0;
     // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
-    char las_filepath[256] = "";
+    // char las_filepath[256] = "";
     using Node::Node;
     void init() {
       add_input("polygons", TT_linear_ring_collection);
       add_output("point_clouds", TT_point_collection_list);
       add_output("points", TT_point_collection);
       add_output("footprint", TT_linear_ring);
+
+      add_param("las_filepath", (std::string) "");
     }
 
     void gui() {
-      ImGui::InputText("LAS file path", las_filepath, IM_ARRAYSIZE(las_filepath));
+      ImGui::InputText("LAS file path", &param<std::string>("las_filepath"));
       if (ImGui::SliderInt("#", &footprint_id, 0, polygons.size()-1)) {
         // if(run_on_change) {
         //   manager.run(*this);
@@ -222,14 +225,14 @@ namespace geoflow::nodes::stepedge {
     //                source_id, target_id, is_footprint
     typedef std::tuple<size_t, size_t, bool> SegmentTuple; 
     Vector_2 ref_vec; // direction of reference line for this cluster (exact_exact arrangent traits)
-    Point_2 ref_point; // extreme point on reference line (ie most left or most right point)
+    Point_2 ref_point; // reference point on reference line
     vec1f vertices; // stored as distances from ref_point in direction of ref_vec
     std::vector<SegmentTuple> segments;
   };
 
   struct ValueCluster {
-    double angle;
-    double distance;
+    Vector_2 ref_vec;
+    Vector_2 ref_point;
     std::vector<size_t> idx;
   };
 
@@ -244,10 +247,11 @@ namespace geoflow::nodes::stepedge {
       add_input("edge_segments", TT_line_string_collection);
       add_input("footprint", TT_linear_ring);
       add_output("edges_out", TT_line_string_collection);
+      add_output("merged_edges_out", TT_line_string_collection);
       add_output("cluster_labels", TT_vec1i);
-      add_output("footprint_labels", TT_vec1i);
-      add_output("line_clusters", TT_any); // ie a LineCluster
-      add_output("tmp_vec3f", TT_vec3f);
+      // add_output("footprint_labels", TT_vec1i);
+      // add_output("line_clusters", TT_any); // ie a LineCluster
+      // add_output("tmp_vec3f", TT_vec3f);
     }
 
     void gui(){

@@ -109,7 +109,10 @@ struct FaceInfo {
   float elevation_min, elevation_max;
   size_t segid=0;
   float segid_coverage;
-  float segid_count;
+  size_t segid_count;
+  PNL_vector points;
+  float rms_error_to_avg=-1;
+  size_t total_count;
 };
 struct EdgeInfo {
   bool is_touched=false;

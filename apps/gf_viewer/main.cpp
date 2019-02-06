@@ -41,11 +41,16 @@ int main(int ac, const char * av[])
     connect(LASInPolygons, RegulariseLines, "footprint", "footprint");
     connect(ComputeMetrics, AlphaShape, "points", "points");
     connect(ComputeMetrics, ProcessArrangement, "points", "points");
-    connect(AlphaShape, DetectLines, "alpha_rings", "edge_points");
+    connect(AlphaShape, DetectLines, "edge_points", "edge_points");
     connect(DetectLines, RegulariseLines, "edge_segments", "edge_segments");
     connect(RegulariseLines, BuildArrangement, "edges_out", "edge_segments");
     connect(BuildArrangement, ProcessArrangement, "arrangement", "arrangement");
     connect(ProcessArrangement, Extruder, "arrangement", "arrangement");
+
+    LASInPolygons->set_param(
+        "las_filepath", (std::string)"/Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las");
+    OGRLoader->set_param(
+        "filepath", (std::string) "/Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_0.gpkg");
 
     // launch the GUI
     launch_flowchart(N, {stepedge, cgal, gdal, las, mat});
