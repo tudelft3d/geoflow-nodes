@@ -916,21 +916,21 @@ void LOD13GeneratorNode::process(){
     BuildArrangement_node->input("footprint").set(polygon);
     RegulariseLines_node->input("footprint").set(polygon);
 
-    connect(*ComputeMetrics_node, *AlphaShape_node, "points", "points");
-    connect(*ComputeMetrics_node, *ProcessArrangement_node, "points", "points");
-    connect(*AlphaShape_node, *DetectLines_node, "alpha_rings", "edge_points");
-    connect(*DetectLines_node, *RegulariseLines_node, "edge_segments", "edge_segments");
-    connect(*RegulariseLines_node, *BuildArrangement_node, "edges_out", "edge_segments");
-    connect(*BuildArrangement_node, *ProcessArrangement_node, "arrangement", "arrangement");
-    connect(*ProcessArrangement_node, *Arr2LinearRings_node, "arrangement", "arrangement");
+    connect(ComputeMetrics_node, AlphaShape_node, "points", "points");
+    connect(ComputeMetrics_node, ProcessArrangement_node, "points", "points");
+    connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
+    connect(DetectLines_node, RegulariseLines_node, "edge_segments", "edge_segments");
+    connect(RegulariseLines_node, BuildArrangement_node, "edges_out", "edge_segments");
+    connect(BuildArrangement_node, ProcessArrangement_node, "arrangement", "arrangement");
+    connect(ProcessArrangement_node, Arr2LinearRings_node, "arrangement", "arrangement");
 
     // config and run
     // this should copy all parameters from this LOD13Generator node to the ProcessArrangement node
     ProcessArrangement_node->set_params( dump_params() );
     
-    N.run(*ComputeMetrics_node);
+    N.run(ComputeMetrics_node);
 
-    auto cells = Arr2LinearRings_node->output("linear_rings").get<LinearRingCollection>();
+    auto cells = Arr2LinearRings_node->("linear_rings").get<LinearRingCollection>();
     auto attributes = Arr2LinearRings_node->output("attributes").get<AttributeMap>();
 
     for (int i=0; i<cells.size(); i++) {

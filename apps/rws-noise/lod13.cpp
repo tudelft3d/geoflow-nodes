@@ -3,6 +3,7 @@
 
 #include <stepedge_register.hpp>
 #include <gdal_register.hpp>
+#include <cgal_register.hpp>
 #include <geoflow/gui/flowchart.hpp>
 
 #include <boost/program_options.hpp>
@@ -44,6 +45,7 @@ int main(int ac, const char * av[])
     geoflow::NodeManager N;
     auto stepedge = gfn::stepedge::create_register();
     auto gdal = gfn::gdal::create_register();
+    auto cgal = gfn::cgal::create_register();
 
     auto ogr_loader = N.create_node(gdal, "OGRLoader", {75,75});
     auto las_in_poly = N.create_node(stepedge, "LASInPolygons", {300,75});
@@ -63,7 +65,7 @@ int main(int ac, const char * av[])
     lod13generator->set_param("step_height_threshold", step_threshold);
     
     if (gui)
-        geoflow::launch_flowchart(N, {stepedge, gdal});
+        geoflow::launch_flowchart(N, {stepedge, gdal, cgal});
     else
         N.run(*ogr_loader);
 
