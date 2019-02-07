@@ -918,7 +918,7 @@ void LOD13GeneratorNode::process(){
 
     connect(ComputeMetrics_node, AlphaShape_node, "points", "points");
     connect(ComputeMetrics_node, ProcessArrangement_node, "points", "points");
-    connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
+    connect(AlphaShape_node, DetectLines_node, "edge_points", "edge_points");
     connect(DetectLines_node, RegulariseLines_node, "edge_segments", "edge_segments");
     connect(RegulariseLines_node, BuildArrangement_node, "edges_out", "edge_segments");
     connect(BuildArrangement_node, ProcessArrangement_node, "arrangement", "arrangement");
@@ -930,13 +930,18 @@ void LOD13GeneratorNode::process(){
     
     N.run(ComputeMetrics_node);
 
-    auto cells = Arr2LinearRings_node->("linear_rings").get<LinearRingCollection>();
+    // note: the following will crash if the flowchart specified above is stopped halfway for some reason
+    auto cells = Arr2LinearRings_node->output("linear_rings").get<LinearRingCollection>();
     auto attributes = Arr2LinearRings_node->output("attributes").get<AttributeMap>();
 
     for (int i=0; i<cells.size(); i++) {
       // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
         all_cells.push_back(cells[i]);
         all_attributes["height"].push_back(attributes["height"][i]);
+        all_attributes["rms_error"].push_back(attributes["rms_error"][i]);
+        all_attributes["max_error"].push_back(attributes["max_error"][i]);
+        all_attributes["count"].push_back(attributes["count"][i]);
+        all_attributes["coverage"].push_back(attributes["coverage"][i]);
       // }
     }
   }

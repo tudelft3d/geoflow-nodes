@@ -19,8 +19,8 @@ namespace gfn = geoflow::nodes;
 
 int main(int ac, const char * av[])
 {   
-    std::string footprints_file;
-    std::string las_file;
+    std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg");
+    std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las");
     std::string decomposed_footprints_file = "out.shp";
     float step_threshold = 1.0;
     bool gui = false;
@@ -48,6 +48,7 @@ int main(int ac, const char * av[])
     auto cgal = gfn::cgal::create_register();
 
     auto ogr_loader = N.create_node(gdal, "OGRLoader", {75,75});
+    auto footprint_simp = N.create_node(cgal, "SimplifyFootprint", {75,175});
     auto las_in_poly = N.create_node(stepedge, "LASInPolygons", {300,75});
     auto lod13generator = N.create_node(stepedge, "LOD13Generator", {650,75});
     auto ogr_writer = N.create_node(gdal, "OGRWriter", {1000,75});
@@ -55,8 +56,9 @@ int main(int ac, const char * av[])
     ogr_loader->set_param("filepath", footprints_file);
     las_in_poly->set_param("las_filepath", las_file);
 
-    geoflow::connect(ogr_loader->output("linear_rings"), las_in_poly->input("polygons"));
-    geoflow::connect(ogr_loader->output("linear_rings"), lod13generator->input("polygons"));
+    geoflow::connect(ogr_loader->output("linear_rings"), footprint_simp->input("polygons"));
+    geoflow::connect(footprint_simp->output("polygons_simp"), las_in_poly->input("polygons"));
+    geoflow::connect(footprint_simp->output("polygons_simp"), lod13generator->input("polygons"));
     geoflow::connect(las_in_poly->output("point_clouds"), lod13generator->input("point_clouds"));
     geoflow::connect(lod13generator->output("decomposed_footprints"), ogr_writer->input("geometries"));
     geoflow::connect(lod13generator->output("attributes"), ogr_writer->input("attributes"));
