@@ -40,7 +40,7 @@ int main(int ac, const char * av[])
     auto tin_creator_lines = std::make_shared<CDTNode>(N);
     auto height_difference_calc = std::make_shared<PointDistanceNode>(N);
     auto tin_creator_difference = std::make_shared<CDTNode>(N);
-    auto iso_lines = std::make_shared<IsoLineSlicerNode>(N);
+    auto iso_lines = std::make_shared<IsoLineNode>(N);
     auto add_height_to_lines = std::make_shared<LineHeightNode>(N);
     auto tin_simp_lines = std::make_shared<TinSimpNode>(N);
     auto tin_simp_iso = std::make_shared<TinSimpNode>(N);
@@ -52,6 +52,7 @@ int main(int ac, const char * av[])
     std::strcpy(add_height_to_lines->filepath, las_file.c_str());
     std::strcpy(ogr_writer->filepath, lines_file_out.c_str());
     
+    tin_creator_lines->create_triangles = true;
     height_difference_calc->thin_nth = 10;
     height_difference_calc->overwritez = true;
     add_height_to_lines->thin_nth = 10;

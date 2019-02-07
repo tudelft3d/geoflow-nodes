@@ -5,6 +5,8 @@ using namespace geoflow;
 
 class CDTNode:public Node {
   public:
+  bool create_triangles = false;
+  
   CDTNode(NodeManager& manager):Node(manager) {
     add_input("geometries", { TT_point_collection, TT_line_string_collection });
     add_output("cgal_cdt", TT_any);

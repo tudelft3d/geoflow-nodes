@@ -85,18 +85,20 @@ void CDTNode::process(){
   std::cout << "Completed CDT with " << cdt.number_of_faces() << " triangles...\n";
   // assert(cdt.is_valid());
   TriangleCollection triangles;
-  for (CDT::Finite_faces_iterator fit = cdt.finite_faces_begin();
-    fit != cdt.finite_faces_end();
-    ++fit)
-  {
-    auto& p0 = fit->vertex(0)->point();
-    auto& p1 = fit->vertex(1)->point();
-    auto& p2 = fit->vertex(2)->point();
-    triangles.push_back({
-      to_arr3f<Point>(p0),
-      to_arr3f<Point>(p1),
-      to_arr3f<Point>(p2)
-    });
+  if (create_triangles) {
+    for (CDT::Finite_faces_iterator fit = cdt.finite_faces_begin();
+      fit != cdt.finite_faces_end();
+      ++fit) {
+      auto& p0 = fit->vertex(0)->point();
+      auto& p1 = fit->vertex(1)->point();
+      auto& p2 = fit->vertex(2)->point();
+      triangles.push_back({
+        to_arr3f<Point>(p0),
+        to_arr3f<Point>(p1),
+        to_arr3f<Point>(p2)
+        });
+    }
+    cdt.clear();
   }
 
   outputs("cgal_cdt").set(cdt);
@@ -374,7 +376,6 @@ void TinSimpNode::process(){
 
   outputs("triangles").set(triangles);
   outputs("normals").set(normals);
-
 }
 
 void SimplifyLine3DNode::process(){
@@ -460,8 +461,8 @@ void SimplifyLinesNode::process() {
   typedef PS::Stop_above_cost_threshold                   Stop_cost;
   typedef PS::Visvalingam_cost                            Cost;
 
-  Cost cost;
   CT ct;
+  Stop_cost stop = Stop_cost(threshold_stop_cost * threshold_stop_cost);
 
   size_t s_index = 0;
   for (auto& linestring : lines) {
@@ -479,13 +480,13 @@ void SimplifyLinesNode::process() {
     ct.insert_constraint(line.begin(), line.end());
   }
 
-  size_t n_removed = PS::simplify(ct, cost, Stop_cost(threshold_stop_cost * threshold_stop_cost));
+  PS::simplify(ct, Cost(), stop);
   LineStringCollection lines_out;
 
   for (auto cit = ct.constraints_begin(); cit != ct.constraints_end(); ++cit) {
     vec3f ls;
-    for (auto vit = ct.points_in_constraint_begin(*cit); vit != ct.points_in_constraint_end(*cit); ++vit) {
-      ls.push_back({ float(vit->x()), float(vit->y()), float(vit->z()) });
+    for (auto vit = ct.vertices_in_constraint_begin(*cit); vit != ct.vertices_in_constraint_end(*cit); ++vit) {
+      ls.push_back({ float((*vit)->point().x()), float((*vit)->point().y()), float((*vit)->point().z()) });
     }
     lines_out.push_back(ls);
   }
@@ -556,27 +557,28 @@ void SimplifyFootprintCDTNode::process(){
   typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
   typedef CT::Point                                       Point;
   typedef CT::Constraint_iterator                         Cit;
-  typedef CT::Points_in_constraint_iterator               Picit;
   typedef PS::Stop_above_cost_threshold                   Stop_cost;
   typedef PS::Squared_distance_cost                       Cost;
 
   CT ct;
+  Stop_cost stop = Stop_cost(threshold_stop_cost * threshold_stop_cost);
 
   for (auto& linearring : polygons) {
-    Polygon_2 polygon;    
+    Polygon_2 polygon;
     for (auto& p : linearring) {
-      polygon.push_back(Point(p[0]+(*manager.data_offset)[0], p[1]+ (*manager.data_offset)[1]));
+      polygon.push_back(Point(p[0], p[1]));
     }
+    // keep constraint id to link results back to input
     ct.insert_constraint(polygon);
   }
 
-  PS::simplify(ct, Cost(), Stop_cost(threshold_stop_cost * threshold_stop_cost));
+  PS::simplify(ct, Cost(), stop);
   LinearRingCollection polygons_out;
 
   for (Cit cit = ct.constraints_begin(); cit != ct.constraints_end(); ++cit) {
     vec3f ls;
-    for (Picit vit = ct.points_in_constraint_begin(*cit); vit != ct.points_in_constraint_end(*cit); ++vit) {
-      ls.push_back({ float(vit->x()-(*manager.data_offset)[0]), float(vit->y()-(*manager.data_offset)[1]) });
+    for (auto vit = ct.vertices_in_constraint_begin(*cit); vit != ct.vertices_in_constraint_end(*cit); ++vit) {
+      ls.push_back({ float((*vit)->point().x()), float((*vit)->point().y()) });
     }
     polygons_out.push_back(ls);
   }
@@ -623,7 +625,7 @@ void IsoLineNode::process() {
   //auto heights = inputs("heights").get<vec1f>();
 
   vec1f heights;
-  for (int i = 1; i < 10; i++) {
+  for (int i = 1; i < 20; i++) {
     heights.push_back(i);
   }
 
