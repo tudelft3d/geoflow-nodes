@@ -32,22 +32,10 @@ target_link_libraries( lod13
   geoflow-gui
   stepedge_nodes
   gdal_nodes
-  las_nodes
+  Boost::program_options
+  LASlib
 )
 set_target_properties(
   lod13
-  PROPERTIES CXX_STANDARD 17
-)
-
-add_executable(lod13-cli lod13-cli.cpp)
-target_link_libraries( lod13-cli 
-  geoflow-core
-  Boost::program_options
-  stepedge_nodes
-  gdal_nodes
-  las_nodes
-)
-set_target_properties(
-  lod13-cli
   PROPERTIES CXX_STANDARD 17
 )

@@ -112,7 +112,8 @@ struct FaceInfo {
   float segid_count;
   PNL_vector points;
   float rms_error_to_avg=0;
-  size_t total_count;
+  float max_error=0;
+  float total_count;
 };
 struct EdgeInfo {
   bool is_touched=false;

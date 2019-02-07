@@ -543,8 +543,9 @@ void process_arrangement(PNL_vector& points, Arrangement_2& arr, config c) {
         auto z = face->data().elevation_avg;
         double square_sum = 0;
         for (auto& p : face->data().points) {
-          auto d = z - boost::get<0>(p).z();
+          float d = z - boost::get<0>(p).z();
           square_sum += d*d;
+          face->data().max_error = std::max(face->data().max_error, std::abs(d));
         }
         face->data().rms_error_to_avg = CGAL::sqrt(square_sum/cnt);
       }

@@ -55,6 +55,8 @@ void AlphaShapeNode::process(){
   typedef Alpha_shape_2::Edge_circulator                     Edge_circulator;
 
   auto points = input("points").get<PNL_vector>();
+  auto thres_alpha = param<float>("thres_alpha");
+  auto extract_alpha_rings = param<bool>("extract_alpha_rings");
   
   // collect plane points
   std::unordered_map<int, std::vector<Point>> points_per_segment;
@@ -188,7 +190,9 @@ void Arr2LinearRingsNode::process(){
       linear_rings.push_back(polygon3d);
       attributes["height"].push_back(face->data().elevation_avg);
       attributes["rms_error"].push_back(face->data().rms_error_to_avg);
-      attributes["point_count"].push_back(float(face->data().total_coun)t);
+      attributes["max_error"].push_back(face->data().max_error);
+      attributes["coverage"].push_back(face->data().segid_coverage);
+      attributes["count"].push_back(face->data().total_count);
     }
   }
   output("linear_rings").set(linear_rings);
@@ -206,16 +210,18 @@ void ExtruderNode::process(){
   vec3f normals;
   vec1i cell_id_vec1i;
   vec1i labels;
-  vec1f rms_errors;
+  vec1f rms_errors, max_errors, segment_coverages;
   using N = uint32_t;
 
   
   size_t cell_id=0;
-  float rms_error;
+  float rms_error, max_error, segment_coverage;
   for (auto face: arr.face_handles()){
     if(face->data().is_finite) {
       cell_id++;
       rms_error = face->data().rms_error_to_avg;
+      max_error = face->data().max_error;
+      segment_coverage = face->data().segid_coverage;
       vec2f polygon, vertices;
       arrangementface_to_polygon(face, polygon);
       std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
@@ -231,6 +237,8 @@ void ExtruderNode::process(){
           normals.push_back({0,0,-1});
           cell_id_vec1i.push_back(cell_id);
           rms_errors.push_back(rms_error);
+          max_errors.push_back(max_error);
+          segment_coverages.push_back(segment_coverage);
         }
         triangles.push_back(triangle);
       }
@@ -244,6 +252,9 @@ void ExtruderNode::process(){
             normals.push_back({0,0,1});
             cell_id_vec1i.push_back(cell_id);
             rms_errors.push_back(rms_error);
+            rms_errors.push_back(rms_error);
+            max_errors.push_back(max_error);
+            segment_coverages.push_back(segment_coverage);
           }
           triangles.push_back(triangle);
         }
@@ -308,6 +319,12 @@ void ExtruderNode::process(){
         rms_errors.push_back(-1);
         rms_errors.push_back(-1);
         rms_errors.push_back(-1);
+        max_errors.push_back(-1);
+        max_errors.push_back(-1);
+        max_errors.push_back(-1);
+        segment_coverages.push_back(-1);
+        segment_coverages.push_back(-1);
+        segment_coverages.push_back(-1);
 
         // 2nd triangle
         triangles.push_back({u1,u2,l2});
@@ -328,6 +345,12 @@ void ExtruderNode::process(){
         rms_errors.push_back(-1);
         rms_errors.push_back(-1);
         rms_errors.push_back(-1);
+        max_errors.push_back(-1);
+        max_errors.push_back(-1);
+        max_errors.push_back(-1);
+        segment_coverages.push_back(-1);
+        segment_coverages.push_back(-1);
+        segment_coverages.push_back(-1);
       }
     }
   }
@@ -335,6 +358,8 @@ void ExtruderNode::process(){
   output("normals_vec3f").set(normals);
   output("cell_id_vec1i").set(cell_id_vec1i);
   output("rms_errors").set(rms_errors);
+  output("max_errors").set(max_errors);
+  output("segment_coverages").set(segment_coverages);
   output("triangles").set(triangles);
   output("labels_vec1i").set(labels);
 }
@@ -343,6 +368,15 @@ void ProcessArrangementNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto points = input("points").get<PNL_vector>();
   auto arr = input("arrangement").get<Arrangement_2>();
+
+  config c;
+  c.step_height_threshold = param<float>("step_height_threshold");
+  c.zrange_threshold = param<float>("zrange_threshold");
+  c.merge_segid = param<bool>("merge_segid");
+  c.merge_zrange = param<bool>("merge_zrange");
+  c.merge_step_height = param<bool>("merge_step_height");
+  c.merge_unsegmented = param<bool>("merge_unsegmented");
+  c.merge_dangling_egdes = param<bool>("merge_dangling_egdes");
 
   process_arrangement(points, arr, c);
   
@@ -468,6 +502,13 @@ void DetectLinesNode::process(){
 void ClassifyEdgePointsNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto points = input("points").get<PNL_vector>();
+
+  config c;
+  c.classify_jump_count_min = param<int>("classify_jump_count_min");
+  c.classify_jump_count_max = param<int>("classify_jump_count_max");
+  c.classify_line_dist = param<float>("classify_line_dist");
+  c.classify_jump_ele = param<float>("classify_jump_ele");
+
   std::vector<linedect::Point> edge_points;
   classify_edgepoints(edge_points, points, c);
   output("edge_points").set(edge_points);
@@ -487,6 +528,17 @@ void ClassifyEdgePointsNode::process(){
 void ComputeMetricsNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto points = input("points").get<PointCollection>();
+
+  config c;
+  c.metrics_normal_k = param<int>("metrics_normal_k");
+  c.metrics_plane_min_points = param<int>("metrics_plane_min_points");
+  c.metrics_plane_epsilon = param<float>("metrics_plane_epsilon");
+  c.metrics_plane_normal_threshold = param<float>("metrics_plane_normal_threshold");
+  c.metrics_is_wall_threshold = param<float>("metrics_is_wall_threshold");
+  c.metrics_is_horizontal_threshold = param<float>("metrics_is_horizontal_threshold");
+  c.metrics_k_linefit = param<int>("metrics_k_linefit");
+  c.metrics_k_jumpcnt_elediff = param<int>("metrics_k_jumpcnt_elediff");
+
   PNL_vector pnl_points;
   for (auto& p : points) {
     PNL pv;
@@ -602,6 +654,10 @@ void RegulariseLinesNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto edges = input("edge_segments").get<LineStringCollection>();
   auto footprint = input("footprint").get<LinearRing>();
+
+  auto dist_threshold = param<float>("dist_threshold");
+  auto angle_threshold = param<float>("angle_threshold");
+
   typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_2 Point_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_3 Point_3;
   typedef std::array<float,2> arr3f;
@@ -869,14 +925,8 @@ void LOD13GeneratorNode::process(){
     connect(*ProcessArrangement_node, *Arr2LinearRings_node, "arrangement", "arrangement");
 
     // config and run
-    auto panode = dynamic_cast<ProcessArrangementNode&>(*ProcessArrangement_node);
-    panode.c.step_height_threshold = step_height_threshold;
-    panode.c.zrange_threshold = zrange_threshold;
-    panode.c.merge_segid = merge_segid;
-    panode.c.merge_zrange = merge_zrange;
-    panode.c.merge_step_height = merge_step_height;
-    panode.c.merge_unsegmented = merge_unsegmented;
-    panode.c.merge_dangling_egdes = merge_dangling_egdes;
+    // this should copy all parameters from this LOD13Generator node to the ProcessArrangement node
+    ProcessArrangement_node->set_params( dump_params() );
     
     N.run(*ComputeMetrics_node);
 

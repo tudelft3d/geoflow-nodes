@@ -8,8 +8,6 @@ namespace geoflow::nodes::stepedge {
 
   class AlphaShapeNode:public Node {
     public:
-    float thres_alpha = 0.7;
-    bool extract_alpha_rings = false;
     using Node::Node;
     void init() {
       // add_input("points", TT_any);
@@ -17,11 +15,14 @@ namespace geoflow::nodes::stepedge {
       add_output("alpha_rings", TT_linear_ring_collection);
       add_output("edge_points", TT_point_collection);
       add_output("alpha_edges", TT_line_string_collection);
+
+      add_param("thres_alpha", (float) 0.7);
+      add_param("extract_alpha_rings", (bool) false);
     }
 
     void gui(){
-      ImGui::InputFloat("Alpha", &thres_alpha, 0.01, 1);
-      ImGui::Checkbox("extract_alpha_rings", &extract_alpha_rings);
+      ImGui::InputFloat("Alpha", &param<float>("thres_alpha"), 0.01, 1);
+      ImGui::Checkbox("extract_alpha_rings", &param<bool>("extract_alpha_rings"));
     }
     void process();
   };
@@ -61,6 +62,8 @@ namespace geoflow::nodes::stepedge {
       add_input("arrangement", TT_any);
       add_output("cell_id_vec1i", TT_vec1i);
       add_output("rms_errors", TT_vec1f);
+      add_output("max_errors", TT_vec1f);
+      add_output("segment_coverages", TT_vec1f);
       add_output("triangles", TT_triangle_collection);
       add_output("normals_vec3f", TT_vec3f);
       add_output("labels_vec1i", TT_vec1i); // 0==ground, 1==roof, 2==outerwall, 3==innerwall
@@ -75,22 +78,28 @@ namespace geoflow::nodes::stepedge {
 
   class ProcessArrangementNode:public Node {
     public:
-    config c;
     using Node::Node;
     void init() {
       add_input("arrangement", TT_any);
       add_input("points", TT_any);
       add_output("arrangement", TT_any);
+      add_param("step_height_threshold", (float) 1.0);
+      add_param("zrange_threshold", (float) 0.2);
+      add_param("merge_segid", (bool) true);
+      add_param("merge_zrange", (bool) false);
+      add_param("merge_step_height", (bool) false);
+      add_param("merge_unsegmented", (bool) false);
+      add_param("merge_dangling_egdes", (bool) false);
     }
 
     void gui() {
-      ImGui::DragFloat("Min step height", &c.step_height_threshold, 0.1);
-      ImGui::DragFloat("zrange_threshold", &c.zrange_threshold, 0.1);
-      ImGui::Checkbox("merge_segid", &c.merge_segid);
-      ImGui::Checkbox("merge_zrange", &c.merge_zrange);
-      ImGui::Checkbox("merge_step_height", &c.merge_step_height);
-      ImGui::Checkbox("merge_unsegmented", &c.merge_unsegmented);
-      ImGui::Checkbox("merge_dangling_egdes", &c.merge_dangling_egdes);
+      ImGui::DragFloat("Min step height", &param<float>("step_height_threshold"), 0.1);
+      ImGui::DragFloat("zrange_threshold", &param<float>("zrange_threshold"), 0.1);
+      ImGui::Checkbox("merge_segid", &param<bool>("merge_segid"));
+      ImGui::Checkbox("merge_zrange", &param<bool>("merge_zrange"));
+      ImGui::Checkbox("merge_step_height", &param<bool>("merge_step_height"));
+      ImGui::Checkbox("merge_unsegmented", &param<bool>("merge_unsegmented"));
+      ImGui::Checkbox("merge_dangling_egdes", &param<bool>("merge_dangling_egdes"));
     }
     void process();
   };
@@ -135,29 +144,30 @@ namespace geoflow::nodes::stepedge {
   };
 
   class ClassifyEdgePointsNode:public Node {
-    config c;
-
     public:
     using Node::Node;
     void init() {
       add_output("edge_points", TT_any);
       add_output("edge_points_vec3f", TT_vec3f);
       add_input("points", TT_any);
+
+      add_param("classify_jump_count_min", (int) 1);
+      add_param("classify_jump_count_max", (int) 5);
+      add_param("classify_line_dist", (float) 0.005);
+      add_param("classify_jump_ele", (float) 1.0);
     }
 
     void gui(){
-      ImGui::InputInt("Jump cnt min", &c.classify_jump_count_min);
-      ImGui::InputInt("Jump cnt max", &c.classify_jump_count_max);
-      ImGui::InputFloat("Line dist", &c.classify_line_dist, 0.01, 1);
-      ImGui::InputFloat("Elevation jump", &c.classify_jump_ele, 0.01, 1);
+      ImGui::InputInt("Jump cnt min", &param<int>("classify_jump_count_min"));
+      ImGui::InputInt("Jump cnt max", &param<int>("classify_jump_count_max"));
+      ImGui::InputFloat("Line dist", &param<float>("classify_line_dist"), 0.01, 1);
+      ImGui::InputFloat("Elevation jump", &param<float>("classify_jump_ele"), 0.01, 1);
     }
 
     void process();
   };
 
   class ComputeMetricsNode:public Node {
-    config c;
-
     public:
     using Node::Node;
     void init() {
@@ -170,16 +180,26 @@ namespace geoflow::nodes::stepedge {
       add_output("jump_count", TT_vec1f);
       add_output("jump_ele", TT_vec1f);
       add_output("points_c", TT_point_collection);
+
+      add_param("metrics_normal_k", (int) 10);
+      add_param("metrics_plane_min_points", (int) 25);
+      add_param("metrics_plane_epsilon", (float) 0.2);
+      add_param("metrics_plane_normal_threshold", (float) 0.75);
+      add_param("metrics_is_horizontal_threshold", (float) 0.9);
+      add_param("metrics_is_wall_threshold", (float) 0.3);
+      add_param("metrics_k_linefit", (int) 15);
+      add_param("metrics_k_jumpcnt_elediff", (int) 10);
     }
 
     void gui(){
-      ImGui::InputInt("K estimate normal ", &c.metrics_normal_k);
-      ImGui::InputInt("Plane min points", &c.metrics_plane_min_points);
-      ImGui::InputFloat("Plane epsilon", &c.metrics_plane_epsilon, 0.01, 1);
-      ImGui::InputFloat("Plane normal thres", &c.metrics_plane_normal_threshold, 0.01, 1);
-      ImGui::InputFloat("Wall angle thres", &c.metrics_is_wall_threshold, 0.01, 1);
-      ImGui::InputInt("K linefit", &c.metrics_k_linefit);
-      ImGui::InputInt("K jumpedge", &c.metrics_k_jumpcnt_elediff);
+      ImGui::InputInt("K estimate normal ", &param<int>("metrics_normal_k"));
+      ImGui::InputInt("Plane min points", &param<int>("metrics_plane_min_points"));
+      ImGui::InputFloat("Plane epsilon", &param<float>("metrics_plane_epsilon"), 0.01, 1);
+      ImGui::InputFloat("Plane normal thres", &param<float>("metrics_plane_normal_threshold"), 0.01, 1);
+      ImGui::InputFloat("Wall angle thres", &param<float>("metrics_is_wall_threshold"), 0.01, 1);
+      ImGui::InputFloat("Is horizontal", &param<float>("metrics_is_horizontal_threshold"), 0.01, 1);
+      ImGui::InputInt("K linefit", &param<int>("metrics_k_linefit"));
+      ImGui::InputInt("K jumpedge", &param<int>("metrics_k_jumpcnt_elediff"));
     }
 
     void process();
@@ -238,8 +258,6 @@ namespace geoflow::nodes::stepedge {
 
   class RegulariseLinesNode:public Node {
     static constexpr double pi = 3.14159265358979323846;
-    float dist_threshold = 0.5;
-    float angle_threshold = 0.1;//5*(pi/180);
 
     public:
     using Node::Node;
@@ -252,40 +270,43 @@ namespace geoflow::nodes::stepedge {
       // add_output("footprint_labels", TT_vec1i);
       // add_output("line_clusters", TT_any); // ie a LineCluster
       // add_output("tmp_vec3f", TT_vec3f);
+      add_param("dist_threshold", (float) 0.5);
+      add_param("angle_threshold", (float) 0.1);
     }
 
     void gui(){
-      ImGui::DragFloat("Distance threshold", &dist_threshold, 0.1, 0);
-      ImGui::DragFloat("Angle threshold", &angle_threshold, 0.01, 0.01, pi);
+      ImGui::DragFloat("Distance threshold", &param<float>("dist_threshold"), 0.1, 0);
+      ImGui::DragFloat("Angle threshold", &param<float>("angle_threshold"), 0.01, 0.01, pi);
     }
     void process();
   };
 
   class LOD13GeneratorNode:public Node {
     public:
-    float step_height_threshold = 1.0;
-    float zrange_threshold = 0.2;
-    bool merge_segid = true;
-    bool merge_zrange = false;
-    bool merge_step_height = true;
-    bool merge_unsegmented = false;
-    bool merge_dangling_egdes = false;
     using Node::Node;
     void init() {
       add_input("point_clouds", TT_point_collection_list);
       add_input("polygons", TT_linear_ring_collection);
       add_output("decomposed_footprints", TT_linear_ring_collection);
       add_output("attributes", TT_attribute_map_f);
+
+      add_param("step_height_threshold", (float) 1.0);
+      add_param("zrange_threshold", (float) 0.2);
+      add_param("merge_segid", (bool) true);
+      add_param("merge_zrange", (bool) false);
+      add_param("merge_step_height", (bool) false);
+      add_param("merge_unsegmented", (bool) false);
+      add_param("merge_dangling_egdes", (bool) false);
     }
 
     void gui(){
-      ImGui::InputFloat("Step height", &step_height_threshold, 0.1, 1);
-      ImGui::DragFloat("zrange_threshold", &zrange_threshold, 0.1);
-      ImGui::Checkbox("merge_segid", &merge_segid);
-      ImGui::Checkbox("merge_zrange", &merge_zrange);
-      ImGui::Checkbox("merge_step_height", &merge_step_height);
-      ImGui::Checkbox("merge_unsegmented", &merge_unsegmented);
-      ImGui::Checkbox("merge_dangling_egdes", &merge_dangling_egdes);
+      ImGui::InputFloat("Step height", &param<float>("step_height_threshold"), 0.1, 1);
+      ImGui::DragFloat("zrange_threshold", &param<float>("zrange_threshold"), 0.1);
+      ImGui::Checkbox("merge_segid", &param<bool>("merge_segid"));
+      ImGui::Checkbox("merge_zrange", &param<bool>("merge_zrange"));
+      ImGui::Checkbox("merge_step_height", &param<bool>("merge_step_height"));
+      ImGui::Checkbox("merge_unsegmented", &param<bool>("merge_unsegmented"));
+      ImGui::Checkbox("merge_dangling_egdes", &param<bool>("merge_dangling_egdes"));
     }
     void process();
   };
