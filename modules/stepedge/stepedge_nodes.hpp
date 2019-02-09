@@ -15,9 +15,12 @@ namespace geoflow::nodes::stepedge {
       add_output("alpha_rings", TT_linear_ring_collection);
       add_output("edge_points", TT_point_collection);
       add_output("alpha_edges", TT_line_string_collection);
+      add_output("alpha_triangles", TT_triangle_collection);
+      add_output("segment_ids", TT_vec1i);
+      add_output("boundary_points", TT_point_collection);
 
       add_param("thres_alpha", (float) 0.7);
-      add_param("extract_alpha_rings", (bool) false);
+      add_param("extract_alpha_rings", (bool) true);
     }
 
     void gui(){

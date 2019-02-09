@@ -36,10 +36,11 @@ vertex get_normal(vertex v0, vertex v1, vertex v2) {
 // interval list
 #include "interval.hpp"
 
+#include <unordered_set>
+#include <stack>
+#include <utility>
 
-namespace geoflow::nodes::stepedge {
-
-void AlphaShapeNode::process(){
+namespace as {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel  K;
   typedef CGAL::Projection_traits_xy_3<K>								       Gt;
   typedef K::FT                                                FT;
@@ -47,12 +48,95 @@ void AlphaShapeNode::process(){
   // typedef K::Segment_2                                         Segment;
   typedef CGAL::Alpha_shape_vertex_base_2<Gt>                  Vb;
   typedef CGAL::Alpha_shape_face_base_2<Gt>                    Fb;
+  // class AlphaShapeFaceWithLabel : public Fb {
+  //   public: 
+  //   int label = 0;
+  //   bool visited = false;
+  //   // using Fb::Fb;
+  // };
   typedef CGAL::Triangulation_data_structure_2<Vb,Fb>          Tds;
   typedef CGAL::Delaunay_triangulation_2<Gt,Tds>               Triangulation_2;
   typedef CGAL::Alpha_shape_2<Triangulation_2>                 Alpha_shape_2;
-  typedef Alpha_shape_2::Vertex_handle                       Vertex_handle;
-  typedef Alpha_shape_2::Vertex_circulator                     Vertex_circulator;
-  typedef Alpha_shape_2::Edge_circulator                     Edge_circulator;
+  typedef Alpha_shape_2::Vertex_handle                        Vertex_handle;
+  typedef Alpha_shape_2::Edge                                 Edge;
+  typedef Alpha_shape_2::Face_handle                          Face_handle;
+  typedef Alpha_shape_2::Vertex_circulator                    Vertex_circulator;
+  typedef Alpha_shape_2::Edge_circulator                      Edge_circulator;
+
+
+  class AlphaShapeRegionGrower {
+    Alpha_shape_2 &A;
+    enum Mode {
+      ALPHA, // stop at alpha boundary
+      EXTERIOR // stop at faces labels as exterior
+    };
+    int label_cnt; // label==-1 means exterior, -2 mean never visiter, 0+ means a regular region
+    public:
+    std::unordered_map<Face_handle, int> face_map;
+    std::unordered_map<int, Vertex_handle> region_map; //label: (boundary vertex)
+    AlphaShapeRegionGrower(Alpha_shape_2& as) : A(as), label_cnt(0) {};
+
+    void grow() {
+      std::stack<Face_handle> seeds;
+      for (auto fh = A.all_faces_begin(); fh!=A.all_faces_end(); ++fh) {
+        seeds.push(fh);
+        face_map[fh] = -2;
+      }
+      auto inf_face = A.infinite_face();
+      face_map[inf_face] = -1;
+      grow_region(inf_face, ALPHA); // this sets label of exterior faces to -1
+      while (!seeds.empty()) {
+        auto fh = seeds.top(); seeds.pop();
+        if (face_map[fh] == -2) {
+          std::cout << "growing new regions\n";
+          grow_region(fh, EXTERIOR);
+          ++label_cnt;
+        }
+      }
+    }
+
+    void grow_region (Face_handle face_handle, Mode mode) {
+      std::stack<Face_handle> candidates;
+      candidates.push(face_handle);
+
+      while(candidates.size()>0) {
+        auto fh = candidates.top(); candidates.pop();
+        // check the 3 neighbors of this face
+        for (int i=0; i<3; ++i) {
+          auto e = std::make_pair(fh,i);
+          auto neighbor = fh->neighbor(i);
+
+          if (mode == ALPHA) {
+            // add neighbor if it is not on the ohter side of alpha boundary
+            // check if this neighbor hasn't been visited before
+            if (face_map[neighbor] == -2) {
+              if (A.classify(e) != Alpha_shape_2::REGULAR) {
+                face_map[neighbor] = -1;
+                candidates.push(neighbor);
+              }
+            }
+          } else if (mode == EXTERIOR) {
+            // check if this neighbor hasn't been visited before and is not exterior
+            if (face_map[neighbor] == -2) {
+              face_map[neighbor] = label_cnt;
+              candidates.push(neighbor);
+            // if it is exterior, we store this boundary edge
+            } else if (face_map[neighbor] == -1) {
+              if( region_map.find(label_cnt)==region_map.end() ) {
+                std::cout << "insert v with label==" << label_cnt <<"\n";
+                region_map[label_cnt] = fh->vertex(A.cw(i));
+              }
+            }
+          }
+
+        }
+      }
+    }
+  };
+}
+namespace geoflow::nodes::stepedge {
+
+void AlphaShapeNode::process(){
 
   auto points = input("points").get<PNL_vector>();
   auto thres_alpha = param<float>("thres_alpha");
@@ -67,18 +151,20 @@ void AlphaShapeNode::process(){
       continue;
     points_per_segment[boost::get<2>(p)].push_back(boost::get<0>(p));
   }
-  PointCollection edge_points;
+  PointCollection edge_points, boundary_points;
   LineStringCollection alpha_edges;
   LinearRingCollection alpha_rings;
+  TriangleCollection alpha_triangles;
+  vec1i segment_ids;
   for (auto& it : points_per_segment ) {
     auto points = it.second;
-    Triangulation_2 T;
+    as::Triangulation_2 T;
     T.insert(points.begin(), points.end());
-    Alpha_shape_2 A(T,
-                FT(thres_alpha),
-                Alpha_shape_2::GENERAL);
+    as::Alpha_shape_2 A(T,
+                as::FT(thres_alpha),
+                as::Alpha_shape_2::GENERAL);
     // thres_alpha = *A.find_optimal_alpha(1);
-    A.set_alpha(FT(thres_alpha));
+    A.set_alpha(as::FT(thres_alpha));
     // std::vector<std::pair<Vertex_handle, Vertex_handle>> alpha_edges;
     // for (auto it = A.alpha_shape_edges_begin(); it!=A.alpha_shape_edges_end(); it++) {
     //   auto face = (it)->first;
@@ -101,51 +187,63 @@ void AlphaShapeNode::process(){
     }
 
     if (extract_alpha_rings) {
-      size_t n_edge_pts = edge_points.size();
+      // flood filling 
+      auto grower = as::AlphaShapeRegionGrower(A);
+      grower.grow();
 
-      // find edges of outer boundary in order
-      LinearRing ring;
-      // first find a vertex v_start on the boundary
-      auto inf = A.infinite_vertex();
-      Vertex_handle v_start;
-      Vertex_circulator vc(A.incident_vertices(inf)), done(vc);
-      do {
-        if(A.classify(vc) == Alpha_shape_2::REGULAR ) {
-          v_start = vc;
-          break;
-        }
-      } while (++vc != done);
+      for (auto fh = A.finite_faces_begin(); fh != A.finite_faces_end(); ++fh) {
+          arr3f p0 = {float (fh->vertex(0)->point().x()), float (fh->vertex(0)->point().y()), float (fh->vertex(0)->point().z())};
+          arr3f p1 = {float (fh->vertex(1)->point().x()), float (fh->vertex(1)->point().y()), float (fh->vertex(1)->point().z())};
+          arr3f p2 = {float (fh->vertex(2)->point().x()), float (fh->vertex(2)->point().y()), float (fh->vertex(2)->point().z())
+          };
+        alpha_triangles.push_back({ p0,p1,p2 });
+        segment_ids.push_back(grower.face_map[fh]);
+        segment_ids.push_back(grower.face_map[fh]);
+        segment_ids.push_back(grower.face_map[fh]);
+      }
 
-      ring.push_back( {float(v_start->point().x()), float(v_start->point().y()), float(v_start->point().z())} );
-      // secondly, walk along the entire boundary starting from v_start
-      Vertex_handle v_next, v_prev = v_start, v_cur = v_start;
-      size_t v_cntr = 0;
-      do {
-        Edge_circulator ec(A.incident_edges(v_cur)), done(ec);
+      std::cout << "region map size: " << grower.region_map.size() << "\n";
+      for (auto& kv : grower.region_map) {
+        auto region_label = kv.first;
+        auto v_start = kv.second;
+        boundary_points.push_back({
+          float(v_start->point().x()),
+          float(v_start->point().y()),
+          float(v_start->point().z())
+        });
+
+        // find edges of outer boundary in order
+        LinearRing ring;
+
+        ring.push_back( {float(v_start->point().x()), float(v_start->point().y()), float(v_start->point().z())} );
+        // secondly, walk along the entire boundary starting from v_start
+        as::Vertex_handle v_next, v_prev = v_start, v_cur = v_start;
+        size_t v_cntr = 0;
         do {
-          // find the vertex on the other side of the incident edge ec
-          auto v = ec->first->vertex(A.cw(ec->second));
-          if (v_cur == v) v = ec->first->vertex(A.ccw(ec->second));
-          // check if the edge is on the boundary of the a-shape and if we are not going backwards
-          if((A.classify(*ec) == Alpha_shape_2::REGULAR)  && (v != v_prev)) {
-            // check if we are not on a dangling edge
-            if (A.classify(ec->first)==Alpha_shape_2::INTERIOR || A.classify(ec->first->neighbor(ec->second))==Alpha_shape_2::INTERIOR ) {
+          as::Edge_circulator ec(A.incident_edges(v_cur)), done(ec);
+          do {
+            // find the vertex on the other side of the incident edge ec
+            auto v = ec->first->vertex(A.cw(ec->second));
+            if (v_cur == v) v = ec->first->vertex(A.ccw(ec->second));
+            // find labels of two adjacent faces
+            auto label1 = grower.face_map[ ec->first ];
+            auto label2 = grower.face_map[ ec->first->neighbor(ec->second) ];
+            // check if the edge is on the boundary of the region and if we are not going backwards
+            bool exterior = label1==-1 || label2==-1;
+            bool region = label1==region_label || label2==region_label;
+            if(( exterior && region )  && (v != v_prev)) {
               v_next = v;
               ring.push_back( {float(v_next->point().x()), float(v_next->point().y()), float(v_next->point().z())} );
               break;
             }
-          }
-        } while (++ec != done);
-        v_prev = v_cur;
-        v_cur = v_next;
-        
-        // if (++v_cntr <= n_edge_pts) {
-        //   std::cout << "this ring is non-manifold, breaking alpha-ring iteration\n";
-        //   break;
-        // }
-      } while (v_next != v_start);
-      // finally, store the ring 
-      alpha_rings.push_back(ring);
+          } while (++ec != done);
+          v_prev = v_cur;
+          v_cur = v_next;
+
+        } while (v_next != v_start);
+        // finally, store the ring 
+        alpha_rings.push_back(ring);
+      }
     }
   }
   
@@ -153,7 +251,10 @@ void AlphaShapeNode::process(){
     output("alpha_rings").set(alpha_rings);
   }
   output("alpha_edges").set(alpha_edges);
+  output("alpha_triangles").set(alpha_triangles);
+  output("segment_ids").set(segment_ids);
   output("edge_points").set(edge_points);
+  output("boundary_points").set(boundary_points);
 }
 
 void PolygonExtruderNode::process(){
@@ -595,23 +696,11 @@ void LASInPolygonsNode::process() {
   point_clouds.clear();
   polygons = input("polygons").get<LinearRingCollection>();
 
-  // std::vector<bg::model::polygon<point_type>> boost_polygons;
   std::vector<pGridSet> poly_grids;
           
   for (auto& ring : polygons) {
     poly_grids.push_back(build_grid(ring));
-    // bg::model::polygon<point_type> boost_poly;
-    // for (auto& p : ring) {
-    //   bg::append(boost_poly.outer(), point_type(p[0], p[1]));
-    // }
-    // bg::unique(boost_poly);
-    // boost_polygons.push_back(boost_poly);
   }
-
-  //  for(auto& p : ring) {
-  //    bg::append(new_fp.outer(), point_type(p[0], p[1]));
-  //  }
-  //  footprints.push_back(new_fp);
 
   LASreadOpener lasreadopener;
   lasreadopener.set_file_name(param<std::string>("las_filepath").c_str());
@@ -936,12 +1025,12 @@ void LOD13GeneratorNode::process(){
 
     for (int i=0; i<cells.size(); i++) {
       // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
-        all_cells.push_back(cells[i]);
-        all_attributes["height"].push_back(attributes["height"][i]);
-        all_attributes["rms_error"].push_back(attributes["rms_error"][i]);
-        all_attributes["max_error"].push_back(attributes["max_error"][i]);
-        all_attributes["count"].push_back(attributes["count"][i]);
-        all_attributes["coverage"].push_back(attributes["coverage"][i]);
+      all_cells.push_back(cells[i]);
+      all_attributes["height"].push_back(attributes["height"][i]);
+      all_attributes["rms_error"].push_back(attributes["rms_error"][i]);
+      all_attributes["max_error"].push_back(attributes["max_error"][i]);
+      all_attributes["count"].push_back(attributes["count"][i]);
+      all_attributes["coverage"].push_back(attributes["coverage"][i]);
       // }
     }
   }

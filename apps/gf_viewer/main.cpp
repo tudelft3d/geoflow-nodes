@@ -27,6 +27,7 @@ int main(int ac, const char * av[])
     NodeManager N;
 
     NodeHandle OGRLoader = N.create_node(gdal, "OGRLoader", {-275,75});
+    NodeHandle PolygonSimp = N.create_node(cgal, "SimplifyFootprint", {-275,175});
     NodeHandle LASInPolygons = N.create_node(stepedge, "LASInPolygons", {75,75});
     NodeHandle ComputeMetrics = N.create_node(stepedge, "ComputeMetrics", {300,75});
     NodeHandle AlphaShape = N.create_node(stepedge, "AlphaShape", {600,75});
@@ -36,6 +37,7 @@ int main(int ac, const char * av[])
     NodeHandle ProcessArrangement = N.create_node(stepedge, "ProcessArrangement", {1500,75});
     NodeHandle Extruder = N.create_node(stepedge, "Extruder", {1800,75});
 
+    connect(OGRLoader, PolygonSimp, "linear_rings", "polygons");
     connect(LASInPolygons, ComputeMetrics, "points", "points");
     connect(LASInPolygons, BuildArrangement, "footprint", "footprint");
     connect(LASInPolygons, RegulariseLines, "footprint", "footprint");
