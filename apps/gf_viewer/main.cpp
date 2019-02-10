@@ -29,6 +29,7 @@ int main(int ac, const char * av[])
     NodeHandle OGRLoader = N.create_node(gdal, "OGRLoader", {-275,75});
     NodeHandle PolygonSimp = N.create_node(cgal, "SimplifyFootprint", {-275,175});
     NodeHandle LASInPolygons = N.create_node(stepedge, "LASInPolygons", {75,75});
+    NodeHandle BuildingSelect = N.create_node(stepedge, "BuildingSelector", {75,175});
     NodeHandle ComputeMetrics = N.create_node(stepedge, "ComputeMetrics", {300,75});
     NodeHandle AlphaShape = N.create_node(stepedge, "AlphaShape", {600,75});
     NodeHandle DetectLines = N.create_node(stepedge, "DetectLines", {900,75});
@@ -38,9 +39,11 @@ int main(int ac, const char * av[])
     NodeHandle Extruder = N.create_node(stepedge, "Extruder", {1800,75});
 
     connect(OGRLoader, PolygonSimp, "linear_rings", "polygons");
-    connect(LASInPolygons, ComputeMetrics, "points", "points");
-    connect(LASInPolygons, BuildArrangement, "footprint", "footprint");
-    connect(LASInPolygons, RegulariseLines, "footprint", "footprint");
+    connect(PolygonSimp, BuildingSelect, "polygons_simp", "polygons");
+    connect(LASInPolygons, BuildingSelect, "point_clouds", "point_clouds");
+    connect(BuildingSelect, ComputeMetrics, "point_cloud", "points");
+    connect(BuildingSelect, BuildArrangement, "polygon", "footprint");
+    connect(BuildingSelect, RegulariseLines, "polygon", "footprint");
     connect(ComputeMetrics, AlphaShape, "points", "points");
     connect(ComputeMetrics, ProcessArrangement, "points", "points");
     connect(AlphaShape, DetectLines, "alpha_rings", "edge_points");

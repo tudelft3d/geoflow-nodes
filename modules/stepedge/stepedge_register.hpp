@@ -14,6 +14,7 @@ namespace geoflow::nodes::stepedge {
     R.register_node<ClassifyEdgePointsNode>("ClassifyEdgePoints");
     R.register_node<ComputeMetricsNode>("ComputeMetrics");
     R.register_node<LASInPolygonsNode>("LASInPolygons");
+    R.register_node<BuildingSelectorNode>("BuildingSelector");
     R.register_node<RegulariseLinesNode>("RegulariseLines");
     R.register_node<LOD13GeneratorNode>("LOD13Generator");
     return R;

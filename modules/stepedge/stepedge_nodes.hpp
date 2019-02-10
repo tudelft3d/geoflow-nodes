@@ -86,7 +86,7 @@ namespace geoflow::nodes::stepedge {
       add_input("arrangement", TT_any);
       add_input("points", TT_any);
       add_output("arrangement", TT_any);
-      add_param("step_height_threshold", (float) 2.0);
+      add_param("step_height_threshold", (float) 1.0);
       add_param("zrange_threshold", (float) 0.2);
       add_param("merge_segid", (bool) true);
       add_param("merge_zrange", (bool) false);
@@ -209,36 +209,46 @@ namespace geoflow::nodes::stepedge {
   };
 
   class LASInPolygonsNode:public Node {
-    std::vector<PointCollection> point_clouds;
-    LinearRingCollection polygons;
-
     public:
-    int footprint_id=0;
-    // char las_filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/ahn3.las";
-    // char las_filepath[256] = "";
     using Node::Node;
     void init() {
       add_input("polygons", TT_linear_ring_collection);
       add_output("point_clouds", TT_point_collection_list);
-      add_output("points", TT_point_collection);
-      add_output("footprint", TT_linear_ring);
 
       add_param("las_filepath", (std::string) "");
     }
 
     void gui() {
       ImGui::InputText("LAS file path", &param<std::string>("las_filepath"));
-      if (ImGui::SliderInt("#", &footprint_id, 0, polygons.size()-1)) {
+    }
+    void process();
+  };
+  
+  class BuildingSelectorNode:public Node {
+    public:
+    int building_id=0, polygon_count=0;
+    using Node::Node;
+    void init() {
+      add_input("point_clouds", TT_point_collection_list);
+      add_input("polygons", TT_linear_ring_collection);
+      add_output("point_cloud", TT_point_collection);
+      add_output("polygon", TT_linear_ring);
+
+      add_param("building_id", (int) 0);
+    }
+
+    void gui() {
+      if (ImGui::SliderInt("#", &building_id, 0, polygon_count-1)) {
         // if(run_on_change) {
         //   manager.run(*this);
         // } else {
-        if (footprint_id < polygons.size() && footprint_id >= 0) {
-          notify_children();
-          output("points").set(point_clouds[footprint_id]);
-          output("point_clouds").set(point_clouds);
-          output("footprint").set(polygons[footprint_id]);
-          propagate_outputs();
-        } else { footprint_id = polygons.size()-1; }
+        if (building_id < polygon_count && building_id >= 0) {
+          // notify_children();
+          // output("points").set(point_clouds[building_id]);
+          // output("point_clouds").set(point_clouds);
+          // output("footprint").set(polygons[building_id]);
+          // propagate_outputs();
+        } else { building_id = polygon_count-1; }
       }
     }
     void process();

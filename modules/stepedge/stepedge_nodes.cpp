@@ -693,9 +693,8 @@ pGridSet build_grid(vec3f& ring) {
 }
 
 void LASInPolygonsNode::process() {
-  polygons.clear();
-  point_clouds.clear();
-  polygons = input("polygons").get<LinearRingCollection>();
+  auto polygons = input("polygons").get<LinearRingCollection>();
+  std::vector<PointCollection> point_clouds(polygons.size());
 
   std::vector<pGridSet> poly_grids;
           
@@ -706,8 +705,6 @@ void LASInPolygonsNode::process() {
   LASreadOpener lasreadopener;
   lasreadopener.set_file_name(param<std::string>("las_filepath").c_str());
   LASreader* lasreader = lasreadopener.open();
-
-  point_clouds.resize(polygons.size());
 
   while (lasreader->read_point()) {
     if (lasreader->point.get_classification() == 6) {
@@ -736,9 +733,15 @@ void LASInPolygonsNode::process() {
   delete lasreader;
 
   output("point_clouds").set(point_clouds);
-  output("points").set(PointCollection(point_clouds[footprint_id]));
-  output("footprint").set(polygons[footprint_id]);
 }
+
+void BuildingSelectorNode::process() {
+  auto& point_clouds = input("point_clouds").get<std::vector<PointCollection>&>();
+  auto& polygons = input("polygons").get<LinearRingCollection&>();
+  polygon_count = polygons.size();
+  output("point_cloud").set(point_clouds[building_id]);
+  output("polygon").set(polygons[building_id]);
+};
 
 void RegulariseLinesNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
