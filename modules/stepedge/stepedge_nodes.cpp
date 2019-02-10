@@ -88,7 +88,7 @@ namespace as {
       while (!seeds.empty()) {
         auto fh = seeds.top(); seeds.pop();
         if (face_map[fh] == -2) {
-          std::cout << "growing new regions\n";
+          face_map[fh] = label_cnt;
           grow_region(fh, EXTERIOR);
           ++label_cnt;
         }
@@ -110,7 +110,8 @@ namespace as {
             // add neighbor if it is not on the ohter side of alpha boundary
             // check if this neighbor hasn't been visited before
             if (face_map[neighbor] == -2) {
-              if (A.classify(e) != Alpha_shape_2::REGULAR) {
+              auto edge_class = A.classify(e);
+              if ( ! (edge_class == Alpha_shape_2::REGULAR || edge_class == Alpha_shape_2::SINGULAR) ) {
                 face_map[neighbor] = -1;
                 candidates.push(neighbor);
               }
@@ -123,7 +124,6 @@ namespace as {
             // if it is exterior, we store this boundary edge
             } else if (face_map[neighbor] == -1) {
               if( region_map.find(label_cnt)==region_map.end() ) {
-                std::cout << "insert v with label==" << label_cnt <<"\n";
                 region_map[label_cnt] = fh->vertex(A.cw(i));
               }
             }
@@ -186,32 +186,31 @@ void AlphaShapeNode::process(){
       });
     }
 
-    if (extract_alpha_rings) {
-      // flood filling 
-      auto grower = as::AlphaShapeRegionGrower(A);
-      grower.grow();
+    
+    // flood filling 
+    auto grower = as::AlphaShapeRegionGrower(A);
+    grower.grow();
 
-      for (auto fh = A.finite_faces_begin(); fh != A.finite_faces_end(); ++fh) {
-          arr3f p0 = {float (fh->vertex(0)->point().x()), float (fh->vertex(0)->point().y()), float (fh->vertex(0)->point().z())};
-          arr3f p1 = {float (fh->vertex(1)->point().x()), float (fh->vertex(1)->point().y()), float (fh->vertex(1)->point().z())};
-          arr3f p2 = {float (fh->vertex(2)->point().x()), float (fh->vertex(2)->point().y()), float (fh->vertex(2)->point().z())
-          };
-        alpha_triangles.push_back({ p0,p1,p2 });
-        segment_ids.push_back(grower.face_map[fh]);
-        segment_ids.push_back(grower.face_map[fh]);
-        segment_ids.push_back(grower.face_map[fh]);
-      }
+    for (auto fh = A.finite_faces_begin(); fh != A.finite_faces_end(); ++fh) {
+        arr3f p0 = {float (fh->vertex(0)->point().x()), float (fh->vertex(0)->point().y()), float (fh->vertex(0)->point().z())};
+        arr3f p1 = {float (fh->vertex(1)->point().x()), float (fh->vertex(1)->point().y()), float (fh->vertex(1)->point().z())};
+        arr3f p2 = {float (fh->vertex(2)->point().x()), float (fh->vertex(2)->point().y()), float (fh->vertex(2)->point().z())
+        };
+      alpha_triangles.push_back({ p0,p1,p2 });
+      segment_ids.push_back(grower.face_map[fh]);
+      segment_ids.push_back(grower.face_map[fh]);
+      segment_ids.push_back(grower.face_map[fh]);
+    }
 
-      std::cout << "region map size: " << grower.region_map.size() << "\n";
-      for (auto& kv : grower.region_map) {
-        auto region_label = kv.first;
-        auto v_start = kv.second;
-        boundary_points.push_back({
-          float(v_start->point().x()),
-          float(v_start->point().y()),
-          float(v_start->point().z())
-        });
-
+    for (auto& kv : grower.region_map) {
+      auto region_label = kv.first;
+      auto v_start = kv.second;
+      boundary_points.push_back({
+        float(v_start->point().x()),
+        float(v_start->point().y()),
+        float(v_start->point().z())
+      });
+      if (extract_alpha_rings) {
         // find edges of outer boundary in order
         LinearRing ring;
 
@@ -541,7 +540,7 @@ void DetectLinesNode::process(){
 
   LineStringCollection edge_segments;
 
-  // line fitting in set of candidate edgepoints
+  // fit lines in all input points
   if (input_geom.connected_type == TT_point_collection) {
     std::vector<linedect::Point> cgal_pts;
     auto points = input_geom.get<PointCollection>();
@@ -554,6 +553,8 @@ void DetectLinesNode::process(){
     LD.N = c.linedetect_k;
     LD.detect();
     LD.get_bounded_edges(edge_segments);
+
+  // fit lines per ring
   } else if (input_geom.connected_type == TT_linear_ring_collection) {
     auto rings = input_geom.get<LinearRingCollection>();
     int n = c.linedetect_k;
@@ -1007,7 +1008,7 @@ void LOD13GeneratorNode::process(){
 
     connect(ComputeMetrics_node, AlphaShape_node, "points", "points");
     connect(ComputeMetrics_node, ProcessArrangement_node, "points", "points");
-    connect(AlphaShape_node, DetectLines_node, "edge_points", "edge_points");
+    connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
     connect(DetectLines_node, RegulariseLines_node, "edge_segments", "edge_segments");
     connect(RegulariseLines_node, BuildArrangement_node, "edges_out", "edge_segments");
     connect(BuildArrangement_node, ProcessArrangement_node, "arrangement", "arrangement");

@@ -43,7 +43,7 @@ int main(int ac, const char * av[])
     connect(LASInPolygons, RegulariseLines, "footprint", "footprint");
     connect(ComputeMetrics, AlphaShape, "points", "points");
     connect(ComputeMetrics, ProcessArrangement, "points", "points");
-    connect(AlphaShape, DetectLines, "edge_points", "edge_points");
+    connect(AlphaShape, DetectLines, "alpha_rings", "edge_points");
     connect(DetectLines, RegulariseLines, "edge_segments", "edge_segments");
     connect(RegulariseLines, BuildArrangement, "edges_out", "edge_segments");
     connect(BuildArrangement, ProcessArrangement, "arrangement", "arrangement");

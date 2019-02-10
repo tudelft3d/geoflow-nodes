@@ -19,7 +19,7 @@ namespace geoflow::nodes::stepedge {
       add_output("segment_ids", TT_vec1i);
       add_output("boundary_points", TT_point_collection);
 
-      add_param("thres_alpha", (float) 0.7);
+      add_param("thres_alpha", (float) 0.5);
       add_param("extract_alpha_rings", (bool) true);
     }
 
@@ -86,11 +86,11 @@ namespace geoflow::nodes::stepedge {
       add_input("arrangement", TT_any);
       add_input("points", TT_any);
       add_output("arrangement", TT_any);
-      add_param("step_height_threshold", (float) 1.0);
+      add_param("step_height_threshold", (float) 2.0);
       add_param("zrange_threshold", (float) 0.2);
       add_param("merge_segid", (bool) true);
       add_param("merge_zrange", (bool) false);
-      add_param("merge_step_height", (bool) false);
+      add_param("merge_step_height", (bool) true);
       add_param("merge_unsegmented", (bool) false);
       add_param("merge_dangling_egdes", (bool) false);
     }
@@ -185,8 +185,8 @@ namespace geoflow::nodes::stepedge {
       add_output("points_c", TT_point_collection);
 
       add_param("metrics_normal_k", (int) 10);
-      add_param("metrics_plane_min_points", (int) 25);
-      add_param("metrics_plane_epsilon", (float) 0.2);
+      add_param("metrics_plane_min_points", (int) 50);
+      add_param("metrics_plane_epsilon", (float) 0.15);
       add_param("metrics_plane_normal_threshold", (float) 0.75);
       add_param("metrics_is_horizontal_threshold", (float) 0.9);
       add_param("metrics_is_wall_threshold", (float) 0.3);
@@ -293,10 +293,10 @@ namespace geoflow::nodes::stepedge {
       add_output("decomposed_footprints", TT_linear_ring_collection);
       add_output("attributes", TT_attribute_map_f);
 
-      add_param("step_height_threshold", (float) 1.0);
+      add_param("step_height_threshold", (float) 2.0);
       add_param("zrange_threshold", (float) 0.2);
       add_param("merge_segid", (bool) true);
-      add_param("merge_zrange", (bool) false);
+      add_param("merge_zrange", (bool) true);
       add_param("merge_step_height", (bool) false);
       add_param("merge_unsegmented", (bool) false);
       add_param("merge_dangling_egdes", (bool) false);

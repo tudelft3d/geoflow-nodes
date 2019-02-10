@@ -22,7 +22,7 @@ int main(int ac, const char * av[])
     std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg");
     std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las");
     std::string decomposed_footprints_file = "out.shp";
-    float step_threshold = 1.0;
+    float step_threshold = 2.0;
     bool gui = false;
     
     po::options_description desc("Allowed options");

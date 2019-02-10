@@ -83,7 +83,7 @@ void compute_metrics(PNL_vector &points, config c) {
   PD.min_segment_count = c.metrics_plane_min_points;
   PD.N = c.metrics_normal_k;
   PD.detect();
-  std::cout << PD.segment_shapes.size() << " shapes detected." << std::endl;
+  // std::cout << PD.segment_shapes.size() << " shapes detected." << std::endl;
 
   // // Instantiates shape detection engine.
   // Region_growing shape_detection;
