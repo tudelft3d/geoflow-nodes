@@ -40,6 +40,7 @@ int main(int ac, const char * av[])
 
     connect(OGRLoader, PolygonSimp, "linear_rings", "polygons");
     connect(PolygonSimp, BuildingSelect, "polygons_simp", "polygons");
+    connect(PolygonSimp, LASInPolygons, "polygons_simp", "polygons");
     connect(LASInPolygons, BuildingSelect, "point_clouds", "point_clouds");
     connect(BuildingSelect, ComputeMetrics, "point_cloud", "points");
     connect(BuildingSelect, BuildArrangement, "polygon", "footprint");

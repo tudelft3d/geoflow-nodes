@@ -306,8 +306,8 @@ namespace geoflow::nodes::stepedge {
       add_param("step_height_threshold", (float) 2.0);
       add_param("zrange_threshold", (float) 0.2);
       add_param("merge_segid", (bool) true);
-      add_param("merge_zrange", (bool) true);
-      add_param("merge_step_height", (bool) false);
+      add_param("merge_zrange", (bool) false);
+      add_param("merge_step_height", (bool) true);
       add_param("merge_unsegmented", (bool) false);
       add_param("merge_dangling_egdes", (bool) false);
     }
