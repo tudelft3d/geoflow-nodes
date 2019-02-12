@@ -236,3 +236,13 @@ public:
   }
   void process();
 };
+
+class SimplifyLinesBufferNode:public Node {
+public:
+  double threshold = 1.0;
+  SimplifyLinesBufferNode(NodeManager& manager):Node(manager) {
+    add_input("polygons", TT_linear_ring_collection);
+    add_output("polygons_simp", TT_linear_ring_collection);
+  }
+  void process();
+};

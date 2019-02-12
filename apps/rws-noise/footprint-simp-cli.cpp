@@ -32,12 +32,14 @@ int main(int ac, const char * av[]) {
 
     auto ogr_loader = std::make_shared<OGRLoaderNode>(N);
     //auto simplify_footprint = std::make_shared<SimplifyFootprintNode>(N);
-    auto simplify_footprint = std::make_shared<SimplifyFootprintCDTNode>(N);
+    //auto simplify_footprint = std::make_shared<SimplifyFootprintCDTNode>(N);
+    auto simplify_footprint = std::make_shared<SimplifyLinesBufferNode>(N);
     auto ogr_writer = std::make_shared<OGRWriterNoAttributesNode>(N);
 
     std::strcpy(ogr_loader->filepath, footprint_file_in.c_str());
     std::strcpy(ogr_writer->filepath, footprint_file_out.c_str());
-    simplify_footprint->threshold_stop_cost = simplification_threshold;
+    //simplify_footprint->threshold_stop_cost = simplification_threshold;
+    simplify_footprint->threshold = simplification_threshold;
 
     // footprint simplification
     geoflow::connect(ogr_loader->outputs("linear_rings"), simplify_footprint->inputs("polygons"));;

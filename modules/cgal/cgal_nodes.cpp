@@ -808,3 +808,46 @@ void LineHeightNode::process() {
 
   outputs("lines").set(lines_out);
 }
+
+void SimplifyLinesBufferNode::process() {
+  typedef linesimp::AproximateLine AproximateLine;
+  typedef linesimp::Point2 Point2;
+
+  auto polygons = inputs("polygons").get<LinearRingCollection>();
+
+  LinearRingCollection output;
+
+  std::cout << "Creating simplified polylines by buffering and joining\n";
+  for (auto& poly : polygons) {
+    std::vector<AproximateLine> lines;
+    // Create lines from polygon
+    for (auto it = poly.begin(); it != poly.end() - 1; it++) {
+      AproximateLine line = AproximateLine(Point2((*it)[0], (*it)[1]), Point2((*(it + 1))[0], (*(it + 1))[1]));
+      lines.push_back(line);
+    }
+    
+    // sort lines on length
+    std::sort(lines.begin(), lines.end(), AproximateLine::compare);
+
+    // Start merging lines
+    std::cout << "Lines count: " << lines.size() << std::endl;
+    int i = 0;
+    while (i + 1 < lines.size()) {
+      if (lines[i].canMerge(lines[i + 1], threshold)) {
+        lines[i].merge(lines[i + 1]);
+        auto it = lines.begin() + i + 1;
+        lines.erase(it);
+      }
+      else {
+        i++;
+      }
+    }
+    std::cout << "Lines count: " << lines.size() << std::endl;
+
+    // Create new lines
+
+
+
+  }
+  outputs("polygons_simp").set(lines);
+}
