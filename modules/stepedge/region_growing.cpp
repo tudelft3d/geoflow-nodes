@@ -46,14 +46,17 @@ vector<size_t> LineDetector::get_point_indices(size_t shape_id) {
   return result;
 }
 
-void LineDetector::get_bounded_edges(geoflow::LineStringCollection& edges) {
+size_t LineDetector::get_bounded_edges(geoflow::SegmentCollection& edges) {
+  std::vector<size_t> id_mins;
+  std::map<size_t, geoflow::Segment> ordered_segments;
   for(auto seg: segment_shapes){
     auto l = seg.second;
     auto l_idx = get_point_indices(seg.first);
     // std::cout << l.direction() << ", #Pts: " << l_idx.size() <<std::endl;
     //find the two extreme points on this line
     double minpl=1, maxpl=0;
-    size_t j=0;
+    size_t minpl_id, maxpl_id;
+    size_t j=0, id_min=l_idx.size();
     auto point_on_line = l.point(0);
     auto l_normal = l.to_vector()/CGAL::sqrt(l.to_vector().squared_length());
     for(auto id : l_idx){
@@ -65,26 +68,44 @@ void LineDetector::get_bounded_edges(geoflow::LineStringCollection& edges) {
 
       if (j++==0){
         minpl = maxpl = pl;
+        minpl_id = maxpl_id = id;
       } else {
-        if (pl < minpl) 
+        if (pl < minpl) {
           minpl=pl;
-        else if (pl > maxpl) 
+          minpl_id = id;
+        }  else if (pl > maxpl) {
           maxpl=pl;
+          maxpl_id = id;
+        }
       }
+      // keep track of lowest point id
+      id_min = std::min(id_min, id);
     }
-    Point p0 = (point_on_line + minpl*l_normal);
-    Point p1 = (point_on_line + maxpl*l_normal);
-
-    edges.push_back({{
+    Point p0,p1;
+    if (minpl_id < maxpl_id) {
+      p0 = (point_on_line + minpl*l_normal);
+      p1 = (point_on_line + maxpl*l_normal);
+    } else {
+      p1 = (point_on_line + minpl*l_normal);
+      p0 = (point_on_line + maxpl*l_normal);
+    }
+    ordered_segments[id_min] = geoflow::Segment();
+    ordered_segments[id_min][0] = {
       float(p0.x()),
       float(p0.y()),
       float(p0.z())
-    },{
+    };
+    ordered_segments[id_min][1] = {
       float(p1.x()),
       float(p1.y()),
       float(p1.z())
-    }});
+    };
   }
+  // deliver the edges in order
+  for (auto& kv : ordered_segments) {
+    edges.push_back(kv.second);
+  }
+  return ordered_segments.size();
 }
 inline Line LineDetector::fit_line(vector<size_t>& neighbour_idx){
   vector<Point> neighbor_points;

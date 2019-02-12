@@ -35,6 +35,7 @@ vertex get_normal(vertex v0, vertex v1, vertex v2) {
 
 // interval list
 #include "interval.hpp"
+#include "line_regulariser.hpp"
 
 #include <unordered_set>
 #include <stack>
@@ -485,8 +486,8 @@ void ProcessArrangementNode::process(){
 
 void BuildArrangementNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto edge_segments = input("edge_segments").get<LineStringCollection>();
   auto footprint = input("footprint").get<LinearRing>();
+  auto geom_term = input("edge_segments");
 
   // bg::model::polygon<point_type> fp;
   // for(auto& p : footprint) {
@@ -495,7 +496,13 @@ void BuildArrangementNode::process(){
 
   Arrangement_2 arr;
   arr.clear();
-  build_arrangement(footprint, edge_segments, arr, remove_unsupported);
+  if (geom_term.connected_type == TT_linear_ring_collection) {
+    auto rings = geom_term.get<LinearRingCollection>();
+    build_arrangement(footprint, rings, arr, remove_unsupported);
+  } else if (geom_term.connected_type == TT_line_string_collection) {
+    auto edge_segments = geom_term.get<LineStringCollection>();
+    build_arrangement(footprint, edge_segments, arr, remove_unsupported);
+  }
   LineStringCollection segments;
   for (auto face: arr.face_handles()){
       if(face->data().is_finite){
@@ -535,11 +542,24 @@ void BuildArrangementNode::process(){
   output("arrangement").set(arr);
 }
 
+// inline int circindex(int i, size_t& N) {
+//   // https://codereview.stackexchange.com/questions/57923/index-into-array-as-if-it-is-circular
+//   bool wasNegative = false;
+//   if (i < 0) {
+//       wasNegative = true;
+//       i = -i; //there's definitely a bithack for this.
+//   }
+//   int offset = i % N;
+//   return (wasNegative) ? (N - offset) : (offset);
+// }
+
 void DetectLinesNode::process(){
   auto input_geom = input("edge_points");
 
-  LineStringCollection edge_segments;
-
+  SegmentCollection edge_segments;
+  vec1i ring_order, ring_id, is_start;
+  // std::vector<SegmentCollection> segment_collections;
+  std::vector<std::vector<size_t>> ring_idx;
   // fit lines in all input points
   if (input_geom.connected_type == TT_point_collection) {
     std::vector<linedect::Point> cgal_pts;
@@ -558,7 +578,10 @@ void DetectLinesNode::process(){
   } else if (input_geom.connected_type == TT_linear_ring_collection) {
     auto rings = input_geom.get<LinearRingCollection>();
     int n = c.linedetect_k;
+    ring_idx.resize(rings.size());
     
+    size_t ring_cntr=0;
+    size_t seg_cntr=0;
     for (auto& ring : rings) {
       
       std::vector<linedect::Point> cgal_pts;
@@ -593,12 +616,85 @@ void DetectLinesNode::process(){
         LD.min_segment_count = c.linedetect_min_segment_count;
         LD.N = n;
         LD.detect();
-        LD.get_bounded_edges(edge_segments);
+        // size_t n_edges = LD.get_bounded_edges(edge_segments);
+        // for (size_t i=0; i<n_edges; ++i) {
+        //   ring_order.push_back(i);
+        //   ring_id.push_back(ring_cntr);
+        //   is_start.push_back(1);
+        //   ring_order.push_back(i);
+        //   ring_id.push_back(ring_cntr);
+        //   is_start.push_back(0);
+        // } ++ring_cntr;
+
+        // chain the detected lines, to ensure correct order
+        vec1i new_ring_ids;
+        bool start_seg = LD.point_segment_idx[0];
+        int prev_i=ring.size()-1,
+          prev_seg=LD.point_segment_idx[prev_i], 
+          cur_seg, 
+          i_last_seg = -1;
+        bool no_offset=false;
+        for( int i=0; i<ring.size(); ++i ) {
+          cur_seg = LD.point_segment_idx[i];
+          if(cur_seg==prev_seg && cur_seg!=0) { // we are inside a segment
+
+          } else if (cur_seg!=0 && prev_seg==0) { // from unsegmented to segmented
+            new_ring_ids.push_back(i); // first of cur
+            if(i==0) no_offset=true;
+            // new_ring_ids.push_back(i); // end of unsegmented linesegment
+          } else if (cur_seg!=0 && prev_seg!=0) { // from one segment to another
+            new_ring_ids.push_back(prev_i); // last of prev
+            new_ring_ids.push_back(i); // first of cur
+          } else if (cur_seg==0 && prev_seg!=0) { //from segment to unsegmented
+            new_ring_ids.push_back(prev_i); // last of prev
+            // new_ring_ids.push_back(prev_i); // begin of unsegmented linesegment
+          } // else: we are inside an unsegmented or segmented zone
+          prev_seg = cur_seg;
+          prev_i = i;
+        }
+        int last = new_ring_ids.size()-1;
+        int order_cnt=0;
+        
+        // ring_idx.push_back();
+        for(int i = no_offset ? 0:1; i<last; i += 2) {
+          // TODO: reproject points on fitted line!!
+          auto& p0 = ring[new_ring_ids[i]];
+          auto& p1 = ring[new_ring_ids[i+1]];
+          edge_segments.push_back({p0,p1});
+          ring_idx[ring_cntr].push_back(seg_cntr++);
+          // segment_collections.back().push_back({p0,p1});
+          ring_order.push_back(order_cnt);
+          ring_id.push_back(ring_cntr);
+          ring_order.push_back(order_cnt++);
+          ring_id.push_back(ring_cntr);
+          is_start.push_back(1);
+          is_start.push_back(0);
+        }
+        if(!no_offset) {
+          auto& p0 = ring[new_ring_ids[last]];
+          auto& p1 = ring[new_ring_ids[0]];
+          edge_segments.push_back({p0,p1});
+          ring_idx[ring_cntr].push_back(seg_cntr++);
+          // segment_collections.back().push_back({p0,p1});
+          ring_order.push_back(order_cnt);
+          ring_id.push_back(ring_cntr);
+          ring_order.push_back(order_cnt++);
+          ring_id.push_back(ring_cntr);
+          is_start.push_back(1);
+          is_start.push_back(0);
+        }
+        ++ring_cntr;
+        // std::cout << "number of shapes: " << LD.segment_shapes.size() <<"\n";
+        // std::cout << "number of segments: " << order_cnt <<"\n";
       }
     }
   }
 
   output("edge_segments").set(edge_segments);
+  output("ring_idx").set(ring_idx);
+  output("ring_id").set(ring_id);
+  output("ring_order").set(ring_order);
+  output("is_start").set(is_start);
 }
 
 void ClassifyEdgePointsNode::process(){
@@ -745,7 +841,7 @@ void BuildingSelectorNode::process() {
 
 void RegulariseLinesNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto edges = input("edge_segments").get<LineStringCollection>();
+  auto edges = input("edge_segments").get<SegmentCollection>();
   auto footprint = input("footprint").get<LinearRing>();
 
   auto dist_threshold = param<float>("dist_threshold");
@@ -968,6 +1064,82 @@ void RegulariseLinesNode::process(){
 
   output("merged_edges_out").set(merged_edges_out);
   output("edges_out").set(edges_out);
+}
+
+void chain(Segment& a, Segment& b, LinearRing& ring, const float& snap_threshold) {
+  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+  K::Line_2 l_a(K::Point_2(a[0][0], a[0][1]), K::Point_2(a[1][0], a[1][1]));
+  K::Line_2 l_b(K::Point_2(b[0][0], b[0][1]), K::Point_2(b[1][0], b[1][1]));
+  K::Segment_2 s(K::Point_2(a[1][0], a[1][1]), K::Point_2(b[0][0], b[0][1]));
+  auto result = CGAL::intersection(l_a, l_b);
+  if (auto p = boost::get<K::Point_2>(&*result)) {
+    if (CGAL::squared_distance(*p, s) < snap_threshold) {
+      ring.push_back({float(p->x()), float(p->y()), 0});
+    } else {
+      ring.push_back(a[1]);
+      ring.push_back(b[0]);
+    }
+
+  } else if (auto l = boost::get<K::Line_2>(&*result)) {
+
+  }
+}
+void RegulariseRingsNode::process(){
+  // Set up vertex data (and buffer(s)) and attribute pointers
+  auto edges = input("edge_segments").get<SegmentCollection>();
+  auto ring_idx = input("ring_idx").get<std::vector<std::vector<size_t>>>();
+  auto footprint = input("footprint").get<LinearRing>();
+  // auto ring_id = input("ring_id").get<vec1i>();
+  // auto ring_order = input("ring_order").get<vec1i>();
+
+  SegmentCollection all_edges;
+
+  // build vector of all input edges
+  for(auto edge : edges) {
+    all_edges.push_back(edge);
+  }
+  for(size_t i=0; i<footprint.size()-1; ++i) {
+    all_edges.push_back(Segment({footprint[i], footprint[i+1]}));
+  }
+  all_edges.push_back(
+    Segment({footprint[footprint.size()-1], footprint[0]})
+  );
+
+  // get clusters from line regularisation 
+  auto LR = LineRegulariser(all_edges);
+  LR.dist_threshold = param<float>("dist_threshold");
+  LR.angle_threshold = param<float>("angle_threshold");
+  LR.cluster();
+
+  // get clusters from line regularisation 
+  // std::vector<std::vector<size_t>> idx_per_ring;
+  // size_t cur_rid, prev_rid = ring_id[0];
+  // std::vector<size_t> idx;
+  // for (size_t i=0; i<edges.size(); ++i) {
+  //   cur_rid = ring_id[i];
+  //   if (cur_rid == prev_rid) {
+  //     idx.push_back(i);
+  //   } else {
+  //     idx_per_ring.push_back(idx);
+  //     idx.clear();
+  //     idx.push_back(i);
+  //   }
+  //   prev_rid = cur_rid;
+  // } idx_per_ring.push_back(idx);
+
+  LinearRingCollection new_rings;
+  for (auto& idx : ring_idx) {
+    LinearRing new_ring;
+    for (size_t i=idx[1]; i<idx[0]+idx.size(); ++i) {
+      chain(all_edges[i-1], all_edges[i], new_ring, param<float>("snap_threshold"));
+    }
+    chain(all_edges[idx[idx.size()-1]], all_edges[idx[0]], new_ring, param<float>("snap_threshold"));
+    new_rings.push_back(new_ring);
+  }
+
+  // output("merged_edges_out").set(merged_edges_out);
+  output("edges_out").set(all_edges);
+  output("rings_out").set(new_rings);
 }
 
 void LOD13GeneratorNode::process(){

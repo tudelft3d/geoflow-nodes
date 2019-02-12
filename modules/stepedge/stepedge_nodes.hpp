@@ -114,7 +114,7 @@ namespace geoflow::nodes::stepedge {
 
     using Node::Node;
     void init() {
-      add_input("edge_segments", TT_line_string_collection);
+      add_input("edge_segments", {TT_line_string_collection, TT_linear_ring_collection});
       add_input("footprint", TT_linear_ring);
       add_output("arrangement", TT_any);
       add_output("arr_segments", TT_line_string_collection);
@@ -134,7 +134,11 @@ namespace geoflow::nodes::stepedge {
     using Node::Node;
     void init() {
       add_input("edge_points", {TT_point_collection, TT_linear_ring_collection});
-      add_output("edge_segments", TT_line_string_collection);
+      add_output("edge_segments", TT_segment_collection);
+      add_output("ring_idx", TT_any);
+      add_output("ring_id", TT_vec1i);
+      add_output("ring_order", TT_vec1i);
+      add_output("is_start", TT_vec1i);
     }
 
     void gui(){
@@ -275,7 +279,7 @@ namespace geoflow::nodes::stepedge {
     public:
     using Node::Node;
     void init() {
-      add_input("edge_segments", TT_line_string_collection);
+      add_input("edge_segments", TT_segment_collection);
       add_input("footprint", TT_linear_ring);
       add_output("edges_out", TT_line_string_collection);
       add_output("merged_edges_out", TT_line_string_collection);
@@ -290,6 +294,37 @@ namespace geoflow::nodes::stepedge {
     void gui(){
       ImGui::DragFloat("Distance threshold", &param<float>("dist_threshold"), 0.1, 0);
       ImGui::DragFloat("Angle threshold", &param<float>("angle_threshold"), 0.01, 0.01, pi);
+    }
+    void process();
+  };
+
+  class RegulariseRingsNode:public Node {
+
+    public:
+    using Node::Node;
+    void init() {
+      add_input("edge_segments", TT_segment_collection);
+      add_input("ring_idx", TT_any);
+      // add_input("ring_id", TT_vec1i);
+      // add_input("ring_order", TT_vec1i);
+      // add_input("edge_segments", TT_segment_collection);
+      add_input("footprint", TT_linear_ring);
+      add_output("edges_out", TT_segment_collection);
+      add_output("merged_edges_out", TT_line_string_collection);
+      add_output("cluster_labels", TT_vec1i);
+      add_output("rings_out", TT_linear_ring_collection);
+      // add_output("footprint_labels", TT_vec1i);
+      // add_output("line_clusters", TT_any); // ie a LineCluster
+      // add_output("tmp_vec3f", TT_vec3f);
+      add_param("dist_threshold", (float) 0.5);
+      add_param("angle_threshold", (float) 0.1);
+      add_param("snap_threshold", (float) 0.3);
+    }
+
+    void gui(){
+      ImGui::DragFloat("Distance threshold", &param<float>("dist_threshold"), 0.1, 0);
+      ImGui::DragFloat("Angle threshold", &param<float>("angle_threshold"), 0.01, 0.01, 3.1415);
+      ImGui::DragFloat("Snap threshold", &param<float>("snap_threshold"), 0.01, 0.01, 10);
     }
     void process();
   };
