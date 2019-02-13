@@ -55,6 +55,8 @@ class PointDistanceNode:public Node{
     add_input("triangles", TT_triangle_collection);
     add_output("points", TT_point_collection);
     add_output("distances", TT_vec1f);
+    add_output("distance_min", TT_float);
+    add_output("distance_max", TT_float);
   }
   void gui(){
     ImGui::InputText("LAS file path", filepath, IM_ARRAYSIZE(filepath));
@@ -204,10 +206,11 @@ class IsoLineNode:public Node {
 public:
   IsoLineNode(NodeManager& manager):Node(manager) {
     add_input("cgal_cdt", TT_any);
+    add_input("min", TT_float);
+    add_input("max", TT_float);
     add_output("lines", TT_line_string_collection);
     add_output("attributes", TT_attribute_map_f);
   }
-
   void process();
 };
 

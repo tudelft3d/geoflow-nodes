@@ -7,6 +7,7 @@
 
 #include <lasreader.hpp>
 #include <fstream>
+#include <algorithm>
 
 // CDT
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
@@ -270,8 +271,12 @@ void PointDistanceNode::process(){
   lasreader->close();
   delete lasreader;
 
+ auto minmax = std::minmax_element(distances.begin(), distances.end());
+
   outputs("points").set(points);
   outputs("distances").set(distances);
+  outputs("distance_min").set(sqrt(*(minmax.first)));
+  outputs("distance_max").set(sqrt(*(minmax.second)));
 }
 
 LineStringCollection densify_linestrings(LineStringCollection line_strings, float interval)
@@ -622,10 +627,14 @@ void PLWriterNode::process() {
 
 void IsoLineNode::process() {
   auto cdt = inputs("cgal_cdt").get<isolines::CDT>();
-  //auto heights = inputs("heights").get<vec1f>();
+  float min = inputs("min").get<float>();
+  float max = inputs("max").get<float>();
+
+  int start = std::floor(min);
+  int end = std::ceil(max);
 
   vec1f heights;
-  for (int i = 1; i < 20; i++) {
+  for (int i = start; i < end; i++) {
     heights.push_back(i);
   }
 
@@ -634,6 +643,7 @@ void IsoLineNode::process() {
   std::map< double, std::vector< CGAL::Segment_3<isolines::K> > > segmentVec;
 
   for (auto isoDepth : heights) {
+    std::cout << "Slicing ISO lines at height " << isoDepth << "\n";
     // faceCache is used to ensure line segments are outputted only once. It will contain faces that have an edge exactly on the contouring depth.
     std::set<isolines::Face_handle> faceCache;
 
@@ -716,7 +726,6 @@ void IsoLineNode::process() {
 }
 
 void IsoLineSlicerNode::process() {
-  //typedef CGAL::Simple_cartesian<double> K;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef K::Point_3 Point;
   typedef K::Plane_3 Plane;

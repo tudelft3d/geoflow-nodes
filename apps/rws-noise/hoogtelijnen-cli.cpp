@@ -41,6 +41,7 @@ int main(int ac, const char * av[])
     auto height_difference_calc = std::make_shared<PointDistanceNode>(N);
     auto tin_creator_difference = std::make_shared<CDTNode>(N);
     auto iso_lines = std::make_shared<IsoLineNode>(N);
+    auto line_merger = std::make_shared<GEOSMergeLinesNode>(N);
     auto add_height_to_lines = std::make_shared<LineHeightNode>(N);
     auto tin_simp_lines = std::make_shared<TinSimpNode>(N);
     auto tin_simp_iso = std::make_shared<TinSimpNode>(N);
@@ -69,9 +70,13 @@ int main(int ac, const char * av[])
     // make tin from height differences
     geoflow::connect(height_difference_calc->outputs("points"), tin_creator_difference->inputs("geometries"));
     // make iso lines
+    geoflow::connect(height_difference_calc->outputs("distance_min"), iso_lines->inputs("min"));
+    geoflow::connect(height_difference_calc->outputs("distance_max"), iso_lines->inputs("max"));
     geoflow::connect(tin_creator_difference->outputs("cgal_cdt"), iso_lines->inputs("cgal_cdt"));
+    // merge iso line segments
+    geoflow::connect(iso_lines->outputs("lines"), line_merger->inputs("lines"));
     // add height to lines
-    geoflow::connect(iso_lines->outputs("lines"), add_height_to_lines->inputs("lines"));
+    geoflow::connect(line_merger->outputs("lines"), add_height_to_lines->inputs("lines"));
     // remove lines using tinsimp
     geoflow::connect(ogr_loader->outputs("line_strings"), tin_simp_lines->inputs("geometries"));
     geoflow::connect(add_height_to_lines->outputs("lines"), tin_simp_iso->inputs("geometries"));

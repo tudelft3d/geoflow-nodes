@@ -61,7 +61,15 @@ class OGRWriterNoAttributesNode:public Node {
   }
   void process();
 };
+class GEOSMergeLinesNode:public Node {
+  public:
+  GEOSMergeLinesNode(NodeManager& manager):Node(manager) {
+    add_input("lines", TT_line_string_collection);
+    add_output("lines", TT_line_string_collection);
+  }
 
+  void process();
+};
 class CSVLoaderNode:public Node {
   public:
   char filepath[256] = "/Users/ravi/git/heightjump-detect/build/ComparePointDistanceNode.out";

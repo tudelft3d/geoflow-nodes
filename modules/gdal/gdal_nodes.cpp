@@ -11,6 +11,7 @@ typedef bg::model::point<double, 3, bg::cs::cartesian> point_type_3d;
 #include <unordered_map>
 #include <variant>
 #include <fstream>
+#include <geos_c.h>
 
 using namespace geoflow;
 
@@ -170,14 +171,14 @@ void OGRLoaderNode::process(){
 //         auto n = poLineString->getNumPoints();
 //         vec3f line;
 //         OGRPoint* poPoint;
-//         for(size_t i=0; i<n; i++) {
-//           poLineString->getPoint(i, poPoint);
+//         for(size_t j=0; j<n; j++) {
+//           poLineString->getPoint(j, poPoint);
 //           line.push_back({float(poPoint->getX()-center_x), float(poPoint->getY()-center_y), float(poPoint->getZ())});
 //         }
 //         lines_vec3f.push_back(line[0]);
-//         for (size_t i=1; i<(line.size()-1); i++){
-//           lines_vec3f.push_back(line[i]);
-//           lines_vec3f.push_back(line[i]);
+//         for (size_t j=1; j<(line.size()-1); j++){
+//           lines_vec3f.push_back(line[j]);
+//           lines_vec3f.push_back(line[j]);
 //         }
 //         lines_vec3f.push_back(line[line.size()-1]);
 //         lines.push_back(line);
@@ -377,6 +378,44 @@ void OGRWriterNoAttributesNode::process() {
     GDALClose( poDS );
 }
 
+void GEOSMergeLinesNode::process() {
+    std::cout << "Merging lines\n";
+    auto lines = inputs("lines").get<LineStringCollection>();
+    GEOSContextHandle_t gc = GEOS_init_r();
+    std::vector<GEOSGeometry*> linearray;
+    assert(geometries = malloc(lines.size() * sizeof(GEOSGeometry *)));
+    for (int i = 0; i < lines.size(); i++) {
+      GEOSCoordSequence *points = GEOSCoordSeq_create_r(gc, 2, 3);
+      for (int j = 0; j < 2; j++) {
+        GEOSCoordSeq_setX_r(gc, points, j, lines[i][j][0]);
+        GEOSCoordSeq_setY_r(gc, points, j, lines[i][j][1]);
+        GEOSCoordSeq_setZ_r(gc, points, j, lines[i][j][2]);
+      }
+      GEOSGeometry* line = GEOSGeom_createLineString_r(gc, points);
+      linearray.push_back(line);
+    }
+    GEOSGeometry* lineCollection = GEOSGeom_createCollection_r(gc, GEOS_GEOMETRYCOLLECTION, linearray.data(), lines.size());
+    GEOSGeometry* mergedlines = GEOSLineMerge_r(gc, lineCollection);
+    
+    LineStringCollection outputLines;
+    for (int i = 0; i < GEOSGetNumGeometries_r(gc, mergedlines); i++) {
+      const GEOSCoordSequence* l = GEOSGeom_getCoordSeq_r(gc, GEOSGetGeometryN_r(gc, mergedlines, i));
+      vec3f line_vec3f;
+      unsigned int size;
+      GEOSCoordSeq_getSize_r(gc, l, &size);
+      std::cout << size << std::endl;
+      for (int j = 0; j < size;j++) {
+        double x,y,z = 0;
+        GEOSCoordSeq_getX_r(gc, l, j, &x);
+        GEOSCoordSeq_getY_r(gc, l, j, &y);
+        GEOSCoordSeq_getZ_r(gc, l, j, &z);
+        line_vec3f.push_back({ float(x),float(y),float(z) });
+      }
+      outputLines.push_back(line_vec3f);
+    }
+
+    outputs("lines").set(outputLines);
+}
 void CSVLoaderNode::process(){
   PointCollection points;
   
