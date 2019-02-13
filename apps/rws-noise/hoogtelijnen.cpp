@@ -3,7 +3,7 @@
 
 #include <gdal_register.hpp>
 #include <cgal_register.hpp>
-#include <geoflow/gui/flowchart.hpp>
+// #include <geoflow/gui/flowchart.hpp>
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
@@ -94,8 +94,8 @@ int main(int ac, const char * av[])
     // write lines
     geoflow::connect(simplify_lines_cdt->output("lines"), ogr_writer->input("geometries"));
 
-    if (gui)
-        geoflow::launch_flowchart(N, {cgal, gdal});
-    else
+    // if (gui)
+        // geoflow::launch_flowchart(N, {cgal, gdal});
+    // else
         N.run(*ogr_loader);
 }
