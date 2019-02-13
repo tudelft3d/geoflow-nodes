@@ -462,7 +462,7 @@ void SimplifyLinesNode::process() {
   typedef PS::Visvalingam_cost                            Cost;
 
   CT ct;
-  Stop_cost stop = Stop_cost(threshold_stop_cost * threshold_stop_cost);
+  Stop_cost stop = Stop_cost(threshold_stop_cost);
 
   size_t s_index = 0;
   for (auto& linestring : lines) {
