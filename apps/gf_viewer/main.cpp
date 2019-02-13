@@ -33,9 +33,10 @@ int main(int ac, const char * av[])
     NodeHandle ComputeMetrics = N.create_node(stepedge, "ComputeMetrics", {300,75});
     NodeHandle AlphaShape = N.create_node(stepedge, "AlphaShape", {600,75});
     NodeHandle DetectLines = N.create_node(stepedge, "DetectLines", {900,75});
-    NodeHandle RegulariseLines = N.create_node(stepedge, "RegulariseLines", {1200,175});
-    NodeHandle BuildArrangement = N.create_node(stepedge, "BuildArrangement", {1200,75});
-    NodeHandle ProcessArrangement = N.create_node(stepedge, "ProcessArrangement", {1500,75});
+    // NodeHandle RegulariseLines = N.create_node(stepedge, "RegulariseLines", {1200,175});
+    NodeHandle RegulariseRings = N.create_node(stepedge, "RegulariseRings", {1200,175});
+    NodeHandle BuildArrangement = N.create_node(stepedge, "BuildArrFromRings", {1200,75});
+    // NodeHandle ProcessArrangement = N.create_node(stepedge, "ProcessArrangement", {1500,75});
     NodeHandle Extruder = N.create_node(stepedge, "Extruder", {1800,75});
 
     connect(OGRLoader, PolygonSimp, "linear_rings", "polygons");
@@ -44,14 +45,18 @@ int main(int ac, const char * av[])
     connect(LASInPolygons, BuildingSelect, "point_clouds", "point_clouds");
     connect(BuildingSelect, ComputeMetrics, "point_cloud", "points");
     connect(BuildingSelect, BuildArrangement, "polygon", "footprint");
-    connect(BuildingSelect, RegulariseLines, "polygon", "footprint");
+    connect(BuildingSelect, RegulariseRings, "polygon", "footprint");
     connect(ComputeMetrics, AlphaShape, "points", "points");
-    connect(ComputeMetrics, ProcessArrangement, "points", "points");
+    // connect(ComputeMetrics, ProcessArrangement, "points", "points");
     connect(AlphaShape, DetectLines, "alpha_rings", "edge_points");
-    connect(DetectLines, RegulariseLines, "edge_segments", "edge_segments");
-    connect(RegulariseLines, BuildArrangement, "edges_out", "edge_segments");
-    connect(BuildArrangement, ProcessArrangement, "arrangement", "arrangement");
-    connect(ProcessArrangement, Extruder, "arrangement", "arrangement");
+    connect(DetectLines, RegulariseRings, "edge_segments", "edge_segments");
+    connect(DetectLines, RegulariseRings, "ring_idx", "ring_idx");
+    connect(RegulariseRings, BuildArrangement, "rings_out", "rings");
+    connect(AlphaShape, BuildArrangement, "points_per_plane", "points_per_plane");
+    connect(AlphaShape, BuildArrangement, "plane_idx", "plane_idx");
+    // connect(BuildArrangement, ProcessArrangement, "arrangement", "arrangement");
+    // connect(ProcessArrangement, Extruder, "arrangement", "arrangement");
+    connect(BuildArrangement, Extruder, "arrangement", "arrangement");
 
     LASInPolygons->set_param(
         "las_filepath", (std::string)"/Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las");

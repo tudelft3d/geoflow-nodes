@@ -156,8 +156,9 @@ void AlphaShapeNode::process(){
   LineStringCollection alpha_edges;
   LinearRingCollection alpha_rings;
   TriangleCollection alpha_triangles;
-  vec1i segment_ids;
+  vec1i segment_ids, plane_idx;
   for (auto& it : points_per_segment ) {
+    plane_idx.push_back(it.first);
     auto points = it.second;
     as::Triangulation_2 T;
     T.insert(points.begin(), points.end());
@@ -249,6 +250,8 @@ void AlphaShapeNode::process(){
   
   if (extract_alpha_rings) {
     output("alpha_rings").set(alpha_rings);
+    output("points_per_plane").set(points_per_segment);
+    output("plane_idx").set(plane_idx);
   }
   output("alpha_edges").set(alpha_edges);
   output("alpha_triangles").set(alpha_triangles);
@@ -309,20 +312,23 @@ void ExtruderNode::process(){
 
   TriangleCollection triangles;
   vec3f normals;
-  vec1i cell_id_vec1i;
+  vec1i cell_id_vec1i, plane_id;
   vec1i labels;
   vec1f rms_errors, max_errors, segment_coverages;
   using N = uint32_t;
 
   
-  size_t cell_id=0;
+  size_t cell_id=0, pid;
   float rms_error, max_error, segment_coverage;
   for (auto face: arr.face_handles()){
-    if(face->data().is_finite) {
+    // bool extract = param<bool>("in_footprint") ? face->data().in_footprint : face->data().is_finite;
+    bool extract = face->data().in_footprint;
+    if(extract) {
       cell_id++;
       rms_error = face->data().rms_error_to_avg;
       max_error = face->data().max_error;
       segment_coverage = face->data().segid_coverage;
+      pid = face->data().segid;
       vec2f polygon, vertices;
       arrangementface_to_polygon(face, polygon);
       std::vector<N> indices = mapbox::earcut<N>(std::vector<vec2f>({polygon}));
@@ -337,6 +343,7 @@ void ExtruderNode::process(){
           labels.push_back(0);
           normals.push_back({0,0,-1});
           cell_id_vec1i.push_back(cell_id);
+          plane_id.push_back(pid);
           rms_errors.push_back(rms_error);
           max_errors.push_back(max_error);
           segment_coverages.push_back(segment_coverage);
@@ -352,7 +359,8 @@ void ExtruderNode::process(){
             labels.push_back(1);
             normals.push_back({0,0,1});
             cell_id_vec1i.push_back(cell_id);
-            rms_errors.push_back(rms_error);
+            plane_id.push_back(pid);
+            // rms_errors.push_back(rms_error);
             rms_errors.push_back(rms_error);
             max_errors.push_back(max_error);
             segment_coverages.push_back(segment_coverage);
@@ -415,8 +423,11 @@ void ExtruderNode::process(){
         normals.push_back(n);
 
         cell_id_vec1i.push_back(0);
+        plane_id.push_back(0);
         cell_id_vec1i.push_back(0);
+        plane_id.push_back(0);
         cell_id_vec1i.push_back(0);
+        plane_id.push_back(0);
         rms_errors.push_back(-1);
         rms_errors.push_back(-1);
         rms_errors.push_back(-1);
@@ -441,8 +452,11 @@ void ExtruderNode::process(){
         normals.push_back(n);
 
         cell_id_vec1i.push_back(0);
+        plane_id.push_back(0);
         cell_id_vec1i.push_back(0);
+        plane_id.push_back(0);
         cell_id_vec1i.push_back(0);
+        plane_id.push_back(0);
         rms_errors.push_back(-1);
         rms_errors.push_back(-1);
         rms_errors.push_back(-1);
@@ -458,6 +472,7 @@ void ExtruderNode::process(){
   
   output("normals_vec3f").set(normals);
   output("cell_id_vec1i").set(cell_id_vec1i);
+  output("plane_id").set(plane_id);
   output("rms_errors").set(rms_errors);
   output("max_errors").set(max_errors);
   output("segment_coverages").set(segment_coverages);
@@ -484,62 +499,100 @@ void ProcessArrangementNode::process(){
   output("arrangement").set(arr);
 }
 
+void arr2segments(Face_handle& face, LineStringCollection& segments) {
+  auto he = face->outer_ccb();
+  auto first = he;
+
+  while(true){
+    segments.push_back({
+      {
+        float(CGAL::to_double(he->source()->point().x())),
+        float(CGAL::to_double(he->source()->point().y())),
+        0
+      },{
+        float(CGAL::to_double(he->target()->point().x())),
+        float(CGAL::to_double(he->target()->point().y())),
+        0
+      }
+    });
+
+    he = he->next();
+    if (he==first) break;
+  }
+  segments.push_back({
+    {
+      float(CGAL::to_double(he->source()->point().x())),
+      float(CGAL::to_double(he->source()->point().y())),
+      0
+    },{
+      float(CGAL::to_double(he->target()->point().x())),
+      float(CGAL::to_double(he->target()->point().y())),
+      0
+    }
+  });
+}
+
 void BuildArrangementNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto footprint = input("footprint").get<LinearRing>();
   auto geom_term = input("edge_segments");
 
-  // bg::model::polygon<point_type> fp;
-  // for(auto& p : footprint) {
-  //     bg::append(fp.outer(), point_type(p[0], p[1]));
-  //   }
-
   Arrangement_2 arr;
-  arr.clear();
-  if (geom_term.connected_type == TT_linear_ring_collection) {
-    auto rings = geom_term.get<LinearRingCollection>();
-    build_arrangement(footprint, rings, arr, remove_unsupported);
-  } else if (geom_term.connected_type == TT_line_string_collection) {
-    auto edge_segments = geom_term.get<LineStringCollection>();
-    build_arrangement(footprint, edge_segments, arr, remove_unsupported);
-  }
+  auto edge_segments = geom_term.get<LineStringCollection>();
+  build_arrangement(footprint, edge_segments, arr, remove_unsupported);
   LineStringCollection segments;
-  for (auto face: arr.face_handles()){
-      if(face->data().is_finite){
-          auto he = face->outer_ccb();
-          auto first = he;
-
-          while(true){
-              segments.push_back({
-                {
-                  float(CGAL::to_double(he->source()->point().x())),
-                  float(CGAL::to_double(he->source()->point().y())),
-                  0
-                },{
-                  float(CGAL::to_double(he->target()->point().x())),
-                  float(CGAL::to_double(he->target()->point().y())),
-                  0
-                }
-              });
-
-              he = he->next();
-              if (he==first) break;
-          }
-          segments.push_back({
-            {
-              float(CGAL::to_double(he->source()->point().x())),
-              float(CGAL::to_double(he->source()->point().y())),
-              0
-            },{
-              float(CGAL::to_double(he->target()->point().x())),
-              float(CGAL::to_double(he->target()->point().y())),
-              0
-            }
-          });
-      }
+  for (auto& face: arr.face_handles()){
+    if (face->data().in_footprint)
+      arr2segments(face, segments);
   }
   output("arr_segments").set(segments);
   output("arrangement").set(arr);
+};
+
+void BuildArrFromRingsNode::process() {
+  // Set up vertex data (and buffer(s)) and attribute pointers
+  auto footprint = input("footprint").get<LinearRing>();
+  auto rings = input("rings").get<LinearRingCollection>();
+  auto plane_idx = input("plane_idx").get<vec1i>();
+  auto points_per_plane = input("points_per_plane").get<std::unordered_map<int, std::vector<Point>>>();
+
+  Arrangement_2 arr_base;
+
+
+  Polygon_2 cgal_footprint = ring_to_cgal_polygon(footprint);
+  // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
+  {
+    Face_index_observer obs (arr_base, true);
+    insert_non_intersecting_curves(arr_base, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
+  }
+  // insert step-edge lines
+  {
+    Arrangement_2 arr_overlay;
+    size_t i=0;
+    for (auto& ring : rings) {
+      // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
+      Arrangement_2 arr;
+      Face_index_observer obs (arr, false);
+      auto polygon = ring_to_cgal_polygon(ring);
+      obs.set_plane_id(plane_idx[i++]);
+      insert(arr, polygon.edges_begin(), polygon.edges_end());
+
+      Overlay_traits overlay_traits;
+      arr_overlay.clear();
+      overlay(arr_base, arr, arr_overlay, overlay_traits);
+      arr_base = arr_overlay;
+      std::cout << "overlay success\n";
+      std::cout << "facecount: " << arr_base.number_of_faces() << "\n\n";
+    }
+  }
+
+  LineStringCollection segments;
+  for (auto& face: arr_base.face_handles()){
+    if (face->data().in_footprint)
+      arr2segments(face, segments);
+  }
+  output("arr_segments").set(segments);
+  output("arrangement").set(arr_base);
 }
 
 // inline int circindex(int i, size_t& N) {

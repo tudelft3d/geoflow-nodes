@@ -4,6 +4,14 @@
 #include <unordered_map>
 #include <boost/tuple/tuple.hpp>
 
+Polygon_2 ring_to_cgal_polygon(geoflow::LinearRing& ring) {
+  std::vector<Point_2> footprint_pts;
+  for (auto p : ring) {
+    footprint_pts.push_back(Point_2(p[0], p[1]));
+  }
+  return Polygon_2(footprint_pts.begin(), footprint_pts.end());
+}
+
 void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<point_type>> &footprints, std::vector<PNL_vector> &points_vec) {
   LASreadOpener lasreadopener;
   lasreadopener.set_file_name(las_filename.c_str());
@@ -263,7 +271,7 @@ void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vect
 }
 
 void build_arrangement(geoflow::LinearRing &footprint, geoflow::LineStringCollection & edge_segments, Arrangement_2 &arr, bool remove_unsupported){
-  Face_index_observer obs (arr);
+  Face_index_observer obs (arr, false);
   // const double s = 100;
 
   // insert footprint segments
@@ -338,58 +346,25 @@ void build_arrangement(geoflow::LinearRing &footprint, geoflow::LineStringCollec
   }
 }
 
-Polygon_2 ring_to_cgal_polygon(geoflow::LinearRing& ring) {
-  std::vector<Point_2> footprint_pts;
-  for (auto p : ring) {
-    footprint_pts.push_back(Point_2(p[0], p[1]));
-  }
-  return Polygon_2(footprint_pts.begin(), footprint_pts.end());
-}
+// void build_arrangement(geoflow::LinearRing &footprint, geoflow::LinearRingCollection & rings, Arrangement_2 &arr, geoflow::vec1i& plane_idx, bool remove_unsupported){
 
-void build_arrangement(geoflow::LinearRing &footprint, geoflow::LinearRingCollection & rings, Arrangement_2 &arr, bool remove_unsupported){
-  Face_index_observer obs (arr);
-
-  Polygon_2 cgal_footprint = ring_to_cgal_polygon(footprint);
-  // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
-  insert_non_intersecting_curves(arr, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
-
-  for (auto edge : arr.edge_handles()) {
-    edge->data().is_touched = true;
-    edge->data().is_footprint = true;
-    edge->twin()->data().is_touched = true;
-    edge->twin()->data().is_footprint = true;
-  }
-  // std::cout << arr.number_of_faces() <<std::endl;
-  // for (auto face: arr.face_handles()){
-  //   if(face->is_unbounded())
-  //     std::cout << "unbounded face, id: " << face->data() << std::endl;
-  //   else
-  //     std::cout << "Bounded face, id: " << face->data() << std::endl;
-  // }
-
-
-  // insert step-edge lines
-  for (auto& ring : rings) {
-    // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
-    auto polygon = ring_to_cgal_polygon(ring);
-    insert(arr, polygon.edges_begin(), polygon.edges_end());
-  }
-}
+// }
 
 void arrangementface_to_polygon(Face_handle face, vec2f& polygons){
-  if(face->data().is_finite){ // ie it is a face on the interior of the footprint
-    auto he = face->outer_ccb();
-    auto first = he;
+  // if(extract_face){ // ie it is a face on the interior of the footprint
+  auto he = face->outer_ccb();
+  auto first = he;
 
-    while(true){
+  while(true){
+    // if (!he->source()- at_infinity())
       polygons.push_back({
         float(CGAL::to_double(he->source()->point().x())),
         float(CGAL::to_double(he->source()->point().y()))
       });
 
-      he = he->next();
-      if (he==first) break;
-    }
+    he = he->next();
+    if (he==first) break;
+  // }
   }
 }
 

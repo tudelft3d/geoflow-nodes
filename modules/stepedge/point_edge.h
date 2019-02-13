@@ -32,6 +32,8 @@
 #include <CGAL/Arrangement_2.h>
 #include <CGAL/Arr_extended_dcel.h>
 #include <CGAL/Arr_observer.h>
+#include <CGAL/Arr_overlay_2.h>
+#include <CGAL/Arr_default_overlay_traits.h>
 #include <CGAL/Cartesian.h>
 #include <CGAL/Exact_rational.h>
 #include <CGAL/Cartesian_converter.h>
@@ -105,6 +107,7 @@ typedef Traits_2::Line_2                              Line_2;
 typedef Traits_2::X_monotone_curve_2                  X_monotone_curve_2;
 struct FaceInfo {
   bool is_finite=false;
+  bool in_footprint=false;
   float elevation_avg=0;
   float elevation_min, elevation_max;
   size_t segid=0;
@@ -132,6 +135,29 @@ typedef Arrangement_2::Face_const_handle              Face_const_handle;
 typedef CGAL::Arr_accessor<Arrangement_2>             Arr_accessor;
 typedef Arr_accessor::Dcel_vertex                     DVertex;
 typedef Arrangement_2::Face                           Face;
+struct overlay_functor {
+  FaceInfo operator()(const FaceInfo a, const FaceInfo b) const { 
+    auto r = FaceInfo();
+    // if (a.is_finite && b.is_finite)
+    r.is_finite = true;
+    if (a.segid!=0 && b.segid==0)
+      r.segid = a.segid;
+    else if (a.segid==0 && b.segid!=0)
+      r.segid = b.segid;
+    else if (a.segid!=0 && b.segid!=0)
+      r.segid = 999;
+
+    if (a.in_footprint || b.in_footprint) {
+      r.in_footprint = true;
+    }
+
+    return r; 
+  }
+};
+typedef CGAL::Arr_face_overlay_traits<Arrangement_2,
+                                      Arrangement_2,
+                                      Arrangement_2,
+                                      overlay_functor >  Overlay_traits;
 // typedef CGAL::Cartesian_converter<IK,EK>                         IK_to_EK;
 // typedef CGAL::Cartesian_converter<Number_type,SCK>          ToInexact;
 
@@ -143,8 +169,39 @@ class Face_index_observer : public CGAL::Arr_observer<Arrangement_2>
 {
 private:
   int     n_faces;          // The current number of faces.
+  int     plane_id;
+  bool    in_footprint;
 public:
-  Face_index_observer (Arrangement_2& arr) :
+  Face_index_observer (Arrangement_2& arr, bool is_footprint) :
+    CGAL::Arr_observer<Arrangement_2> (arr),
+    n_faces (0), in_footprint(is_footprint)
+  {
+    CGAL_precondition (arr.is_empty());
+    arr.unbounded_face()->data().is_finite=false;
+    n_faces++;
+  };
+  void set_plane_id(int pid) { plane_id=pid; };
+  virtual void after_split_face (Face_handle old_face,
+                                 Face_handle new_face, bool )
+  {
+    // Assign index to the new face.
+    new_face->data().in_footprint = in_footprint;
+    if(n_faces == 1) {
+      new_face->data().is_finite = true;
+    } else if(old_face->data().is_finite) {
+      new_face->data().is_finite = true;
+      new_face->data().segid = plane_id;
+    } else
+      new_face->data().is_finite = false;
+    n_faces++;
+  }
+};
+class Face_split_observer : public CGAL::Arr_observer<Arrangement_2>
+{
+private:
+  int     n_faces;          // The current number of faces.
+public:
+  Face_split_observer (Arrangement_2& arr) :
     CGAL::Arr_observer<Arrangement_2> (arr),
     n_faces (0)
   {
@@ -259,11 +316,13 @@ struct config {
 
 typedef std::vector<std::array<float,2>> vec2f;
 
+Polygon_2 ring_to_cgal_polygon(geoflow::LinearRing& ring);
+
 void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<point_type>> &footprint, std::vector<PNL_vector> &points_vec) ;
 void compute_metrics(PNL_vector &points, config = config()) ;
 void classify_edgepoints(std::vector<linedect::Point> &edge_points, PNL_vector &points, config = config()) ;
 void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vector<linedect::Point> &edge_points, config = config()) ;
 void build_arrangement(geoflow::LinearRing &footprint, geoflow::LineStringCollection & edge_segments, Arrangement_2 &arr, bool remove_unsupported);
-void build_arrangement(geoflow::LinearRing &footprint, geoflow::LinearRingCollection & rings, Arrangement_2 &arr, bool remove_unsupported);
+// void build_arrangement(geoflow::LinearRing &footprint, geoflow::LinearRingCollection & rings, Arrangement_2 &arr, geoflow::vec1i& plane_idx, bool remove_unsupported);
 void process_arrangement(PNL_vector& points, Arrangement_2& arr, config = config());
 void arrangementface_to_polygon(Face_handle face, vec2f& polygons);

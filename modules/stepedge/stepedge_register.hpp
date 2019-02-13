@@ -10,6 +10,7 @@ namespace geoflow::nodes::stepedge {
     R.register_node<ExtruderNode>("Extruder");
     R.register_node<ProcessArrangementNode>("ProcessArrangement");
     R.register_node<BuildArrangementNode>("BuildArrangement");
+    R.register_node<BuildArrFromRingsNode>("BuildArrFromRings");
     R.register_node<DetectLinesNode>("DetectLines");
     R.register_node<ClassifyEdgePointsNode>("ClassifyEdgePoints");
     R.register_node<ComputeMetricsNode>("ComputeMetrics");

@@ -13,6 +13,8 @@ namespace geoflow::nodes::stepedge {
       // add_input("points", TT_any);
       add_input("points", TT_any);
       add_output("alpha_rings", TT_linear_ring_collection);
+      add_output("points_per_plane", TT_any);
+      add_output("plane_idx", TT_vec1i);
       add_output("edge_points", TT_point_collection);
       add_output("alpha_edges", TT_line_string_collection);
       add_output("alpha_triangles", TT_triangle_collection);
@@ -64,17 +66,21 @@ namespace geoflow::nodes::stepedge {
     void init() {
       add_input("arrangement", TT_any);
       add_output("cell_id_vec1i", TT_vec1i);
+      add_output("plane_id", TT_vec1i);
       add_output("rms_errors", TT_vec1f);
       add_output("max_errors", TT_vec1f);
       add_output("segment_coverages", TT_vec1f);
       add_output("triangles", TT_triangle_collection);
       add_output("normals_vec3f", TT_vec3f);
       add_output("labels_vec1i", TT_vec1i); // 0==ground, 1==roof, 2==outerwall, 3==innerwall
+
+      add_param("in_footprint", (bool) false);
     }
 
     void gui() {
       ImGui::Checkbox("Do walls", &do_walls);
       ImGui::Checkbox("Do roofs", &do_roofs);
+      ImGui::Checkbox("In footprint", &param<bool>("in_footprint"));
     }
     void process();
   };
@@ -121,6 +127,26 @@ namespace geoflow::nodes::stepedge {
     }
     void gui() {
       ImGui::Checkbox("Remove unsupported edges", &remove_unsupported);
+    }
+    void process();
+  };
+
+  class BuildArrFromRingsNode:public Node {
+
+    public:
+    // bool remove_unsupported=false;
+
+    using Node::Node;
+    void init() {
+      add_input("rings", TT_linear_ring_collection);
+      add_input("plane_idx", TT_vec1i);
+      add_input("points_per_plane", TT_any);
+      add_input("footprint", TT_linear_ring);
+      add_output("arrangement", TT_any);
+      add_output("arr_segments", TT_line_string_collection);
+    }
+    void gui() {
+      // ImGui::Checkbox("Remove unsupported edges", &remove_unsupported);
     }
     void process();
   };
