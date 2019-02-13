@@ -494,8 +494,8 @@ void SimplifyLinesNode::process() {
 
   for (auto cit = ct.constraints_begin(); cit != ct.constraints_end(); ++cit) {
     vec3f ls;
-    for (auto vit = ct.points_in_constraint_begin(*cit); vit != ct.points_in_constraint_end(*cit); ++vit) {
-      ls.push_back({ float(vit->x()), float(vit->y()), float(vit->z()) });
+    for (auto vit = ct.vertices_in_constraint_begin(*cit); vit != ct.vertices_in_constraint_end(*cit); ++vit) {
+      ls.push_back({ float((*vit)->point().x()), float((*vit)->point().y()), float((*vit)->point().z()) });
     }
     lines_out.push_back(ls);
   }
