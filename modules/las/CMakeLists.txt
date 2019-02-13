@@ -4,7 +4,7 @@ add_library(las_nodes STATIC
 )
 target_link_libraries( las_nodes
   geoflow-core
-  LASlib
+  ${LASlib}
 )
 set_target_properties(
   las_nodes

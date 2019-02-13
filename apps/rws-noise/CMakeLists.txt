@@ -4,7 +4,7 @@ endif()
 
 add_executable(hoogtelijnen hoogtelijnen.cpp)
 target_link_libraries( hoogtelijnen
-  geoflow-gui
+  # geoflow-gui
   Boost::program_options
   gdal_nodes
   cgal_nodes
