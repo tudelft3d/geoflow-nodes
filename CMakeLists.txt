@@ -33,12 +33,13 @@ add_definitions(
 )
 
 # LASlib
-add_subdirectory(thirdparty/LAStools/LASlib/src)
 include_directories(
   thirdparty/LAStools/LASlib/inc
   thirdparty/LAStools/LASzip/inc
   thirdparty/LAStools/LASzip/src
 )
+#add_subdirectory(thirdparty/LAStools/LASlib/src)
+SET(LASlib /home/rypeters/git/LAStools/LASlib/lib/libLASlib.a)
 
 # masbcpp
 add_subdirectory(thirdparty/masbcpp)
