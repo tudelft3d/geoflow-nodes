@@ -69,6 +69,7 @@ namespace geoflow::nodes::stepedge {
       add_output("plane_id", TT_vec1i);
       add_output("rms_errors", TT_vec1f);
       add_output("max_errors", TT_vec1f);
+      add_output("elevations", TT_vec1f);
       add_output("segment_coverages", TT_vec1f);
       add_output("triangles", TT_triangle_collection);
       add_output("normals_vec3f", TT_vec3f);
@@ -144,9 +145,12 @@ namespace geoflow::nodes::stepedge {
       add_input("footprint", TT_linear_ring);
       add_output("arrangement", TT_any);
       add_output("arr_segments", TT_line_string_collection);
+
+      add_param("z_percentile", (float) 0.9);
     }
     void gui() {
       // ImGui::Checkbox("Remove unsupported edges", &remove_unsupported);
+      ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
     }
     void process();
   };
@@ -336,15 +340,14 @@ namespace geoflow::nodes::stepedge {
       // add_input("edge_segments", TT_segment_collection);
       add_input("footprint", TT_linear_ring);
       add_output("edges_out", TT_segment_collection);
-      add_output("merged_edges_out", TT_line_string_collection);
-      add_output("cluster_labels", TT_vec1i);
       add_output("rings_out", TT_linear_ring_collection);
+      add_output("footprint_out", TT_linear_ring);
       // add_output("footprint_labels", TT_vec1i);
       // add_output("line_clusters", TT_any); // ie a LineCluster
       // add_output("tmp_vec3f", TT_vec3f);
       add_param("dist_threshold", (float) 0.5);
       add_param("angle_threshold", (float) 0.1);
-      add_param("snap_threshold", (float) 0.3);
+      add_param("snap_threshold", (float) 1.0);
     }
 
     void gui(){

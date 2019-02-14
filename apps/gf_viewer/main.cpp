@@ -37,14 +37,14 @@ int main(int ac, const char * av[])
     NodeHandle RegulariseRings = N.create_node(stepedge, "RegulariseRings", {1200,175});
     NodeHandle BuildArrangement = N.create_node(stepedge, "BuildArrFromRings", {1200,75});
     // NodeHandle ProcessArrangement = N.create_node(stepedge, "ProcessArrangement", {1500,75});
-    NodeHandle Extruder = N.create_node(stepedge, "Extruder", {1800,75});
+    NodeHandle Extruder = N.create_node(stepedge, "Extruder", {1500,75});
 
     connect(OGRLoader, PolygonSimp, "linear_rings", "polygons");
     connect(PolygonSimp, BuildingSelect, "polygons_simp", "polygons");
     connect(PolygonSimp, LASInPolygons, "polygons_simp", "polygons");
     connect(LASInPolygons, BuildingSelect, "point_clouds", "point_clouds");
     connect(BuildingSelect, ComputeMetrics, "point_cloud", "points");
-    connect(BuildingSelect, BuildArrangement, "polygon", "footprint");
+    // connect(BuildingSelect, BuildArrangement, "polygon", "footprint");
     connect(BuildingSelect, RegulariseRings, "polygon", "footprint");
     connect(ComputeMetrics, AlphaShape, "points", "points");
     // connect(ComputeMetrics, ProcessArrangement, "points", "points");
@@ -52,6 +52,7 @@ int main(int ac, const char * av[])
     connect(DetectLines, RegulariseRings, "edge_segments", "edge_segments");
     connect(DetectLines, RegulariseRings, "ring_idx", "ring_idx");
     connect(RegulariseRings, BuildArrangement, "rings_out", "rings");
+    connect(RegulariseRings, BuildArrangement, "footprint_out", "footprint");
     connect(AlphaShape, BuildArrangement, "points_per_plane", "points_per_plane");
     connect(AlphaShape, BuildArrangement, "plane_idx", "plane_idx");
     // connect(BuildArrangement, ProcessArrangement, "arrangement", "arrangement");
