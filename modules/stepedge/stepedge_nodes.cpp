@@ -1,4 +1,5 @@
 #include "stepedge_nodes.hpp"
+#include "region_growing_plane.h"
 // #include "gloo.h"
 #include "ptinpoly.h"
 #include "earcut.hpp"
@@ -138,20 +139,19 @@ namespace as {
 namespace geoflow::nodes::stepedge {
 
 void AlphaShapeNode::process(){
+  auto points_per_segment = input("pts_per_roofplane").get<std::unordered_map<int, std::vector<Point>>>();
 
-  auto points = input("points").get<PNL_vector>();
   auto thres_alpha = param<float>("thres_alpha");
   auto extract_alpha_rings = param<bool>("extract_alpha_rings");
   
   // collect plane points
-  std::unordered_map<int, std::vector<Point>> points_per_segment;
-  for (auto& p : points) {
-    if (boost::get<2>(p)==0) // unsegmented
-      continue;
-    if (boost::get<3>(p)) // classified as wall
-      continue;
-    points_per_segment[boost::get<2>(p)].push_back(boost::get<0>(p));
-  }
+  // for (auto& p : points) {
+  //   if (boost::get<2>(p)==0) // unsegmented
+  //     continue;
+  //   if (boost::get<3>(p)) // classified as wall
+  //     continue;
+  //   points_per_segment[boost::get<2>(p)].push_back(boost::get<0>(p));
+  // }
   PointCollection edge_points, boundary_points;
   LineStringCollection alpha_edges;
   LinearRingCollection alpha_rings;
@@ -187,7 +187,6 @@ void AlphaShapeNode::process(){
         {float(p2.x()), float(p2.y()), float(p2.z())}
       });
     }
-
     
     // flood filling 
     auto grower = as::AlphaShapeRegionGrower(A);
@@ -250,8 +249,6 @@ void AlphaShapeNode::process(){
   
   if (extract_alpha_rings) {
     output("alpha_rings").set(alpha_rings);
-    output("points_per_plane").set(points_per_segment);
-    output("plane_idx").set(plane_idx);
   }
   output("alpha_edges").set(alpha_edges);
   output("alpha_triangles").set(alpha_triangles);
@@ -558,12 +555,20 @@ void BuildArrangementNode::process(){
   output("arrangement").set(arr);
 };
 
+void LinearRingtoRingsNode::process(){
+  auto lr = input("linear_ring").get<LinearRing>();
+  LinearRingCollection lrc;
+  lrc.push_back(lr);
+  output("linear_rings").set(lrc);
+}
+
 void BuildArrFromRingsNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto footprint = input("footprint").get<LinearRing>();
+  auto lrc = input("footprint").get<LinearRingCollection>();
+  auto footprint = lrc[0];
   auto rings = input("rings").get<LinearRingCollection>();
-  auto plane_idx = input("plane_idx").get<vec1i>();
-  auto points_per_plane = input("points_per_plane").get<std::unordered_map<int, std::vector<Point>>>();
+  // auto plane_idx = input("plane_idx").get<vec1i>();
+  auto points_per_plane = input("pts_per_roofplane").get<std::unordered_map<int, std::vector<Point>>>();
 
 
   Arrangement_2 arr_base;
@@ -577,11 +582,12 @@ void BuildArrFromRingsNode::process() {
   {
     Arrangement_2 arr_overlay;
     size_t i=0;
-    for (auto& ring : rings) {
+    // NOTE: rings and points_per_plane must be aligned!! (matching length and order)
+    for (auto& kv : points_per_plane) {
+      auto& ring = rings[i++];
       if (!ring.empty()) {
-        auto plane_id = plane_idx[i++];
-
-        auto& points = points_per_plane[plane_id];
+        auto plane_id = kv.first;
+        auto& points = kv.second;
         std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
           return p1.z() < p2.z();
         });
@@ -612,7 +618,7 @@ void BuildArrFromRingsNode::process() {
   }
   for (auto& kv : face_map) {
     std::stack<Face_handle> candidate_stack;
-    std::cout << "Growing face with elevation=" << kv.first << "\n";
+    // std::cout << "Growing face with elevation=" << kv.first << "\n";
     auto& cur_segid = kv.second->data().segid;
     auto& cur_elev = kv.second->data().elevation_avg;
     candidate_stack.push(kv.second);
@@ -838,8 +844,90 @@ void ClassifyEdgePointsNode::process(){
   output("edge_points_vec3f").set(edge_points_vec3f);
 }
 
+void DetectPlanesNode::process() {
+  auto points = input("points").get<PointCollection>();
+
+  auto metrics_normal_k = param<int>("metrics_normal_k");
+  auto metrics_plane_min_points = param<int>("metrics_plane_min_points");
+  auto metrics_plane_epsilon = param<float>("metrics_plane_epsilon");
+  auto metrics_plane_normal_threshold = param<float>("metrics_plane_normal_threshold");
+  auto metrics_is_wall_threshold = param<float>("metrics_is_wall_threshold");
+  auto metrics_is_horizontal_threshold = param<float>("metrics_is_horizontal_threshold");
+
+  // convert to cgal points with attributes
+  PNL_vector pnl_points;
+  for (auto& p : points) {
+    PNL pv;
+    boost::get<0>(pv) = Point(p[0], p[1], p[2]);
+    boost::get<2>(pv) = 0;
+    boost::get<3>(pv) = 0;
+    boost::get<9>(pv) = 0;
+    pnl_points.push_back(pv);
+  }
+  // estimate normals
+  CGAL::pca_estimate_normals<Concurrency_tag>(
+    pnl_points, metrics_normal_k,
+    CGAL::parameters::point_map(Point_map()).
+    normal_map(Normal_map())
+  );
+  // orient normals upwards
+  auto up = Vector(0,0,1);
+  for ( auto& pv : pnl_points) {
+    auto &n = boost::get<1>(pv);
+    if (n*up<0) 
+      boost::get<1>(pv) = -n;
+  }
+
+  // convert to lists required by the planedetector class
+  // size_t i=0;
+  std::vector<Point> points_vec;
+  std::vector<Vector> normals_vec;
+  points_vec.reserve(points.size());
+  for (auto &p : pnl_points) {
+    points_vec.push_back(boost::get<0>(p));
+    normals_vec.push_back(boost::get<1>(p));
+  }
+  // perform plane detection
+  planedect::PlaneDetector PD(points_vec, normals_vec);
+  PD.dist_thres = metrics_plane_epsilon * metrics_plane_epsilon;
+  PD.normal_thres = metrics_plane_normal_threshold;
+  PD.min_segment_count = metrics_plane_min_points;
+  PD.N = metrics_normal_k;
+  PD.detect();
+
+  // classify horizontal/vertical planes using plane normals
+  std::unordered_map<int, std::vector<Point>> pts_per_roofplane;
+  for(auto seg: PD.segment_shapes){
+    auto& plane = seg.second;
+    Vector n = plane.orthogonal_vector();
+    // this dot product is close to 0 for vertical planes
+    auto horizontality = CGAL::abs(n*Vector(0,0,1));
+    bool is_wall = horizontality < metrics_is_wall_threshold;
+    bool is_horizontal = horizontality > metrics_is_horizontal_threshold;
+    if (!is_wall)
+      pts_per_roofplane[seg.first] = PD.get_points(seg.first);
+    
+    auto plane_idx = PD.get_point_indices(seg.first);
+    for (size_t& i : plane_idx) {
+      boost::get<2>(pnl_points[i]) = seg.first;
+      boost::get<3>(pnl_points[i]) = is_wall;
+      boost::get<9>(pnl_points[i]) = is_horizontal;
+    }
+  }
+
+  vec1i plane_id, is_wall, is_horizontal;
+  for(auto& p : pnl_points){
+    plane_id.push_back(boost::get<2>(p));
+    is_wall.push_back(boost::get<3>(p));
+    is_horizontal.push_back(boost::get<9>(p));
+  }
+  output("pts_per_roofplane").set(pts_per_roofplane);
+  output("plane_id").set(plane_id);
+  output("is_wall").set(is_wall);
+  output("is_horizontal").set(is_horizontal);
+}
+
 void ComputeMetricsNode::process() {
-  // Set up vertex data (and buffer(s)) and attribute pointers
   auto points = input("points").get<PointCollection>();
 
   config c;
@@ -951,7 +1039,9 @@ void BuildingSelectorNode::process() {
   auto& polygons = input("polygons").get<LinearRingCollection&>();
   polygon_count = polygons.size();
   output("point_cloud").set(point_clouds[building_id]);
-  output("polygon").set(polygons[building_id]);
+  LinearRingCollection lrc;
+  lrc.push_back(polygons[building_id]);
+  output("polygon").set(lrc);
 };
 
 void RegulariseLinesNode::process(){
@@ -1203,7 +1293,8 @@ void RegulariseRingsNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto edges = input("edge_segments").get<SegmentCollection>();
   auto ring_idx = input("ring_idx").get<std::vector<std::vector<size_t>>>();
-  auto footprint = input("footprint").get<LinearRing>();
+  auto lrc = input("footprint").get<LinearRingCollection>();
+  auto footprint = lrc[0];
   // auto ring_id = input("ring_id").get<vec1i>();
   // auto ring_order = input("ring_order").get<vec1i>();
 
@@ -1261,11 +1352,13 @@ void RegulariseRingsNode::process(){
     chain(all_edges[i-1], all_edges[i], new_fp, param<float>("snap_threshold"));
   }
   chain(all_edges[fpi_end], all_edges[fpi_begin], new_fp, param<float>("snap_threshold"));
+  LinearRingCollection lrc2;
+  lrc2.push_back(new_fp);
 
   // output("merged_edges_out").set(merged_edges_out);
   output("edges_out").set(all_edges);
   output("rings_out").set(new_rings);
-  output("footprint_out").set(new_fp);
+  output("footprint_out").set(lrc2);
 }
 
 void LOD13GeneratorNode::process(){

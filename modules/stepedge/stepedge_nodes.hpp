@@ -11,10 +11,8 @@ namespace geoflow::nodes::stepedge {
     using Node::Node;
     void init() {
       // add_input("points", TT_any);
-      add_input("points", TT_any);
+      add_input("pts_per_roofplane", TT_any);
       add_output("alpha_rings", TT_linear_ring_collection);
-      add_output("points_per_plane", TT_any);
-      add_output("plane_idx", TT_vec1i);
       add_output("edge_points", TT_point_collection);
       add_output("alpha_edges", TT_line_string_collection);
       add_output("alpha_triangles", TT_triangle_collection);
@@ -140,9 +138,8 @@ namespace geoflow::nodes::stepedge {
     using Node::Node;
     void init() {
       add_input("rings", TT_linear_ring_collection);
-      add_input("plane_idx", TT_vec1i);
-      add_input("points_per_plane", TT_any);
-      add_input("footprint", TT_linear_ring);
+      add_input("pts_per_roofplane", TT_any);
+      add_input("footprint", TT_linear_ring_collection);
       add_output("arrangement", TT_any);
       add_output("arr_segments", TT_line_string_collection);
 
@@ -151,6 +148,15 @@ namespace geoflow::nodes::stepedge {
     void gui() {
       // ImGui::Checkbox("Remove unsupported edges", &remove_unsupported);
       ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
+    }
+    void process();
+  };
+  class LinearRingtoRingsNode:public Node {
+    public:
+    using Node::Node;
+    void init() {
+      add_input("linear_ring", TT_linear_ring);
+      add_output("linear_rings", TT_linear_ring_collection);
     }
     void process();
   };
@@ -199,6 +205,36 @@ namespace geoflow::nodes::stepedge {
       ImGui::InputInt("Jump cnt max", &param<int>("classify_jump_count_max"));
       ImGui::InputFloat("Line dist", &param<float>("classify_line_dist"), 0.01, 1);
       ImGui::InputFloat("Elevation jump", &param<float>("classify_jump_ele"), 0.01, 1);
+    }
+
+    void process();
+  };
+
+  class DetectPlanesNode:public Node {
+    public:
+    using Node::Node;
+    void init() {
+      add_input("points", TT_point_collection);
+      add_output("plane_id", TT_vec1i);
+      add_output("is_wall", TT_vec1i);
+      add_output("is_horizontal", TT_vec1i);
+      add_output("pts_per_roofplane", TT_any);
+
+      add_param("metrics_normal_k", (int) 10);
+      add_param("metrics_plane_min_points", (int) 50);
+      add_param("metrics_plane_epsilon", (float) 0.15);
+      add_param("metrics_plane_normal_threshold", (float) 0.75);
+      add_param("metrics_is_horizontal_threshold", (float) 0.9);
+      add_param("metrics_is_wall_threshold", (float) 0.3);
+    }
+
+    void gui(){
+      ImGui::InputInt("K estimate normal ", &param<int>("metrics_normal_k"));
+      ImGui::InputInt("Plane min points", &param<int>("metrics_plane_min_points"));
+      ImGui::InputFloat("Plane epsilon", &param<float>("metrics_plane_epsilon"), 0.01, 1);
+      ImGui::InputFloat("Plane normal thres", &param<float>("metrics_plane_normal_threshold"), 0.01, 1);
+      ImGui::InputFloat("Wall angle thres", &param<float>("metrics_is_wall_threshold"), 0.01, 1);
+      ImGui::InputFloat("Is horizontal", &param<float>("metrics_is_horizontal_threshold"), 0.01, 1);
     }
 
     void process();
@@ -266,7 +302,7 @@ namespace geoflow::nodes::stepedge {
       add_input("point_clouds", TT_point_collection_list);
       add_input("polygons", TT_linear_ring_collection);
       add_output("point_cloud", TT_point_collection);
-      add_output("polygon", TT_linear_ring);
+      add_output("polygon", TT_linear_ring_collection);
 
       add_param("building_id", (int) 0);
     }
@@ -310,7 +346,7 @@ namespace geoflow::nodes::stepedge {
     using Node::Node;
     void init() {
       add_input("edge_segments", TT_segment_collection);
-      add_input("footprint", TT_linear_ring);
+      add_input("footprint", TT_linear_ring_collection);
       add_output("edges_out", TT_line_string_collection);
       add_output("merged_edges_out", TT_line_string_collection);
       add_output("cluster_labels", TT_vec1i);
@@ -338,10 +374,10 @@ namespace geoflow::nodes::stepedge {
       // add_input("ring_id", TT_vec1i);
       // add_input("ring_order", TT_vec1i);
       // add_input("edge_segments", TT_segment_collection);
-      add_input("footprint", TT_linear_ring);
+      add_input("footprint", TT_linear_ring_collection);
       add_output("edges_out", TT_segment_collection);
       add_output("rings_out", TT_linear_ring_collection);
-      add_output("footprint_out", TT_linear_ring);
+      add_output("footprint_out", TT_linear_ring_collection);
       // add_output("footprint_labels", TT_vec1i);
       // add_output("line_clusters", TT_any); // ie a LineCluster
       // add_output("tmp_vec3f", TT_vec3f);

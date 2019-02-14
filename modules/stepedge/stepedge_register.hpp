@@ -9,9 +9,11 @@ namespace geoflow::nodes::stepedge {
     R.register_node<Arr2LinearRingsNode>("Arr2LinearRings");
     R.register_node<ExtruderNode>("Extruder");
     R.register_node<ProcessArrangementNode>("ProcessArrangement");
+    R.register_node<LinearRingtoRingsNode>("LinearRingtoRings");
     R.register_node<BuildArrangementNode>("BuildArrangement");
     R.register_node<BuildArrFromRingsNode>("BuildArrFromRings");
     R.register_node<DetectLinesNode>("DetectLines");
+    R.register_node<DetectPlanesNode>("DetectPlanes");
     R.register_node<ClassifyEdgePointsNode>("ClassifyEdgePoints");
     R.register_node<ComputeMetricsNode>("ComputeMetrics");
     R.register_node<LASInPolygonsNode>("LASInPolygons");

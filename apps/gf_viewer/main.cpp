@@ -16,6 +16,10 @@ namespace gfn = geoflow::nodes;
 
 int main(int ac, const char * av[])
 {
+    // /Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las
+    // /Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_0.gpkg
+    std::string las_path = "/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las";
+    std::string fp_path = "/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg";
     // register nodes from various modules
     NodeRegister stepedge = gfn::stepedge::create_register();
     NodeRegister cgal = gfn::cgal::create_register();
@@ -28,9 +32,10 @@ int main(int ac, const char * av[])
 
     NodeHandle OGRLoader = N.create_node(gdal, "OGRLoader", {-275,75});
     NodeHandle PolygonSimp = N.create_node(cgal, "SimplifyFootprint", {-275,175});
+    NodeHandle PolygonSimp_post = N.create_node(cgal, "SimplifyFootprint", {1500,-25});
     NodeHandle LASInPolygons = N.create_node(stepedge, "LASInPolygons", {75,75});
     NodeHandle BuildingSelect = N.create_node(stepedge, "BuildingSelector", {75,175});
-    NodeHandle ComputeMetrics = N.create_node(stepedge, "ComputeMetrics", {300,75});
+    NodeHandle DetectPlanes = N.create_node(stepedge, "DetectPlanes", {300,75});
     NodeHandle AlphaShape = N.create_node(stepedge, "AlphaShape", {600,75});
     NodeHandle DetectLines = N.create_node(stepedge, "DetectLines", {900,75});
     // NodeHandle RegulariseLines = N.create_node(stepedge, "RegulariseLines", {1200,175});
@@ -43,26 +48,26 @@ int main(int ac, const char * av[])
     connect(PolygonSimp, BuildingSelect, "polygons_simp", "polygons");
     connect(PolygonSimp, LASInPolygons, "polygons_simp", "polygons");
     connect(LASInPolygons, BuildingSelect, "point_clouds", "point_clouds");
-    connect(BuildingSelect, ComputeMetrics, "point_cloud", "points");
+    connect(BuildingSelect, DetectPlanes, "point_cloud", "points");
     // connect(BuildingSelect, BuildArrangement, "polygon", "footprint");
     connect(BuildingSelect, RegulariseRings, "polygon", "footprint");
-    connect(ComputeMetrics, AlphaShape, "points", "points");
+    connect(DetectPlanes, AlphaShape, "pts_per_roofplane", "pts_per_roofplane");
     // connect(ComputeMetrics, ProcessArrangement, "points", "points");
     connect(AlphaShape, DetectLines, "alpha_rings", "edge_points");
     connect(DetectLines, RegulariseRings, "edge_segments", "edge_segments");
     connect(DetectLines, RegulariseRings, "ring_idx", "ring_idx");
     connect(RegulariseRings, BuildArrangement, "rings_out", "rings");
-    connect(RegulariseRings, BuildArrangement, "footprint_out", "footprint");
-    connect(AlphaShape, BuildArrangement, "points_per_plane", "points_per_plane");
-    connect(AlphaShape, BuildArrangement, "plane_idx", "plane_idx");
+    connect(RegulariseRings, PolygonSimp_post, "footprint_out", "polygons");
+    connect(PolygonSimp_post, BuildArrangement, "polygons_simp", "footprint");
+    connect(DetectPlanes, BuildArrangement, "pts_per_roofplane", "pts_per_roofplane");
     // connect(BuildArrangement, ProcessArrangement, "arrangement", "arrangement");
     // connect(ProcessArrangement, Extruder, "arrangement", "arrangement");
     connect(BuildArrangement, Extruder, "arrangement", "arrangement");
 
     LASInPolygons->set_param(
-        "las_filepath", (std::string)"/Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las");
+        "las_filepath", las_path);
     OGRLoader->set_param(
-        "filepath", (std::string) "/Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_0.gpkg");
+        "filepath", fp_path);
 
     // launch the GUI
     launch_flowchart(N, {stepedge, cgal, gdal, las, mat});
