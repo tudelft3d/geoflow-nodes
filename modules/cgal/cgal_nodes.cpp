@@ -503,59 +503,6 @@ void SimplifyLinesNode::process() {
   output("lines").set(lines_out);
 }
 
-void SimplifyFootprintNode::process(){
-  // Set up vertex data (and buffer(s)) and attribute pointers
-
-  namespace PS = CGAL::Polyline_simplification_2;
-  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-  typedef K::Point_2 Point_2;
-  typedef CGAL::Polygon_2<K>                   Polygon_2;
-  typedef PS::Stop_below_count_ratio_threshold Stop_count_ratio;
-  typedef PS::Stop_above_cost_threshold        Stop_cost;
-  typedef PS::Squared_distance_cost            Cost;
-
-  auto polygons = input("polygons").get<LinearRingCollection>();
-
-  auto threshold_stop_cost = param<float>("threshold_stop_cost");
-
-  LinearRingCollection polygons_out;
-  
-  for (auto& polygon : polygons) {
-    if (polygon.size()>2) {
-      Polygon_2 cgal_polygon;
-      Cost cost;
-
-      for (auto& p : polygon) {
-        cgal_polygon.push_back(Point_2(p[0], p[1]));
-      }
-      // cgal_polygon.erase(cgal_polygon.vertices_end()-1); // remove repeated point from the boost polygon
-      
-      // polygon = PS::simplify(polygon, cost, Stop_count_ratio(0.5));
-
-      cgal_polygon = PS::simplify(cgal_polygon, cost, Stop_cost(threshold_stop_cost));
-      
-      vec3f footprint_vec3f;
-      for (auto v = cgal_polygon.vertices_begin(); v!=cgal_polygon.vertices_end(); v++){
-        footprint_vec3f.push_back({float(v->x()),float(v->y()),0});
-      }
-
-      // HACK: CGAL does not seem to remove the first point of the input polygon in any case, so we need to check ourselves
-      auto p_0 = *(cgal_polygon.vertices_begin());
-      auto p_1 = *(cgal_polygon.vertices_begin()+1);
-      auto p_end = *(cgal_polygon.vertices_end()-1);
-      // check the distance between the first vertex and the line between its 2 neighbours
-      if (CGAL::squared_distance(Point_2(p_0), K::Segment_2(p_end, p_1)) < threshold_stop_cost) {
-        footprint_vec3f.erase(footprint_vec3f.begin());
-      }
-
-      // auto bv = cgal_polygon.vertices_begin(); // repeat first pt as last
-      // footprint_vec3f.push_back({float(bv->x()),float(bv->y()),0});
-      polygons_out.push_back(footprint_vec3f);
-    } else polygons_out.push_back(polygon);
-  }
-  output("polygons_simp").set(polygons_out);
-}
-
 void PLYWriterNode::process() {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
   typedef Kernel::Point_3 Point;

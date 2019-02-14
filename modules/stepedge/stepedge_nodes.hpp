@@ -404,6 +404,24 @@ namespace geoflow::nodes::stepedge {
     void process();
   };
 
+
+  class SimplifyFootprintNode:public Node {
+    public:
+    using Node::Node;
+    void init() {
+      add_input("polygons", TT_linear_ring_collection);
+      add_output("polygons_simp", TT_linear_ring_collection);
+
+      add_param("threshold_stop_cost", (float) 0.01);
+    }
+    void gui() {
+      if(ImGui::DragFloat("stop cost", &param<float>("threshold_stop_cost"),0.01, 0,1000)) {
+        manager.run(*this);
+      }
+    }
+    void process();
+  };
+
   class LOD13GeneratorNode:public Node {
     public:
     using Node::Node;
@@ -412,24 +430,25 @@ namespace geoflow::nodes::stepedge {
       add_input("polygons", TT_linear_ring_collection);
       add_output("decomposed_footprints", TT_linear_ring_collection);
       add_output("attributes", TT_attribute_map_f);
+      add_output("building_class", TT_attribute_map_f);
 
       add_param("step_height_threshold", (float) 2.0);
-      add_param("zrange_threshold", (float) 0.2);
-      add_param("merge_segid", (bool) true);
-      add_param("merge_zrange", (bool) false);
-      add_param("merge_step_height", (bool) true);
-      add_param("merge_unsegmented", (bool) false);
-      add_param("merge_dangling_egdes", (bool) false);
+      // add_param("zrange_threshold", (float) 0.2);
+      // add_param("merge_segid", (bool) true);
+      // add_param("merge_zrange", (bool) false);
+      // add_param("merge_step_height", (bool) true);
+      // add_param("merge_unsegmented", (bool) false);
+      // add_param("merge_dangling_egdes", (bool) false);
     }
 
     void gui(){
       ImGui::InputFloat("Step height", &param<float>("step_height_threshold"), 0.1, 1);
-      ImGui::DragFloat("zrange_threshold", &param<float>("zrange_threshold"), 0.1);
-      ImGui::Checkbox("merge_segid", &param<bool>("merge_segid"));
-      ImGui::Checkbox("merge_zrange", &param<bool>("merge_zrange"));
-      ImGui::Checkbox("merge_step_height", &param<bool>("merge_step_height"));
-      ImGui::Checkbox("merge_unsegmented", &param<bool>("merge_unsegmented"));
-      ImGui::Checkbox("merge_dangling_egdes", &param<bool>("merge_dangling_egdes"));
+      // ImGui::DragFloat("zrange_threshold", &param<float>("zrange_threshold"), 0.1);
+      // ImGui::Checkbox("merge_segid", &param<bool>("merge_segid"));
+      // ImGui::Checkbox("merge_zrange", &param<bool>("merge_zrange"));
+      // ImGui::Checkbox("merge_step_height", &param<bool>("merge_step_height"));
+      // ImGui::Checkbox("merge_unsegmented", &param<bool>("merge_unsegmented"));
+      // ImGui::Checkbox("merge_dangling_egdes", &param<bool>("merge_dangling_egdes"));
     }
     void process();
   };

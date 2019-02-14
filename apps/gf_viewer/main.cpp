@@ -31,8 +31,8 @@ int main(int ac, const char * av[])
     NodeManager N;
 
     NodeHandle OGRLoader = N.create_node(gdal, "OGRLoader", {-275,75});
-    NodeHandle PolygonSimp = N.create_node(cgal, "SimplifyFootprint", {-275,175});
-    NodeHandle PolygonSimp_post = N.create_node(cgal, "SimplifyFootprint", {1200,-25});
+    NodeHandle PolygonSimp = N.create_node(stepedge, "SimplifyFootprint", {-275,175});
+    NodeHandle PolygonSimp_post = N.create_node(stepedge, "SimplifyFootprint", {1200,-25});
     NodeHandle LASInPolygons = N.create_node(stepedge, "LASInPolygons", {75,75});
     NodeHandle BuildingSelect = N.create_node(stepedge, "BuildingSelector", {75,175});
     NodeHandle DetectPlanes = N.create_node(stepedge, "DetectPlanes", {300,75});

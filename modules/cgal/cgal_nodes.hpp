@@ -159,23 +159,6 @@ namespace geoflow::nodes::cgal {
     void process();
   };
 
-  class SimplifyFootprintNode:public Node {
-    public:
-    using Node::Node;
-    void init() {
-      add_input("polygons", TT_linear_ring_collection);
-      add_output("polygons_simp", TT_linear_ring_collection);
-
-      add_param("threshold_stop_cost", (float) 0.01);
-    }
-    void gui() {
-      if(ImGui::DragFloat("stop cost", &param<float>("threshold_stop_cost"),0.01, 0,1000)) {
-        manager.run(*this);
-      }
-    }
-    void process();
-  };
-
   class PLYWriterNode:public Node {
     public:
     bool multiple_files = true;

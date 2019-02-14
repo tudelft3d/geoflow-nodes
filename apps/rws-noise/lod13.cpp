@@ -21,7 +21,8 @@ int main(int ac, const char * av[])
 {   
     std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg");
     std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las");
-    std::string decomposed_footprints_file = "out.shp";
+    std::string footprints_classes_file("out_bclass.shp");
+    std::string decomposed_footprints_file("out_lod13.shp");
     float step_threshold = 1.0;
     bool gui = false;
     
@@ -48,13 +49,19 @@ int main(int ac, const char * av[])
     auto cgal = gfn::cgal::create_register();
 
     auto ogr_loader = N.create_node(gdal, "OGRLoader", {75,75});
-    auto footprint_simp = N.create_node(cgal, "SimplifyFootprint", {75,175});
+    auto footprint_simp = N.create_node(stepedge, "SimplifyFootprint", {75,175});
     auto las_in_poly = N.create_node(stepedge, "LASInPolygons", {300,75});
     auto lod13generator = N.create_node(stepedge, "LOD13Generator", {650,75});
     auto ogr_writer = N.create_node(gdal, "OGRWriter", {1000,75});
+    auto ogr_writer_class = N.create_node(gdal, "OGRWriter", {1000,175});
 
     ogr_loader->set_param("filepath", footprints_file);
     las_in_poly->set_param("las_filepath", las_file);
+
+    lod13generator->set_param("step_height_threshold", step_threshold);
+    
+    ogr_writer->set_param("filepath", decomposed_footprints_file);
+    ogr_writer_class->set_param("filepath", footprints_classes_file);
 
     geoflow::connect(
         ogr_loader->output("linear_rings"), 
@@ -80,9 +87,15 @@ int main(int ac, const char * av[])
         lod13generator->output("attributes"), 
         ogr_writer->input("attributes")
     );
-
-    ogr_writer->set_param("filepath", decomposed_footprints_file);
-    lod13generator->set_param("step_height_threshold", step_threshold);
+    geoflow::connect(
+        ogr_loader->output("linear_rings"), 
+        ogr_writer_class->input("geometries")
+    );
+    geoflow::connect(
+        lod13generator->output("building_class"), 
+        ogr_writer_class->input("attributes")
+    );
+    
     
     if (gui)
         geoflow::launch_flowchart(N, {stepedge, gdal, cgal});

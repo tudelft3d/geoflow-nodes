@@ -14,6 +14,11 @@
 
 #include <numeric>
 
+// line simplification
+#include <CGAL/Polyline_simplification_2/simplify.h>
+#include <CGAL/Constrained_Delaunay_triangulation_2.h>
+#include <CGAL/Constrained_triangulation_plus_2.h>
+
 // #include <filesystem>
 // namespace fs=std::filesystem;
 
@@ -562,42 +567,49 @@ void BuildArrFromRingsNode::process() {
 
   Arrangement_2 arr_base;
   Polygon_2 cgal_footprint = ring_to_cgal_polygon(footprint);
-  // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
-  {
-    Face_index_observer obs (arr_base, true, 0, 0);
-    insert_non_intersecting_curves(arr_base, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
-  }
-  // insert step-edge lines
-  {
-    Arrangement_2 arr_overlay;
-    size_t i=0;
-    // NOTE: rings and points_per_plane must be aligned!! (matching length and order)
-    for (auto& kv : points_per_plane) {
-      auto& ring = rings[i++];
-      if (ring.size()>2) {
-        auto plane_id = kv.first;
-        auto& points = kv.second;
-        std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
-          return p1.z() < p2.z();
-        });
-        auto elevation_id = int(param<float>("z_percentile")*float(points.size()));
+  if (cgal_footprint.is_simple()) {
+      
+    // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
+    {
+      Face_index_observer obs (arr_base, true, 0, 0);
+      // insert(arr_base, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
+      insert_non_intersecting_curves(arr_base, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
+    }
+    // insert step-edge lines
+    {
+      Arrangement_2 arr_overlay;
+      size_t i=0;
+      // NOTE: rings and points_per_plane must be aligned!! (matching length and order)
+      for (auto& kv : points_per_plane) {
+        auto& ring = rings[i++];
+        if (ring.size()>2) {
+          auto polygon = ring_to_cgal_polygon(ring);
+          if (polygon.is_simple()) {
+            auto plane_id = kv.first;
+            auto& points = kv.second;
+            std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
+              return p1.z() < p2.z();
+            });
+            auto elevation_id = int(param<float>("z_percentile")*float(points.size()));
 
-        // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
-        Arrangement_2 arr;
-        Face_index_observer obs (arr, false, plane_id, points[elevation_id].z());
-        auto polygon = ring_to_cgal_polygon(ring);
-        insert(arr, polygon.edges_begin(), polygon.edges_end());
+            // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
+            Arrangement_2 arr;
+            Face_index_observer obs (arr, false, plane_id, points[elevation_id].z());
+            insert(arr, polygon.edges_begin(), polygon.edges_end());
 
-        Overlay_traits overlay_traits;
-        arr_overlay.clear();
-        overlay(arr_base, arr, arr_overlay, overlay_traits);
-        arr_base = arr_overlay;
-        // std::cout << "overlay success\n";
-        // std::cout << "facecount: " << arr_base.number_of_faces() << "\n\n";
+            Overlay_traits overlay_traits;
+            arr_overlay.clear();
+            overlay(arr_base, arr, arr_overlay, overlay_traits);
+            arr_base = arr_overlay;
+          } else std::cout << "This alpha ring is no longer simple after regularisation!\n";
+          // std::cout << "overlay success\n";
+          // std::cout << "facecount: " << arr_base.number_of_faces() << "\n\n";
+        }
       }
     }
+  } else {
+    std::cout << "This polygon is no longer simple after regularisation!\n";
   }
-
   // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
 
   if (param<bool>("flood_to_unsegmented")) {
@@ -1286,16 +1298,21 @@ void chain(Segment& a, Segment& b, LinearRing& ring, const float& snap_threshold
   K::Line_2 l_b(K::Point_2(b[0][0], b[0][1]), K::Point_2(b[1][0], b[1][1]));
   K::Segment_2 s(K::Point_2(a[1][0], a[1][1]), K::Point_2(b[0][0], b[0][1]));
   auto result = CGAL::intersection(l_a, l_b);
-  if (auto p = boost::get<K::Point_2>(&*result)) {
-    if (CGAL::squared_distance(*p, s) < snap_threshold) {
-      ring.push_back({float(p->x()), float(p->y()), 0});
-    } else {
-      ring.push_back(a[1]);
-      ring.push_back(b[0]);
+  if (result) {
+    if (auto p = boost::get<K::Point_2>(&*result)) {
+      if (CGAL::squared_distance(*p, s) < snap_threshold) {
+        ring.push_back({float(p->x()), float(p->y()), 0});
+      } else {
+        ring.push_back(a[1]);
+        ring.push_back(b[0]);
+      }
     }
+  // } else if (auto l = boost::get<K::Line_2>(&*result)) {
 
-  } else if (auto l = boost::get<K::Line_2>(&*result)) {
-
+  // }
+  } else { // there is no intersection
+    ring.push_back(a[1]);
+    ring.push_back(b[0]);
   }
 }
 void RegulariseRingsNode::process(){
@@ -1359,6 +1376,59 @@ void RegulariseRingsNode::process(){
   output("footprint_out").set(lrc2);
 }
 
+void SimplifyFootprintNode::process(){
+  // Set up vertex data (and buffer(s)) and attribute pointers
+
+  namespace PS = CGAL::Polyline_simplification_2;
+  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+  typedef K::Point_2 Point_2;
+  typedef CGAL::Polygon_2<K>                   Polygon_2;
+  typedef PS::Stop_below_count_ratio_threshold Stop_count_ratio;
+  typedef PS::Stop_above_cost_threshold        Stop_cost;
+  typedef PS::Squared_distance_cost            Cost;
+
+  auto polygons = input("polygons").get<LinearRingCollection>();
+
+  auto threshold_stop_cost = param<float>("threshold_stop_cost");
+
+  LinearRingCollection polygons_out;
+  
+  for (auto& polygon : polygons) {
+    if (polygon.size()>2) {
+      Polygon_2 cgal_polygon;
+      Cost cost;
+
+      for (auto& p : polygon) {
+        cgal_polygon.push_back(Point_2(p[0], p[1]));
+      }
+      // cgal_polygon.erase(cgal_polygon.vertices_end()-1); // remove repeated point from the boost polygon
+      
+      // polygon = PS::simplify(polygon, cost, Stop_count_ratio(0.5));
+
+      cgal_polygon = PS::simplify(cgal_polygon, cost, Stop_cost(threshold_stop_cost));
+      
+      vec3f footprint_vec3f;
+      for (auto v = cgal_polygon.vertices_begin(); v!=cgal_polygon.vertices_end(); v++){
+        footprint_vec3f.push_back({float(v->x()),float(v->y()),0});
+      }
+
+      // HACK: CGAL does not seem to remove the first point of the input polygon in any case, so we need to check ourselves
+      auto p_0 = *(cgal_polygon.vertices_begin());
+      auto p_1 = *(cgal_polygon.vertices_begin()+1);
+      auto p_end = *(cgal_polygon.vertices_end()-1);
+      // check the distance between the first vertex and the line between its 2 neighbours
+      if (CGAL::squared_distance(Point_2(p_0), K::Segment_2(p_end, p_1)) < threshold_stop_cost) {
+        footprint_vec3f.erase(footprint_vec3f.begin());
+      }
+
+      // auto bv = cgal_polygon.vertices_begin(); // repeat first pt as last
+      // footprint_vec3f.push_back({float(bv->x()),float(bv->y()),0});
+      polygons_out.push_back(footprint_vec3f);
+    } else polygons_out.push_back(polygon);
+  }
+  output("polygons_simp").set(polygons_out);
+}
+
 void LOD13GeneratorNode::process(){
   auto point_clouds = input("point_clouds").get<std::vector<PointCollection>>();
   auto polygons = input("polygons").get<LinearRingCollection>();
@@ -1369,52 +1439,60 @@ void LOD13GeneratorNode::process(){
   if (point_clouds.size()!=polygons.size()) return;
 
   LinearRingCollection all_cells;
-  AttributeMap all_attributes;
+  AttributeMap all_attributes, building_class;
   
   for(int i=0; i<point_clouds.size(); i++) {
+    std::cout << "b id: " << i << "\n";
     auto& points = point_clouds[i];
     auto& polygon = polygons[i];
 
     NodeRegister R("Nodes");
-    R.register_node<ComputeMetricsNode>("ComputeMetrics");
     R.register_node<AlphaShapeNode>("AlphaShape");
+    R.register_node<SimplifyFootprintNode>("SimplifyFootprint");
+    R.register_node<DetectPlanesNode>("DetectPlanes");
     R.register_node<DetectLinesNode>("DetectLines");
-    R.register_node<RegulariseLinesNode>("RegulariseLines");
-    R.register_node<BuildArrangementNode>("BuildArrangement");
-    R.register_node<ProcessArrangementNode>("ProcessArrangement");
+    R.register_node<RegulariseRingsNode>("RegulariseRings");
+    R.register_node<BuildArrFromRingsNode>("BuildArrFromRings");
+    // R.register_node<ProcessArrangementNode>("ProcessArrangement");
     R.register_node<Arr2LinearRingsNode>("Arr2LinearRings");
 
     NodeManager N = NodeManager();
 
-    auto ComputeMetrics_node = N.create_node(R, "ComputeMetrics");
+    auto DetectPlanes_node = N.create_node(R, "DetectPlanes");
     auto AlphaShape_node = N.create_node(R, "AlphaShape");
     auto DetectLines_node = N.create_node(R, "DetectLines");
-    auto RegulariseLines_node = N.create_node(R, "RegulariseLines");
-    auto BuildArrangement_node = N.create_node(R, "BuildArrangement");
-    auto ProcessArrangement_node = N.create_node(R, "ProcessArrangement");
+    auto RegulariseRings_node = N.create_node(R, "RegulariseRings");
+    auto BuildArrFromRings_node = N.create_node(R, "BuildArrFromRings");
+    // auto ProcessArrangement_node = N.create_node(R, "ProcessArrangement");
     auto Arr2LinearRings_node = N.create_node(R, "Arr2LinearRings");
+    auto SimplifyFootprint_node = N.create_node(R, "SimplifyFootprint");
 
-    ComputeMetrics_node->input("points").set(points);
-    BuildArrangement_node->input("footprint").set(polygon);
-    RegulariseLines_node->input("footprint").set(polygon);
+    DetectPlanes_node->input("points").set(points);
+    LinearRingCollection lrc;
+    lrc.push_back(polygon);
+    RegulariseRings_node->input("footprint").set(lrc);
 
-    connect(ComputeMetrics_node, AlphaShape_node, "points", "points");
-    connect(ComputeMetrics_node, ProcessArrangement_node, "points", "points");
+    connect(DetectPlanes_node, AlphaShape_node, "pts_per_roofplane", "pts_per_roofplane");
+    connect(DetectPlanes_node, BuildArrFromRings_node, "pts_per_roofplane", "pts_per_roofplane");
     connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
-    connect(DetectLines_node, RegulariseLines_node, "edge_segments", "edge_segments");
-    connect(RegulariseLines_node, BuildArrangement_node, "edges_out", "edge_segments");
-    connect(BuildArrangement_node, ProcessArrangement_node, "arrangement", "arrangement");
-    connect(ProcessArrangement_node, Arr2LinearRings_node, "arrangement", "arrangement");
+    connect(DetectLines_node, RegulariseRings_node, "edge_segments", "edge_segments");
+    connect(DetectLines_node, RegulariseRings_node, "ring_idx", "ring_idx");
+    connect(RegulariseRings_node, BuildArrFromRings_node, "rings_out", "rings");
+    connect(RegulariseRings_node, SimplifyFootprint_node, "footprint_out", "polygons");
+    connect(SimplifyFootprint_node, BuildArrFromRings_node, "polygons_simp", "footprint");
+    connect(BuildArrFromRings_node, Arr2LinearRings_node, "arrangement", "arrangement");
 
     // config and run
     // this should copy all parameters from this LOD13Generator node to the ProcessArrangement node
-    ProcessArrangement_node->set_params( dump_params() );
+    // BuildArrFromRings_node->set_params( dump_params() );
     
-    N.run(ComputeMetrics_node);
+    N.run(DetectPlanes_node);
 
-    // note: the following will crash if the flowchart specified above is stopped halfway for some reason
+    // note: the following will crash if the flowchart specified above is stopped halfway for some reason (eg missing output/connection)
     auto cells = Arr2LinearRings_node->output("linear_rings").get<LinearRingCollection>();
     auto attributes = Arr2LinearRings_node->output("attributes").get<AttributeMap>();
+    auto classf = DetectPlanes_node->output("classf").get<float>();
+    building_class["building_class"].push_back(classf);
 
     for (int i=0; i<cells.size(); i++) {
       // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
@@ -1424,11 +1502,13 @@ void LOD13GeneratorNode::process(){
       all_attributes["max_error"].push_back(attributes["max_error"][i]);
       all_attributes["count"].push_back(attributes["count"][i]);
       all_attributes["coverage"].push_back(attributes["coverage"][i]);
+      all_attributes["building_class"].push_back(classf);
       // }
     }
   }
   output("decomposed_footprints").set(all_cells);
   output("attributes").set(all_attributes);
+  output("building_class").set(building_class);
 }
 
 // void PlaneDetectorNode::process() {
