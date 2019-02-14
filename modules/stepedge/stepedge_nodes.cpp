@@ -142,16 +142,9 @@ void AlphaShapeNode::process(){
   auto points_per_segment = input("pts_per_roofplane").get<std::unordered_map<int, std::vector<Point>>>();
 
   auto thres_alpha = param<float>("thres_alpha");
-  auto extract_alpha_rings = param<bool>("extract_alpha_rings");
-  
-  // collect plane points
-  // for (auto& p : points) {
-  //   if (boost::get<2>(p)==0) // unsegmented
-  //     continue;
-  //   if (boost::get<3>(p)) // classified as wall
-  //     continue;
-  //   points_per_segment[boost::get<2>(p)].push_back(boost::get<0>(p));
-  // }
+  auto optimal_alpha = param<bool>("optimal_alpha");
+  auto optimal_only_if_needed = param<bool>("optimal_only_if_needed");
+
   PointCollection edge_points, boundary_points;
   LineStringCollection alpha_edges;
   LinearRingCollection alpha_rings;
@@ -165,14 +158,13 @@ void AlphaShapeNode::process(){
     as::Alpha_shape_2 A(T,
                 as::FT(thres_alpha),
                 as::Alpha_shape_2::GENERAL);
-    // thres_alpha = *A.find_optimal_alpha(1);
+    
+    if (optimal_alpha && optimal_only_if_needed) {
+      thres_alpha = std::max(float(*A.find_optimal_alpha(1)), thres_alpha);
+    } else if (optimal_alpha) {
+      thres_alpha = *A.find_optimal_alpha(1);
+    }
     A.set_alpha(as::FT(thres_alpha));
-    // std::vector<std::pair<Vertex_handle, Vertex_handle>> alpha_edges;
-    // for (auto it = A.alpha_shape_edges_begin(); it!=A.alpha_shape_edges_end(); it++) {
-    //   auto face = (it)->first;
-    //   auto i = (it)->second;
-    //   alpha_edges.push_back(std::make_pair(face->vertex(T.cw(i)), face->vertex(T.ccw(i))));
-    // }
 
     for (auto it = A.alpha_shape_vertices_begin(); it!=A.alpha_shape_vertices_end(); it++) {
       auto p = (*it)->point();
@@ -211,45 +203,42 @@ void AlphaShapeNode::process(){
         float(v_start->point().y()),
         float(v_start->point().z())
       });
-      if (extract_alpha_rings) {
-        // find edges of outer boundary in order
-        LinearRing ring;
 
-        ring.push_back( {float(v_start->point().x()), float(v_start->point().y()), float(v_start->point().z())} );
-        // secondly, walk along the entire boundary starting from v_start
-        as::Vertex_handle v_next, v_prev = v_start, v_cur = v_start;
-        size_t v_cntr = 0;
+      // find edges of outer boundary in order
+      LinearRing ring;
+
+      ring.push_back( {float(v_start->point().x()), float(v_start->point().y()), float(v_start->point().z())} );
+      // secondly, walk along the entire boundary starting from v_start
+      as::Vertex_handle v_next, v_prev = v_start, v_cur = v_start;
+      size_t v_cntr = 0;
+      do {
+        as::Edge_circulator ec(A.incident_edges(v_cur)), done(ec);
         do {
-          as::Edge_circulator ec(A.incident_edges(v_cur)), done(ec);
-          do {
-            // find the vertex on the other side of the incident edge ec
-            auto v = ec->first->vertex(A.cw(ec->second));
-            if (v_cur == v) v = ec->first->vertex(A.ccw(ec->second));
-            // find labels of two adjacent faces
-            auto label1 = grower.face_map[ ec->first ];
-            auto label2 = grower.face_map[ ec->first->neighbor(ec->second) ];
-            // check if the edge is on the boundary of the region and if we are not going backwards
-            bool exterior = label1==-1 || label2==-1;
-            bool region = label1==region_label || label2==region_label;
-            if(( exterior && region )  && (v != v_prev)) {
-              v_next = v;
-              ring.push_back( {float(v_next->point().x()), float(v_next->point().y()), float(v_next->point().z())} );
-              break;
-            }
-          } while (++ec != done);
-          v_prev = v_cur;
-          v_cur = v_next;
+          // find the vertex on the other side of the incident edge ec
+          auto v = ec->first->vertex(A.cw(ec->second));
+          if (v_cur == v) v = ec->first->vertex(A.ccw(ec->second));
+          // find labels of two adjacent faces
+          auto label1 = grower.face_map[ ec->first ];
+          auto label2 = grower.face_map[ ec->first->neighbor(ec->second) ];
+          // check if the edge is on the boundary of the region and if we are not going backwards
+          bool exterior = label1==-1 || label2==-1;
+          bool region = label1==region_label || label2==region_label;
+          if(( exterior && region )  && (v != v_prev)) {
+            v_next = v;
+            ring.push_back( {float(v_next->point().x()), float(v_next->point().y()), float(v_next->point().z())} );
+            break;
+          }
+        } while (++ec != done);
+        v_prev = v_cur;
+        v_cur = v_next;
 
-        } while (v_next != v_start);
-        // finally, store the ring 
-        alpha_rings.push_back(ring);
-      }
+      } while (v_next != v_start);
+      // finally, store the ring 
+      alpha_rings.push_back(ring);
     }
   }
   
-  if (extract_alpha_rings) {
-    output("alpha_rings").set(alpha_rings);
-  }
+  output("alpha_rings").set(alpha_rings);
   output("alpha_edges").set(alpha_edges);
   output("alpha_triangles").set(alpha_triangles);
   output("segment_ids").set(segment_ids);
@@ -1347,6 +1336,8 @@ void RegulariseRingsNode::process(){
     new_rings.push_back(new_ring);
   }
 
+  // TODO: check if we are not creating duplicate points when a linesegment becomes 0 length
+  // now solved with simplifier
   LinearRing new_fp;
   for (size_t i=fpi_begin+1; i<=fpi_end; ++i) {
     chain(all_edges[i-1], all_edges[i], new_fp, param<float>("snap_threshold"));

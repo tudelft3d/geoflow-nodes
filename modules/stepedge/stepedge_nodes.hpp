@@ -19,13 +19,16 @@ namespace geoflow::nodes::stepedge {
       add_output("segment_ids", TT_vec1i);
       add_output("boundary_points", TT_point_collection);
 
-      add_param("thres_alpha", (float) 0.5);
-      add_param("extract_alpha_rings", (bool) true);
+      add_param("thres_alpha", (float) 0.15);
+      add_param("optimal_alpha", (bool) true);
+      add_param("optimal_only_if_needed", (bool) true);
     }
 
     void gui(){
       ImGui::InputFloat("Alpha", &param<float>("thres_alpha"), 0.01, 1);
-      ImGui::Checkbox("extract_alpha_rings", &param<bool>("extract_alpha_rings"));
+      ImGui::Checkbox("optimal_alpha", &param<bool>("optimal_alpha"));
+      if (param<bool>("optimal_alpha"))
+        ImGui::Checkbox("Only if needed", &param<bool>("optimal_only_if_needed"));
     }
     void process();
   };
@@ -218,7 +221,10 @@ namespace geoflow::nodes::stepedge {
       add_output("plane_id", TT_vec1i);
       add_output("is_wall", TT_vec1i);
       add_output("is_horizontal", TT_vec1i);
+      
       add_output("pts_per_roofplane", TT_any);
+
+      add_output("class", TT_any);
 
       add_param("metrics_normal_k", (int) 10);
       add_param("metrics_plane_min_points", (int) 50);
