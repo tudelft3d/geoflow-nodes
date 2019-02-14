@@ -16,10 +16,10 @@ class LineRegulariser {
 
   typedef std::tuple<double, Point_2, double> linetype; 
     // new angle, midpoint, distance in angle cluster, id_cntr
-    std::vector<linetype> lines;
 
   geoflow::SegmentCollection& input_segments;
   public:
+  std::vector<linetype> lines;
   double angle_threshold, dist_threshold;
 
   LineRegulariser(geoflow::SegmentCollection& segments) : input_segments(segments) {
@@ -39,7 +39,6 @@ class LineRegulariser {
   };
 
   void cluster() {
-
     // cluster by angle
     std::vector<size_t> edge_idx(lines.size());
     for (size_t i=0; i<lines.size(); ++i) {

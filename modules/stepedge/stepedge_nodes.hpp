@@ -147,10 +147,13 @@ namespace geoflow::nodes::stepedge {
       add_output("arr_segments", TT_line_string_collection);
 
       add_param("z_percentile", (float) 0.9);
+      add_param("flood_to_unsegmented", (bool) true);
+      add_param("dissolve_edges", (bool) false);
     }
     void gui() {
-      // ImGui::Checkbox("Remove unsupported edges", &remove_unsupported);
       ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
+      ImGui::Checkbox("Flood to unsegmented", &param<bool>("flood_to_unsegmented"));
+      ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
     }
     void process();
   };
@@ -224,7 +227,8 @@ namespace geoflow::nodes::stepedge {
       
       add_output("pts_per_roofplane", TT_any);
 
-      add_output("class", TT_any);
+      add_output("class", TT_int);
+      add_output("classf", TT_float);
 
       add_param("metrics_normal_k", (int) 10);
       add_param("metrics_plane_min_points", (int) 50);

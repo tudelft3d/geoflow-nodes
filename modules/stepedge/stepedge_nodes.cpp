@@ -574,7 +574,7 @@ void BuildArrFromRingsNode::process() {
     // NOTE: rings and points_per_plane must be aligned!! (matching length and order)
     for (auto& kv : points_per_plane) {
       auto& ring = rings[i++];
-      if (!ring.empty()) {
+      if (ring.size()>2) {
         auto plane_id = kv.first;
         auto& points = kv.second;
         std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
@@ -600,45 +600,48 @@ void BuildArrFromRingsNode::process() {
 
   // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
 
-  std::map<float, Face_handle> face_map;
-  for (auto& face : arr_base.face_handles()) {
-    if (face->data().segid!=0)
-      face_map[face->data().elevation_avg] = face;
-  }
-  for (auto& kv : face_map) {
-    std::stack<Face_handle> candidate_stack;
-    // std::cout << "Growing face with elevation=" << kv.first << "\n";
-    auto& cur_segid = kv.second->data().segid;
-    auto& cur_elev = kv.second->data().elevation_avg;
-    candidate_stack.push(kv.second);
-    while (!candidate_stack.empty()) {
-      auto fh = candidate_stack.top(); candidate_stack.pop();
-      auto circ = fh->outer_ccb();
-      auto curr = circ;
-      do {
-        // std::cout << &(*curr) << "\n";
-        // ignore weird nullptrs (should not be possible...)
-        if (curr==nullptr) break;
-        auto candidate = curr->twin()->face();
-        if (candidate->data().segid == 0) {
-          candidate->data().segid = cur_segid;
-          candidate->data().elevation_avg = cur_elev;
-          candidate_stack.push(candidate);
-        }
-      } while (++curr != circ);
+  if (param<bool>("flood_to_unsegmented")) {
+    std::map<float, Face_handle> face_map;
+    for (auto& face : arr_base.face_handles()) {
+      if (face->data().segid!=0)
+        face_map[face->data().elevation_avg] = face;
+    }
+    for (auto& kv : face_map) {
+      std::stack<Face_handle> candidate_stack;
+      // std::cout << "Growing face with elevation=" << kv.first << "\n";
+      auto& cur_segid = kv.second->data().segid;
+      auto& cur_elev = kv.second->data().elevation_avg;
+      candidate_stack.push(kv.second);
+      while (!candidate_stack.empty()) {
+        auto fh = candidate_stack.top(); candidate_stack.pop();
+        auto circ = fh->outer_ccb();
+        auto curr = circ;
+        do {
+          // std::cout << &(*curr) << "\n";
+          // ignore weird nullptrs (should not be possible...)
+          if (curr==nullptr) break;
+          auto candidate = curr->twin()->face();
+          if (candidate->data().segid == 0) {
+            candidate->data().segid = cur_segid;
+            candidate->data().elevation_avg = cur_elev;
+            candidate_stack.push(candidate);
+          }
+        } while (++curr != circ);
+      }
     }
   }
-
   //remove edges that have the same segid on both sides
-  std::vector<Halfedge_handle> to_remove;
-  for (auto he : arr_base.edge_handles()) {
-    auto d1 = he->face()->data();
-    auto d2 = he->twin()->face()->data();
-    if ((d1.segid == d2.segid )&& (d1.in_footprint && d2.in_footprint))
-      to_remove.push_back(he);
-  }
-  for (auto he : to_remove) {
-    arr_base.remove_edge(he);
+  if (param<bool>("dissolve_edges")) {
+    std::vector<Halfedge_handle> to_remove;
+    for (auto he : arr_base.edge_handles()) {
+      auto d1 = he->face()->data();
+      auto d2 = he->twin()->face()->data();
+      if ((d1.segid == d2.segid )&& (d1.in_footprint && d2.in_footprint))
+        to_remove.push_back(he);
+    }
+    for (auto he : to_remove) {
+      arr_base.remove_edge(he);
+    }
   }
 
   LineStringCollection segments;
@@ -886,6 +889,8 @@ void DetectPlanesNode::process() {
 
   // classify horizontal/vertical planes using plane normals
   std::unordered_map<int, std::vector<Point>> pts_per_roofplane;
+  size_t horiz_roofplane_cnt=0;
+  size_t slant_roofplane_cnt=0;
   for(auto seg: PD.segment_shapes){
     auto& plane = seg.second;
     Vector n = plane.orthogonal_vector();
@@ -895,7 +900,12 @@ void DetectPlanesNode::process() {
     bool is_horizontal = horizontality > metrics_is_horizontal_threshold;
     if (!is_wall)
       pts_per_roofplane[seg.first] = PD.get_points(seg.first);
-    
+
+    if (is_horizontal)
+      ++horiz_roofplane_cnt;
+    else if (!is_wall && !is_horizontal)
+      ++slant_roofplane_cnt;
+
     auto plane_idx = PD.get_point_indices(seg.first);
     for (size_t& i : plane_idx) {
       boost::get<2>(pnl_points[i]) = seg.first;
@@ -904,8 +914,18 @@ void DetectPlanesNode::process() {
     }
   }
 
+  int building_type; // as built: 0=LOD1, 1=LOD1.3, 2=LOD2
+  if (horiz_roofplane_cnt==1 && slant_roofplane_cnt==0)
+    building_type=0;
+  else if (horiz_roofplane_cnt!=0 && slant_roofplane_cnt!=0)
+    building_type=1;
+  else
+    building_type=2;
+  output("class").set(building_type);
+  output("classf").set(float(building_type));
+
   vec1i plane_id, is_wall, is_horizontal;
-  for(auto& p : pnl_points){
+  for(auto& p : pnl_points) {
     plane_id.push_back(boost::get<2>(p));
     is_wall.push_back(boost::get<3>(p));
     is_horizontal.push_back(boost::get<9>(p));
@@ -1308,21 +1328,8 @@ void RegulariseRingsNode::process(){
   LR.angle_threshold = param<float>("angle_threshold");
   LR.cluster();
 
-  // get clusters from line regularisation 
-  // std::vector<std::vector<size_t>> idx_per_ring;
-  // size_t cur_rid, prev_rid = ring_id[0];
-  // std::vector<size_t> idx;
-  // for (size_t i=0; i<edges.size(); ++i) {
-  //   cur_rid = ring_id[i];
-  //   if (cur_rid == prev_rid) {
-  //     idx.push_back(i);
-  //   } else {
-  //     idx_per_ring.push_back(idx);
-  //     idx.clear();
-  //     idx.push_back(i);
-  //   }
-  //   prev_rid = cur_rid;
-  // } idx_per_ring.push_back(idx);
+  // TODO: align to fp edges
+  // LR.lines
 
   LinearRingCollection new_rings;
   for (auto& idx : ring_idx) {

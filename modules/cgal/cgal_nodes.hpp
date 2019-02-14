@@ -166,10 +166,10 @@ namespace geoflow::nodes::cgal {
       add_input("polygons", TT_linear_ring_collection);
       add_output("polygons_simp", TT_linear_ring_collection);
 
-      add_param("threshold_stop_cost", (float) 0.1);
+      add_param("threshold_stop_cost", (float) 0.01);
     }
     void gui() {
-      if(ImGui::DragFloat("stop cost", &param<float>("threshold_stop_cost"),0.01)) {
+      if(ImGui::DragFloat("stop cost", &param<float>("threshold_stop_cost"),0.01, 0,1000)) {
         manager.run(*this);
       }
     }
