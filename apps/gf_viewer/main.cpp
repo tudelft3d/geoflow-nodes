@@ -3,95 +3,72 @@
 #include <array>
 
 #include "imgui.h"
-#include "app_povi.h"
-#include "nodes.h"
+#include <geoflow/gui/flowchart.hpp>
 
-#include <cgal_nodes.hpp>
-#include <gdal_nodes.hpp>
-#include <las_nodes.hpp>
-#include <stepedge_nodes.hpp>
-#include <masb_nodes.hpp>
+#include <geoflow/core/geoflow.hpp>
+#include <cgal_register.hpp>
+#include <gdal_register.hpp>
+#include <las_register.hpp>
+#include <stepedge_register.hpp>
+#include <masb_register.hpp>
 
-static auto a = std::make_shared<poviApp>(1280, 800, "Geoflow nodes");
-static geoflow::NodeManager N;
-static ImGui::Nodes nodes_(N, *a);
-
-void on_draw() {
-    ImGui::Begin("Nodes");
-        nodes_.ProcessNodes();
-    ImGui::End();
-}
+namespace gfn = geoflow::nodes;
 
 int main(int ac, const char * av[])
 {
-    //viewer nodes
-    N.register_node<TriangleNode>("Triangle");
-    N.register_node<ColorMapperNode>("ColorMapper");
-    N.register_node<Vec3SplitterNode>("Vec3Splitter");
-    N.register_node<GradientMapperNode>("GradientMapper");
+    // /Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las
+    // /Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_0.gpkg
+    std::string las_path = "/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las";
+    std::string fp_path = "/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg";
+    // register nodes from various modules
+    NodeRegister stepedge = gfn::stepedge::create_register();
+    NodeRegister cgal = gfn::cgal::create_register();
+    NodeRegister gdal = gfn::gdal::create_register();
+    NodeRegister las = gfn::las::create_register();
+    NodeRegister mat = gfn::mat::create_register();
 
-    //processing nodes
-    N.register_node<SimplifyFootprintNode>("SimplifyFootprint");
-    N.register_node<SimplifyLinesNode>("SimplifyLines");
-    N.register_node<SimplifyLineNode>("SimplifyLine");
-    N.register_node<ExtruderNode>("Extruder");
-    N.register_node<ProcessArrangementNode>("ProcessArrangement");
-    N.register_node<BuildArrangementNode>("BuildArrangement");
-    N.register_node<DetectLinesNode>("DetectLines");
-    N.register_node<ClassifyEdgePointsNode>("ClassifyEdgePoints");
-    N.register_node<ComputeMetricsNode>("ComputeMetrics");
-    N.register_node<LASInPolygonsNode>("LASInPolygons");
-    // N.register_node<PointsInFootprintNode>("PointsInFootprint");
-    N.register_node<RegulariseLinesNode>("RegulariseLines");
-    N.register_node<AlphaShapeNode>("AlphaShape");
-    N.register_node<Arr2LinearRingsNode>("Arr2LinearRings");
-    N.register_node<PolygonExtruderNode>("PolygonExtruder");
-    N.register_node<LOD13GeneratorNode>("LOD13Generator");
-    
-    //gdal nodes
-    N.register_node<OGRLoaderNode>("OGRLoader");
-    N.register_node<OGRWriterNode>("OGRWriter");
-    N.register_node<LASLoaderNode>("LASLoader");
-    N.register_node<LASWriterNode>("LASWriter");
-    N.register_node<PLWriterNode>("PLWriter");
-    N.register_node<CDTNode>("CDT");
-    N.register_node<PointDistanceNode>("PointDistance");
-    // N.register_node<ComparePointDistanceNode>("ComparePointDistance");
-    N.register_node<CSVLoaderNode>("CSVLoader");
-    N.register_node<CSVWriterNode>("CSVWriter");
-    N.register_node<TinSimpNode>("TinSimp");
-    N.register_node<SimplifyLine3DNode>("SimplifyLine3D");
+    // create some nodes and connections
+    NodeManager N;
 
-    N.register_node<ComputeNormalsNode>("ComputeNormals");
-    N.register_node<ComputeMedialAxisNode>("ComputeMedialAxis");
+    NodeHandle OGRLoader = N.create_node(gdal, "OGRLoader", {-275,75});
+    NodeHandle PolygonSimp = N.create_node(stepedge, "SimplifyFootprint", {-275,175});
+    NodeHandle PolygonSimp_post = N.create_node(stepedge, "SimplifyFootprint", {1200,-25});
+    NodeHandle LASInPolygons = N.create_node(stepedge, "LASInPolygons", {75,75});
+    NodeHandle BuildingSelect = N.create_node(stepedge, "BuildingSelector", {75,175});
+    NodeHandle DetectPlanes = N.create_node(stepedge, "DetectPlanes", {300,75});
+    NodeHandle AlphaShape = N.create_node(stepedge, "AlphaShape", {600,75});
+    NodeHandle DetectLines = N.create_node(stepedge, "DetectLines", {900,75});
+    // NodeHandle RegulariseLines = N.create_node(stepedge, "RegulariseLines", {1200,175});
+    NodeHandle RegulariseRings = N.create_node(stepedge, "RegulariseRings", {1200,175});
+    NodeHandle BuildArrangement = N.create_node(stepedge, "BuildArrFromRings", {1200,75});
+    // NodeHandle ProcessArrangement = N.create_node(stepedge, "ProcessArrangement", {1500,75});
+    NodeHandle Extruder = N.create_node(stepedge, "Extruder", {1500,75});
 
-    a->draw_that(on_draw);
+    connect(OGRLoader, PolygonSimp, "linear_rings", "polygons");
+    connect(PolygonSimp, BuildingSelect, "polygons_simp", "polygons");
+    connect(PolygonSimp, LASInPolygons, "polygons_simp", "polygons");
+    connect(LASInPolygons, BuildingSelect, "point_clouds", "point_clouds");
+    connect(BuildingSelect, DetectPlanes, "point_cloud", "points");
+    // connect(BuildingSelect, BuildArrangement, "polygon", "footprint");
+    connect(BuildingSelect, RegulariseRings, "polygon", "footprint");
+    connect(DetectPlanes, AlphaShape, "pts_per_roofplane", "pts_per_roofplane");
+    // connect(ComputeMetrics, ProcessArrangement, "points", "points");
+    connect(AlphaShape, DetectLines, "alpha_rings", "edge_points");
+    connect(DetectLines, RegulariseRings, "edge_segments", "edge_segments");
+    connect(DetectLines, RegulariseRings, "ring_idx", "ring_idx");
+    connect(RegulariseRings, BuildArrangement, "rings_out", "rings");
+    connect(RegulariseRings, PolygonSimp_post, "footprint_out", "polygons");
+    connect(PolygonSimp_post, BuildArrangement, "polygons_simp", "footprint");
+    connect(DetectPlanes, BuildArrangement, "pts_per_roofplane", "pts_per_roofplane");
+    // connect(BuildArrangement, ProcessArrangement, "arrangement", "arrangement");
+    // connect(ProcessArrangement, Extruder, "arrangement", "arrangement");
+    connect(BuildArrangement, Extruder, "arrangement", "arrangement");
 
-    ImGui::NodeStore ns;
-    ns.push_back(std::make_tuple("OGRLoader", "TheOGRLoader", ImVec2(-275,75)));
-    ns.push_back(std::make_tuple("LASInPolygons", "TheLASInPolygons", ImVec2(75,75)));
-    ns.push_back(std::make_tuple("ComputeMetrics", "TheComputeMetrics", ImVec2(300,75)));
-    ns.push_back(std::make_tuple("AlphaShape", "TheAlphaShape", ImVec2(600,75)));
-    ns.push_back(std::make_tuple("DetectLines", "TheDetectLines", ImVec2(900,75)));
-    ns.push_back(std::make_tuple("RegulariseLines", "TheRegulariseLines", ImVec2(1200,175)));
-    ns.push_back(std::make_tuple("BuildArrangement", "TheBuildArrangement", ImVec2(1200,75)));
-    ns.push_back(std::make_tuple("ProcessArrangement", "TheProcessArrangement", ImVec2(1500,75)));
-    ns.push_back(std::make_tuple("Extruder", "TheExtruder", ImVec2(1800,75)));
-    nodes_.PreloadNodes(ns);
+    LASInPolygons->set_param(
+        "las_filepath", las_path);
+    OGRLoader->set_param(
+        "filepath", fp_path);
 
-    ImGui::LinkStore ls;
-    // ls.push_back(std::make_tuple("TheOGRLoader", "TheLASInPolygons", "linear_rings", "polygons"));
-    ls.push_back(std::make_tuple("TheLASInPolygons", "TheComputeMetrics", "points", "points"));
-    ls.push_back(std::make_tuple("TheLASInPolygons", "TheBuildArrangement", "footprint", "footprint"));
-    ls.push_back(std::make_tuple("TheLASInPolygons", "TheRegulariseLines", "footprint", "footprint"));
-    ls.push_back(std::make_tuple("TheComputeMetrics", "TheAlphaShape", "points", "points"));
-    ls.push_back(std::make_tuple("TheComputeMetrics", "TheProcessArrangement", "points", "points"));
-    ls.push_back(std::make_tuple("TheAlphaShape", "TheDetectLines", "alpha_rings", "edge_points"));
-    ls.push_back(std::make_tuple("TheDetectLines", "TheRegulariseLines", "edge_segments", "edge_segments"));
-    ls.push_back(std::make_tuple("TheRegulariseLines", "TheBuildArrangement", "edges_out", "edge_segments"));
-    ls.push_back(std::make_tuple("TheBuildArrangement", "TheProcessArrangement", "arrangement", "arrangement"));
-    ls.push_back(std::make_tuple("TheProcessArrangement", "TheExtruder", "arrangement", "arrangement"));
-    nodes_.PreloadLinks(ls);
-
-    a->run();
+    // launch the GUI
+    launch_flowchart(N, {stepedge, cgal, gdal, las, mat});
 }

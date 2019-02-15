@@ -2,9 +2,11 @@
 
 #include <algorithm>
 
+namespace geoflow::nodes::mat {
+
 void ComputeMedialAxisNode::process(){
-  auto point_collection = inputs("points").get<PointCollection>();
-  auto normals_vec3f = inputs("normals").get<vec3f>();
+  auto point_collection = input("points").get<PointCollection>();
+  auto normals_vec3f = input("normals").get<vec3f>();
 
   masb::ma_data madata;
   madata.m = point_collection.size();
@@ -44,14 +46,14 @@ void ComputeMedialAxisNode::process(){
   vec1i ma_is_interior(madata.m*2, 0);
   std::fill_n(ma_is_interior.begin(), madata.m, 1);
 
-  outputs("ma_coords").set(ma_coords);
-  outputs("ma_qidx").set(ma_qidx);
-  outputs("ma_is_interior").set(ma_is_interior);
+  output("ma_coords").set(ma_coords);
+  output("ma_qidx").set(ma_qidx);
+  output("ma_is_interior").set(ma_is_interior);
 }
 
 
 void ComputeNormalsNode::process(){
-  auto point_collection = inputs("points").get<PointCollection>();
+  auto point_collection = input("points").get<PointCollection>();
 
   masb::ma_data madata;
   madata.m = point_collection.size();
@@ -72,5 +74,7 @@ void ComputeNormalsNode::process(){
     normals_vec3f.push_back({n[0], n[1], n[2]});
   }
 
-  outputs("normals").set(normals_vec3f);
+  output("normals").set(normals_vec3f);
+}
+
 }

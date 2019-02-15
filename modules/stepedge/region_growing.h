@@ -9,7 +9,7 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Search_traits_adapter.h>
 
-#include <geoflow.hpp>
+#include <geoflow/core/geoflow.hpp>
 
 namespace linedect {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel cgal_kernel;
@@ -47,7 +47,7 @@ namespace linedect {
     LineDetector(vector<Point> &points);
     LineDetector(vector<Point> &points, vector<vector<size_t>> neighbours);
     vector<size_t> get_point_indices(size_t shape_id);
-    void get_bounded_edges(geoflow::LineStringCollection& edges);
+    size_t get_bounded_edges(geoflow::SegmentCollection& edges);
     void detect();
 
     private:

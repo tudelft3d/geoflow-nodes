@@ -3,25 +3,14 @@ if (MSVC)
 endif()
 
 add_executable(hoogtelijnen hoogtelijnen.cpp)
-target_link_libraries( hoogtelijnen 
-  flowchart-gui
-  gdal_nodes
-  las_nodes
-  cgal_nodes
-)
-set_target_properties(
-  hoogtelijnen
-  PROPERTIES CXX_STANDARD 17
-)
-add_executable(hoogtelijnen-cli hoogtelijnen-cli.cpp)
-target_link_libraries( hoogtelijnen-cli
-  flowchart-core
+target_link_libraries( hoogtelijnen
+  geoflow-gui
   Boost::program_options
   gdal_nodes
   cgal_nodes
 )
 set_target_properties(
-  hoogtelijnen-cli
+  hoogtelijnen
   PROPERTIES CXX_STANDARD 17
 )
 
@@ -54,25 +43,14 @@ set_target_properties(
 
 add_executable(lod13 lod13.cpp)
 target_link_libraries( lod13 
-  flowchart-gui
+  geoflow-gui
   stepedge_nodes
+  cgal_nodes
   gdal_nodes
-  las_nodes
+  Boost::program_options
+  LASlib
 )
 set_target_properties(
   lod13
-  PROPERTIES CXX_STANDARD 17
-)
-
-add_executable(lod13-cli lod13-cli.cpp)
-target_link_libraries( lod13-cli 
-  flowchart-core
-  Boost::program_options
-  stepedge_nodes
-  gdal_nodes
-  las_nodes
-)
-set_target_properties(
-  lod13-cli
   PROPERTIES CXX_STANDARD 17
 )

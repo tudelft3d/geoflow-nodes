@@ -7,7 +7,7 @@
 
 #include <boost/heap/fibonacci_heap.hpp>
 
-#include "geoflow.hpp"
+#include <geoflow/core/geoflow.hpp>
 
 namespace tinsimp {
 

@@ -44,6 +44,7 @@ namespace planedect {
 
     PlaneDetector(vector<Point> &points, vector<Vector> &normals);
     vector<size_t> get_point_indices(size_t shape_id);
+    vector<Point> get_points(size_t shape_id);
     void detect();
 
     private:

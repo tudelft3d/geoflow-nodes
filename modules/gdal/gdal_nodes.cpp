@@ -11,12 +11,10 @@ typedef bg::model::point<double, 3, bg::cs::cartesian> point_type_3d;
 #include <unordered_map>
 #include <variant>
 #include <fstream>
-#include <geos_c.h>
 
-using namespace geoflow;
-
+namespace geoflow::nodes::gdal {
 void OGRLoaderNode::process(){
-  GDALDatasetUniquePtr poDS(GDALDataset::Open( filepath, GDAL_OF_VECTOR));
+  GDALDatasetUniquePtr poDS(GDALDataset::Open( param<std::string>("filepath").c_str(), GDAL_OF_VECTOR));
   if( poDS == nullptr )
   {
       std::cerr<<"Open failed.\n";
@@ -24,15 +22,15 @@ void OGRLoaderNode::process(){
   }
   layer_count = poDS->GetLayerCount();
   std::cout << "Layer count: " << layer_count << "\n";
-  current_layer_id = 0;
+  param<int>("layer_id") = 0;
 
   // Set up vertex data (and buffer(s)) and attribute pointers
   LineStringCollection line_strings;
   LinearRingCollection linear_rings;
 
   OGRLayer  *poLayer;
-  poLayer = poDS->GetLayer( current_layer_id );
-  std::cout << "Layer " << current_layer_id << " feature count: " << poLayer->GetFeatureCount() << "\n";
+  poLayer = poDS->GetLayer( param<int>("layer_id") );
+  std::cout << "Layer " << param<int>("layer_id") << " feature count: " << poLayer->GetFeatureCount() << "\n";
   geometry_type = poLayer->GetGeomType();
   geometry_type_name = OGRGeometryTypeToName(geometry_type);
   std::cout << "Layer geometry type: " << geometry_type_name << "\n";
@@ -93,114 +91,18 @@ void OGRLoaderNode::process(){
 
   }
   if (geometry_type == wkbLineString25D || geometry_type == wkbLineStringZM) {
-    outputs("line_strings").set(line_strings);
+    output("line_strings").set(line_strings);
     std::cout << "pushed " << line_strings.size() << " line_string features...\n";
   } else if (geometry_type == wkbPolygon || geometry_type == wkbPolygon25D || geometry_type == wkbPolygonZM || geometry_type == wkbPolygonM) {
-    outputs("linear_rings").set(linear_rings);
+    output("linear_rings").set(linear_rings);
     std::cout << "pushed " << linear_rings.size() << " linear_ring features...\n";
   }
 }
 
-// class OGRLoaderOldNode:public Node {
-//   char filepath[256] = "/Users/ravi/surfdrive/data/step-edge-detector/test-lines.gpkg";
-//   // char filepath[256] = "/Users/ravi/surfdrive/Projects/RWS-Basisbestand-3D-geluid/3D-basisbestand-geluid-v0.1/output/hoogtelijnen/hoogtelijnen_v2/hoogtelijnen_out";
-
-//   public:
-//   OGRLoaderOldNode(NodeManager& manager):Node(manager) {
-//     add_output("lines", TT_any);
-//     add_output("lines_vec3f", TT_vec3f);
-//   }
-
-//   void gui(){
-//     ImGui::InputText("File path", filepath, IM_ARRAYSIZE(filepath));
-//   }
-
-//   void process(){
-//     // Set up vertex data (and buffer(s)) and attribute pointers
-//     std::vector<vec3f> lines;
-//     vec3f lines_vec3f;
-
-//     GDALAllRegister();
-//     GDALDataset *poDS = static_cast<GDALDataset*>(
-//     GDALOpenEx( filepath, GDAL_OF_VECTOR, NULL, NULL, NULL ));
-//     if( poDS == NULL )
-//         {
-//             std::cerr<<"Open failed.\n";
-//             return;
-//         }
-//     OGRLayer  *poLayer = poDS->GetLayer( 0 );
-
-//     OGREnvelope *poExtent;
-//     poLayer->GetExtent(poExtent);
-//     auto center_x = poExtent->MaxX - poExtent->MinX;
-//     auto center_y = poExtent->MaxY - poExtent->MinY;
-
-//     OGRFeatureDefn *poFDefn = poLayer->GetLayerDefn();
-//         poLayer->ResetReading();
-//     OGRFeature *poFeature;
-//     while( (poFeature = poLayer->GetNextFeature()) != NULL )
-//     {
-//       // for( int iField = 0; iField < poFDefn->GetFieldCount(); iField++ )
-//       // {
-//       //   OGRFieldDefn *poFieldDefn = poFDefn->GetFieldDefn( iField );
-//       //   switch( poFieldDefn->GetType() )
-//       //               {
-//       //   case OFTInteger:
-//       //                       printf( "%d,", poFeature->GetFieldAsInteger( iField ) );
-//       //   break;
-//       //   case OFTInteger64:
-//       //                       printf( CPL_FRMT_GIB ",", poFeature->GetFieldAsInteger64( iField ) );
-//       //   break;
-//       //   case OFTReal:
-//       //                       printf( "%.3f,", poFeature->GetFieldAsDouble(iField) );
-//       //   break;
-//       //   case OFTString:
-//       //                       printf( "%s,", poFeature->GetFieldAsString(iField) );
-//       //   break;
-//       //   default:
-//       //                       printf( "%s,", poFeature->GetFieldAsString(iField) );
-//       //   break;
-//       //               }
-//       // }
-//       OGRGeometry *poGeometry = poFeature->GetGeometryRef();
-//       if( poGeometry != NULL
-//         && wkbFlatten(poGeometry->getGeometryType()) == wkbLineString25D )
-//       {
-//         OGRLineString *poLineString = (OGRLineString *) poGeometry;
-
-//         auto n = poLineString->getNumPoints();
-//         vec3f line;
-//         OGRPoint* poPoint;
-//         for(size_t j=0; j<n; j++) {
-//           poLineString->getPoint(j, poPoint);
-//           line.push_back({float(poPoint->getX()-center_x), float(poPoint->getY()-center_y), float(poPoint->getZ())});
-//         }
-//         lines_vec3f.push_back(line[0]);
-//         for (size_t j=1; j<(line.size()-1); j++){
-//           lines_vec3f.push_back(line[j]);
-//           lines_vec3f.push_back(line[j]);
-//         }
-//         lines_vec3f.push_back(line[line.size()-1]);
-//         lines.push_back(line);
-
-//       } else {
-//         std::cout << "no point geometry\n";
-//       }
-//       OGRFeature::DestroyFeature( poFeature );
-//     }
-//     GDALClose( poDS );
-    
-//     // poLayer = poDS->GetLayerByName( "point" );
-
-//     outputs("lines").set(lines);
-//     outputs("lines_vec3f").set(lines_vec3f);
-//   }
-// };
-
 void OGRWriterNode::process() {
-    auto geom_term = inputs("geometries");
-    auto attributes = inputs("attributes").get<AttributeMap>();
-    // auto attributes = inputs("attributes").get<Attributes>();
+    auto geom_term = input("geometries");
+    auto attributes = input("attributes").get<AttributeMap>();
+    // auto attributes = input("attributes").get<Attributes>();
     // what about the attributes?
 
     const char *gszDriverName = "ESRI Shapefile";
@@ -217,7 +119,7 @@ void OGRWriterNode::process() {
 
     GDALDataset *poDS;
 
-    poDS = poDriver->Create( filepath, 0, 0, 0, GDT_Unknown, NULL );
+    poDS = poDriver->Create( param<std::string>("filepath").c_str(), 0, 0, 0, GDT_Unknown, NULL );
     if( poDS == NULL )
     {
         printf( "Creation of output file failed.\n" );
@@ -295,7 +197,7 @@ void OGRWriterNode::process() {
 }
 
 void OGRWriterNoAttributesNode::process() {
-    auto geom_term = inputs("geometries");
+    auto geom_term = input("geometries");
 
     const char *gszDriverName = "ESRI Shapefile";
     GDALDriver *poDriver;
@@ -311,7 +213,7 @@ void OGRWriterNoAttributesNode::process() {
 
     GDALDataset *poDS;
 
-    poDS = poDriver->Create( filepath, 0, 0, 0, GDT_Unknown, NULL );
+    poDS = poDriver->Create( param<std::string>("filepath").c_str(), 0, 0, 0, GDT_Unknown, NULL );
     if( poDS == NULL )
     {
         printf( "Creation of output file failed.\n" );
@@ -378,14 +280,51 @@ void OGRWriterNoAttributesNode::process() {
     GDALClose( poDS );
 }
 
+void CSVLoaderNode::process(){
+  PointCollection points;
+  auto& thin_nth = param<int>("thin_nth");
+  
+  std::ifstream f_in(param<std::string>("filepath"));
+  float px, py, pz;
+  size_t i=0;
+  std::string header;
+  std::getline(f_in, header);
+  while(f_in >> px >> py >> pz) {
+    if(i++%thin_nth==0) {
+      points.push_back({px,py,pz});
+    }
+  }
+  f_in.close();
+
+  output("points").set(points);\
+}
+
+void CSVWriterNode::process() {
+  auto points = input("points").get<PointCollection>();
+  auto distances = input("distances").get<vec1f>();
+  
+  std::ofstream f_out(param<std::string>("filepath"));
+  f_out << std::fixed << std::setprecision(2);
+  f_out << "x y z distance\n";
+  for (size_t i=0; i< points.size(); ++i) {
+    f_out 
+    << points[i][0] + (*manager.data_offset)[0] << " " 
+    << points[i][1] + (*manager.data_offset)[1] << " " 
+    << points[i][2] + (*manager.data_offset)[2] << " "
+    << distances[i] << "\n";
+  }
+  f_out.close();
+}
+
 void GEOSMergeLinesNode::process() {
+  
     std::cout << "Merging lines\n";
-    auto lines = inputs("lines").get<LineStringCollection>();
+    auto lines = input("lines").get<LineStringCollection>();
     GEOSContextHandle_t gc = GEOS_init_r();
     std::vector<GEOSGeometry*> linearray;
     assert(geometries = malloc(lines.size() * sizeof(GEOSGeometry *)));
     for (int i = 0; i < lines.size(); i++) {
-      GEOSCoordSequence *points = GEOSCoordSeq_create_r(gc, 2, 3);
+      GEOSCoordSequence* points = GEOSCoordSeq_create_r(gc, 2, 3);
       for (int j = 0; j < 2; j++) {
         GEOSCoordSeq_setX_r(gc, points, j, lines[i][j][0]);
         GEOSCoordSeq_setY_r(gc, points, j, lines[i][j][1]);
@@ -396,7 +335,7 @@ void GEOSMergeLinesNode::process() {
     }
     GEOSGeometry* lineCollection = GEOSGeom_createCollection_r(gc, GEOS_GEOMETRYCOLLECTION, linearray.data(), lines.size());
     GEOSGeometry* mergedlines = GEOSLineMerge_r(gc, lineCollection);
-    
+
     LineStringCollection outputLines;
     for (int i = 0; i < GEOSGetNumGeometries_r(gc, mergedlines); i++) {
       const GEOSCoordSequence* l = GEOSGeom_getCoordSeq_r(gc, GEOSGetGeometryN_r(gc, mergedlines, i));
@@ -414,39 +353,14 @@ void GEOSMergeLinesNode::process() {
       outputLines.push_back(line_vec3f);
     }
 
-    outputs("lines").set(outputLines);
-}
-void CSVLoaderNode::process(){
-  PointCollection points;
-  
-  std::ifstream f_in(filepath);
-  float px, py, pz;
-  size_t i=0;
-  std::string header;
-  std::getline(f_in, header);
-  while(f_in >> px >> py >> pz) {
-    if(i++%thin_nth==0) {
-      points.push_back({px,py,pz});
+    // clean GEOS geometries
+    for (auto l : linearray) {
+      GEOSGeom_destroy_r(gc, l);
     }
-  }
-  f_in.close();
+    GEOSGeom_destroy_r(gc, lineCollection);
+    GEOSGeom_destroy_r(gc, mergedlines);
+    GEOS_finish_r(gc);
 
-  outputs("points").set(points);\
+    output("lines").set(outputLines);
 }
-
-void CSVWriterNode::process() {
-  auto points = inputs("points").get<PointCollection>();
-  auto distances = inputs("distances").get<vec1f>();
-  
-  std::ofstream f_out(filepath);
-  f_out << std::fixed << std::setprecision(2);
-  f_out << "x y z distance\n";
-  for (size_t i=0; i< points.size(); ++i) {
-    f_out 
-    << points[i][0] + (*manager.data_offset)[0] << " " 
-    << points[i][1] + (*manager.data_offset)[1] << " " 
-    << points[i][2] + (*manager.data_offset)[2] << " "
-    << distances[i] << "\n";
-  }
-  f_out.close();
 }

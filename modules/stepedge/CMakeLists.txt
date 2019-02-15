@@ -9,7 +9,7 @@ add_library(stepedge_nodes STATIC
   region_growing.cpp
 )
 target_link_libraries( stepedge_nodes
-  flowchart-core
+  geoflow-core
   ptinpoly
 )
 set_target_properties(

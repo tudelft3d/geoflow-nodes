@@ -25,6 +25,15 @@ vector<size_t> PlaneDetector::get_point_indices(size_t shape_id) {
   }
   return result;
 }
+vector<Point> PlaneDetector::get_points(size_t shape_id) {
+  vector<Point> result;
+  for (auto pi:indexed_points){
+    auto idx = pi.second;
+    if (point_segment_idx[idx] == shape_id)
+      result.push_back(pi.first);
+  }
+  return result;
+}
 
 inline Plane PlaneDetector::fit_plane(Neighbor_search search_result){
   vector<Point> neighbor_points;

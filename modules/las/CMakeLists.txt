@@ -3,7 +3,7 @@ add_library(las_nodes STATIC
   las_nodes.cpp
 )
 target_link_libraries( las_nodes
-  flowchart-core
+  geoflow-core
   LASlib
 )
 set_target_properties(

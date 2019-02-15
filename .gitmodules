@@ -1,6 +1,6 @@
 [submodule "thirdparty/geoflow"]
 	path = thirdparty/geoflow
-	url = git@github.com:tudelft3d/geoflow.git
+	url = https://github.com/tudelft3d/geoflow.git
 [submodule "thirdparty/LAStools"]
 	path = thirdparty/LAStools
 	url = https://github.com/LAStools/LAStools.git

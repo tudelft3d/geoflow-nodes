@@ -9,6 +9,8 @@ cmake_minimum_required (VERSION 3.10)
 #   link_directories("/usr/local/opt/llvm/lib")
 # endif()
 
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules/" ${CMAKE_MODULE_PATH})
+
 project( geoflow_nodes )
 
 if (MSVC)
@@ -23,6 +25,10 @@ INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
 # GDAL
 find_package( GDAL )
 include_directories(${GDAL_INCLUDE_DIR})
+
+# GEOS
+find_package( GEOS )
+include_directories(${GEOS_INCLUDE_DIR})
 
 # CGAL
 find_package( CGAL QUIET COMPONENTS )
@@ -59,8 +65,7 @@ include_directories(thirdparty/ptinpoly)
 # geoflow
 add_subdirectory(thirdparty/geoflow)
 include_directories(
-  thirdparty/geoflow/src/flowchart
-  thirdparty/geoflow/src/viewer
+  thirdparty/geoflow/src/
   thirdparty/geoflow/thirdparty/glad/include 
   thirdparty/geoflow/thirdparty/imgui
   thirdparty/geoflow/thirdparty/imgui/examples

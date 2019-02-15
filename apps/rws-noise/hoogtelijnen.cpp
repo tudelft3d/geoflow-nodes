@@ -1,72 +1,110 @@
 #include <iostream>
 #include <fstream>
 
-#include "imgui.h"
-#include "app_povi.h"
-#include "nodes.h"
-#include <gdal_nodes.hpp>
-#include <las_nodes.hpp>
-#include <cgal_nodes.hpp>
+#include <gdal_register.hpp>
+#include <cgal_register.hpp>
+#include <geoflow/gui/flowchart.hpp>
 
-static auto a = std::make_shared<poviApp>(1280, 800, "hoogtelijnen");
-static geoflow::NodeManager N;
-static ImGui::Nodes nodes_(N, *a);
-
-void on_draw() {
-    ImGui::Begin("Nodes");
-        nodes_.ProcessNodes();
-    ImGui::End();
-}
+#include <boost/program_options.hpp>
+namespace po = boost::program_options;
+namespace gfn = geoflow::nodes;
 
 int main(int ac, const char * av[])
 {
-    //viewer nodes
-    N.register_node<TriangleNode>("Triangle");
-    N.register_node<ColorMapperNode>("ColorMapper");
-    N.register_node<Vec3SplitterNode>("Vec3Splitter");
-    N.register_node<GradientMapperNode>("GradientMapper");
+    std::string lines_file_in;
+    std::string lines_file_out;
+    std::string las_file;
+    float selection_threshold = 0.5;
+    float simplification_threshold = 10;
+    int pointthinning = 10;
+    bool gui = false;
+    
+    po::options_description desc("Allowed options");
+    desc.add_options()
+    ("help", "produce help message")
+    ("gui", po::bool_switch(&gui), "launch gui")
+    ("las", po::value<std::string>(&las_file), "Point cloud ")
+    ("lines_file_in", po::value<std::string>(&lines_file_in), "Input lines")
+    ("lines_file_out", po::value<std::string>(&lines_file_out), "Output lines")
+    ("selection_threshold", po::value<float>(&selection_threshold), "Selection threshold")
+    ("simplification_threshold", po::value<float>(&simplification_threshold), "Simplification threshold")
+    ;
+    po::variables_map vm;
+    po::store(po::parse_command_line(ac, av, desc), vm);
+    po::notify(vm);
+    if (vm.count("help")) {
+        std::cout << desc << "\n";
+        return 1;
+    }
 
-    //gdal nodes
-    N.register_node<OGRLoaderNode>("OGRLoader");
-    N.register_node<OGRWriterNode>("OGRWriter");
-    N.register_node<OGRWriterNoAttributesNode>("OGRWriterNoAttributes");
+    auto cgal = gfn::cgal::create_register();
+    auto gdal = gfn::gdal::create_register();
+    geoflow::NodeManager N;
 
-    //las nodes
-    N.register_node<LASLoaderNode>("LASLoader");
-    N.register_node<CDTNode>("CDT");
+    auto ogr_loader = N.create_node(gdal, "OGRLoader");
+    auto tin_creator_lines = N.create_node(cgal, "CDT");
+    auto height_difference_calc = N.create_node(cgal, "PointDistance");
+    auto tin_creator_difference = N.create_node(cgal, "CDT");
+    auto iso_lines = N.create_node(cgal, "IsoLineSlicer");
+    auto line_merger = N.create_node(gdal, "GEOSMergeLines");
+    auto add_height_to_lines = N.create_node(cgal, "LineHeight");
+    auto tin_simp_lines = N.create_node(cgal, "TinSimp");
+    auto tin_simp_iso = N.create_node(cgal, "TinSimp");
+    auto simplify_lines_cdt = N.create_node(cgal, "SimplifyLines");
+    auto ogr_writer = N.create_node(gdal, "OGRWriterNoAttributes");
 
-    //cgal nodes
-    // N.register_node<PointDistanceNode>("PointDistance");
-    // N.register_node<ComparePointDistanceNode>("ComparePointDistance");
-    N.register_node<CSVLoaderNode>("CSVLoader");
-    N.register_node<TinSimpNode>("TinSimp");
-    N.register_node<DensifyNode>("Densify");
-    N.register_node<SimplifyLine3DNode>("SimplifyLine3D");
+    ogr_loader->set_param("filepath", lines_file_in);
+    ogr_writer->set_param("filepath", lines_file_out);
+    
+    tin_creator_lines->set_params({
+        {"create_triangles", true}
+      });
+    height_difference_calc->set_params({
+        {"filepath", las_file},
+        {"thin_nth", pointthinning},
+        {"overwritez", true}
+    });
+    add_height_to_lines->set_params({
+        {"filepath", las_file},
+        {"thin_nth", pointthinning}
+    });
+    tin_simp_lines->set_params({
+        {"thres_error", selection_threshold},
+        {"densify_interval", selection_threshold}
+    });
+    tin_simp_iso->set_params({
+        {"thres_error", selection_threshold},
+        {"densify_interval", selection_threshold}
+    });
+    simplify_lines_cdt->set_params({
+        {"threshold_stop_cost", simplification_threshold}
+    });
 
-    a->draw_that(on_draw);
+    // iso line generation
+    geoflow::connect(ogr_loader->output("line_strings"), tin_creator_lines->input("geometries"));;
+    // calculate height difference tin-points
+    geoflow::connect(tin_creator_lines->output("triangles"), height_difference_calc->input("triangles"));
+    // make tin from height differences
+    geoflow::connect(height_difference_calc->output("points"), tin_creator_difference->input("geometries"));
+    // make iso lines
+    geoflow::connect(height_difference_calc->output("distance_min"), iso_lines->input("min"));
+    geoflow::connect(height_difference_calc->output("distance_max"), iso_lines->input("max"));
+    geoflow::connect(tin_creator_difference->output("cgal_cdt"), iso_lines->input("cgal_cdt"));
+    // merge iso line segments
+    geoflow::connect(iso_lines->output("lines"), line_merger->input("lines"));
+    // add height to lines
+    geoflow::connect(line_merger->output("lines"), add_height_to_lines->input("lines"));
+    // remove lines using tinsimp
+    geoflow::connect(ogr_loader->output("line_strings"), tin_simp_lines->input("geometries"));
+    geoflow::connect(add_height_to_lines->output("lines"), tin_simp_iso->input("geometries"));
+    // simplify lines using CDT
+    geoflow::connect(tin_simp_lines->output("selected_lines"), simplify_lines_cdt->input("lines"));
+    geoflow::connect(tin_simp_iso->output("selected_lines"), simplify_lines_cdt->input("lines2"));
+    // write lines
+    geoflow::connect(simplify_lines_cdt->output("lines"), ogr_writer->input("geometries"));
 
-    ImGui::NodeStore ns;
-    ns.push_back(std::make_tuple("OGRLoader", "TheOGRLoader", ImVec2(75,75)));
-    // ns.push_back(std::make_tuple("Densify", "TheDensify", ImVec2(375,75)));
-    ns.push_back(std::make_tuple("TinSimp", "TheTinSimp", ImVec2(375,75)));
-    ns.push_back(std::make_tuple("SimplifyLine3D", "TheSimplifyLine3D", ImVec2(675,75)));
-    ns.push_back(std::make_tuple("OGRWriterNoAttributes", "TheOGRWriter", ImVec2(1075,75)));
-    ns.push_back(std::make_tuple("LASLoader", "LASLoader6", ImVec2(75,175)));
-
-    nodes_.PreloadNodes(ns);
-
-    // ImGui::LinkStore ls;
-    // ls.push_back(std::make_tuple("ThePointsInFootprint", "TheComputeMetrics", "points", "points"));
-    // ls.push_back(std::make_tuple("ThePointsInFootprint", "TheBuildArrangement", "footprint", "footprint"));
-    // ls.push_back(std::make_tuple("ThePointsInFootprint", "TheRegulariseLines", "footprint_vec3f", "footprint_vec3f"));
-    // ls.push_back(std::make_tuple("TheComputeMetrics", "TheClassifyEdgePoints", "points", "points"));
-    // ls.push_back(std::make_tuple("TheComputeMetrics", "TheProcessArrangement", "points", "points"));
-    // ls.push_back(std::make_tuple("TheClassifyEdgePoints", "TheDetectLines", "edge_points", "edge_points"));
-    // ls.push_back(std::make_tuple("TheDetectLines", "TheRegulariseLines", "edge_segments", "edge_segments"));
-    // ls.push_back(std::make_tuple("TheRegulariseLines", "TheBuildArrangement", "edges_out", "edge_segments"));
-    // ls.push_back(std::make_tuple("TheBuildArrangement", "TheProcessArrangement", "arrangement", "arrangement"));
-    // ls.push_back(std::make_tuple("TheProcessArrangement", "TheExtruder", "arrangement", "arrangement"));
-    // nodes_.PreloadLinks(ls);
-
-    a->run();
+    if (gui)
+        geoflow::launch_flowchart(N, {cgal, gdal});
+    else
+      N.run(*ogr_loader);
 }

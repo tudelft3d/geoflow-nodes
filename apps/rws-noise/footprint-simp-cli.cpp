@@ -32,7 +32,7 @@ int main(int ac, const char * av[]) {
 
     auto ogr_loader = std::make_shared<OGRLoaderNode>(N);
     //auto simplify_footprint = std::make_shared<SimplifyFootprintNode>(N);
-    //auto simplify_footprint = std::make_shared<SimplifyFootprintCDTNode>(N);
+    //auto simplify_footprint = std::make_shared<SimplifyFootprintsCDTNode>(N);
     auto simplify_footprint = std::make_shared<SimplifyLinesBufferNode>(N);
     auto ogr_writer = std::make_shared<OGRWriterNoAttributesNode>(N);
 
