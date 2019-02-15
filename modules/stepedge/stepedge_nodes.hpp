@@ -33,6 +33,17 @@ namespace geoflow::nodes::stepedge {
     void process();
   };
 
+  class Ring2SegmentsNode:public Node {
+    public:
+    using Node::Node;
+    void init() {
+      add_input("rings", TT_linear_ring_collection);
+      add_output("edge_segments", TT_segment_collection);
+      add_output("ring_idx", TT_any);
+    }
+    void process();
+  };
+
   class PolygonExtruderNode:public Node {
 
     public:
@@ -148,12 +159,16 @@ namespace geoflow::nodes::stepedge {
 
       add_param("z_percentile", (float) 0.9);
       add_param("flood_to_unsegmented", (bool) true);
-      add_param("dissolve_edges", (bool) false);
+      add_param("dissolve_edges", (bool) true);
+      add_param("dissolve_stepedges", (bool) true);
+      add_param("step_height_threshold", (float) 1.0);
     }
     void gui() {
       ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
       ImGui::Checkbox("Flood to unsegmented", &param<bool>("flood_to_unsegmented"));
       ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
+      ImGui::Checkbox("Dissolve stepedges", &param<bool>("dissolve_stepedges"));
+      ImGui::SliderFloat("step_height_threshold", &param<float>("step_height_threshold"), 0, 100);
     }
     void process();
   };
@@ -229,12 +244,14 @@ namespace geoflow::nodes::stepedge {
 
       add_output("class", TT_int);
       add_output("classf", TT_float);
+      add_output("horiz_roofplane_cnt", TT_float);
+      add_output("slant_roofplane_cnt", TT_float);
 
       add_param("metrics_normal_k", (int) 10);
       add_param("metrics_plane_min_points", (int) 50);
       add_param("metrics_plane_epsilon", (float) 0.15);
       add_param("metrics_plane_normal_threshold", (float) 0.75);
-      add_param("metrics_is_horizontal_threshold", (float) 0.9);
+      add_param("metrics_is_horizontal_threshold", (float) 0.99);
       add_param("metrics_is_wall_threshold", (float) 0.3);
     }
 
@@ -433,6 +450,12 @@ namespace geoflow::nodes::stepedge {
       add_output("building_class", TT_attribute_map_f);
 
       add_param("step_height_threshold", (float) 2.0);
+      add_param("only_classify", (bool) false);
+      add_param("direct_alpharing", (bool) false);
+      add_param("z_percentile", (float) 0.9);
+      add_param("flood_to_unsegmented", (bool) true);
+      add_param("dissolve_edges", (bool) true);
+      add_param("dissolve_stepedges", (bool) true);
       // add_param("zrange_threshold", (float) 0.2);
       // add_param("merge_segid", (bool) true);
       // add_param("merge_zrange", (bool) false);
@@ -442,13 +465,14 @@ namespace geoflow::nodes::stepedge {
     }
 
     void gui(){
-      ImGui::InputFloat("Step height", &param<float>("step_height_threshold"), 0.1, 1);
-      // ImGui::DragFloat("zrange_threshold", &param<float>("zrange_threshold"), 0.1);
-      // ImGui::Checkbox("merge_segid", &param<bool>("merge_segid"));
-      // ImGui::Checkbox("merge_zrange", &param<bool>("merge_zrange"));
-      // ImGui::Checkbox("merge_step_height", &param<bool>("merge_step_height"));
-      // ImGui::Checkbox("merge_unsegmented", &param<bool>("merge_unsegmented"));
-      // ImGui::Checkbox("merge_dangling_egdes", &param<bool>("merge_dangling_egdes"));
+      ImGui::Checkbox("only_classify", &param<bool>("only_classify"));
+      ImGui::Checkbox("direct_alpharing", &param<bool>("direct_alpharing"));
+      
+      ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
+      ImGui::Checkbox("Flood to unsegmented", &param<bool>("flood_to_unsegmented"));
+      ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
+      ImGui::Checkbox("Dissolve stepedges", &param<bool>("dissolve_stepedges"));
+      ImGui::SliderFloat("step_height_threshold", &param<float>("step_height_threshold"), 0, 100);
     }
     void process();
   };

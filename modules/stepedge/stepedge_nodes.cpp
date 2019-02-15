@@ -251,6 +251,24 @@ void AlphaShapeNode::process(){
   output("boundary_points").set(boundary_points);
 }
 
+void Ring2SegmentsNode::process() {
+  auto rings = input("rings").get<LinearRingCollection>();
+  SegmentCollection segments;
+  std::vector<std::vector<size_t>> ring_idx(rings.size());
+  size_t ring_i=0;
+  size_t seg_i=0;
+  for (auto& ring : rings) {
+    for (size_t i=0; i< ring.size()-1; ++i) {
+      segments.push_back({ring[i], ring[i+1]});
+      ring_idx[ring_i].push_back(seg_i++);
+    }
+    segments.push_back({ring[ring.size()-1], ring[0]});
+    ring_idx[ring_i++].push_back(seg_i++);
+  }
+  output("edge_segments").set(segments);
+  output("ring_idx").set(ring_idx);
+}
+
 void PolygonExtruderNode::process(){
   auto polygons = input("polygons").get<LinearRingCollection>();
   auto point_clouds = input("point_clouds").get<std::vector<PointCollection>>();
@@ -655,6 +673,28 @@ void BuildArrFromRingsNode::process() {
       arr_base.remove_edge(he);
     }
   }
+  if (param<bool>("dissolve_stepedges")) {
+  std::vector<Arrangement_2::Halfedge_handle> edges;
+  for (auto edge : arr_base.edge_handles()) {
+    edges.push_back(edge);
+  }
+  for (auto& edge : edges) {
+    auto f1 = edge->face();
+    auto f2 = edge->twin()->face();
+    if((f1->data().in_footprint && f2->data().in_footprint) && (f1->data().segid!=0 && f2->data().segid!=0)) {
+      if(std::abs(f1->data().elevation_avg - f2->data().elevation_avg) < param<float>("step_height_threshold")){
+        // should add face merge call back in face observer class...
+        // pick elevation of the segment with the highest count
+        if (f2->data().elevation_avg < f1->data().elevation_avg) {
+          f2->data().elevation_avg = f1->data().elevation_avg;
+        } else {
+          f1->data().elevation_avg = f2->data().elevation_avg;
+        }
+        arr_base.remove_edge(edge);
+      }
+    }
+  }
+  }
 
   LineStringCollection segments;
   for (auto& face: arr_base.face_handles()){
@@ -926,15 +966,20 @@ void DetectPlanesNode::process() {
     }
   }
 
-  int building_type; // as built: 0=LOD1, 1=LOD1.3, 2=LOD2
+  int building_type=-2; // as built: -2=undefined; -1=no pts; 0=LOD1, 1=LOD1.3, 2=LOD2
   if (horiz_roofplane_cnt==1 && slant_roofplane_cnt==0)
     building_type=0;
-  else if (horiz_roofplane_cnt!=0 && slant_roofplane_cnt!=0)
+  else if (horiz_roofplane_cnt!=0 && slant_roofplane_cnt==0)
     building_type=1;
-  else
+  else if (slant_roofplane_cnt!=0)
     building_type=2;
+  else if (PD.segment_shapes.size()==0)
+    building_type=-1;
+
   output("class").set(building_type);
   output("classf").set(float(building_type));
+  output("horiz_roofplane_cnt").set(float(horiz_roofplane_cnt));
+  output("slant_roofplane_cnt").set(float(slant_roofplane_cnt));
 
   vec1i plane_id, is_wall, is_horizontal;
   for(auto& p : pnl_points) {
@@ -1455,6 +1500,7 @@ void LOD13GeneratorNode::process(){
     R.register_node<BuildArrFromRingsNode>("BuildArrFromRings");
     // R.register_node<ProcessArrangementNode>("ProcessArrangement");
     R.register_node<Arr2LinearRingsNode>("Arr2LinearRings");
+    R.register_node<Ring2SegmentsNode>("Ring2Segments");
 
     NodeManager N = NodeManager();
 
@@ -1466,44 +1512,63 @@ void LOD13GeneratorNode::process(){
     // auto ProcessArrangement_node = N.create_node(R, "ProcessArrangement");
     auto Arr2LinearRings_node = N.create_node(R, "Arr2LinearRings");
     auto SimplifyFootprint_node = N.create_node(R, "SimplifyFootprint");
+    auto Ring2Segments_node = N.create_node(R, "Ring2Segments");
 
     DetectPlanes_node->input("points").set(points);
     LinearRingCollection lrc;
     lrc.push_back(polygon);
     RegulariseRings_node->input("footprint").set(lrc);
 
-    connect(DetectPlanes_node, AlphaShape_node, "pts_per_roofplane", "pts_per_roofplane");
-    connect(DetectPlanes_node, BuildArrFromRings_node, "pts_per_roofplane", "pts_per_roofplane");
-    connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
-    connect(DetectLines_node, RegulariseRings_node, "edge_segments", "edge_segments");
-    connect(DetectLines_node, RegulariseRings_node, "ring_idx", "ring_idx");
-    connect(RegulariseRings_node, BuildArrFromRings_node, "rings_out", "rings");
-    connect(RegulariseRings_node, SimplifyFootprint_node, "footprint_out", "polygons");
-    connect(SimplifyFootprint_node, BuildArrFromRings_node, "polygons_simp", "footprint");
-    connect(BuildArrFromRings_node, Arr2LinearRings_node, "arrangement", "arrangement");
-
+    if (!param<bool>("only_classify")) {
+      connect(DetectPlanes_node, AlphaShape_node, "pts_per_roofplane", "pts_per_roofplane");
+      connect(DetectPlanes_node, BuildArrFromRings_node, "pts_per_roofplane", "pts_per_roofplane");
+      
+      if (param<bool>("direct_alpharing")) {
+        SimplifyFootprint_node->set_param("threshold_stop_cost", float(0.3));
+        connect(AlphaShape_node, SimplifyFootprint_node, "alpha_rings", "polygons");
+        connect(SimplifyFootprint_node, Ring2Segments_node, "polygons", "rings");
+        connect(Ring2Segments_node, RegulariseRings_node, "edge_segments", "rings");
+        connect(Ring2Segments_node, RegulariseRings_node, "ring_idx", "ring_idx");
+        connect(RegulariseRings_node, BuildArrFromRings_node, "rings_out", "rings");
+        BuildArrFromRings_node->input("footprint").set(lrc);
+      } else {
+        connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
+        connect(DetectLines_node, RegulariseRings_node, "edge_segments", "edge_segments");
+        connect(DetectLines_node, RegulariseRings_node, "ring_idx", "ring_idx");
+        connect(RegulariseRings_node, BuildArrFromRings_node, "rings_out", "rings");
+        connect(RegulariseRings_node, SimplifyFootprint_node, "footprint_out", "polygons");
+        connect(SimplifyFootprint_node, BuildArrFromRings_node, "polygons_simp", "footprint");
+      } 
+        connect(BuildArrFromRings_node, Arr2LinearRings_node, "arrangement", "arrangement");
+    }
     // config and run
     // this should copy all parameters from this LOD13Generator node to the ProcessArrangement node
-    // BuildArrFromRings_node->set_params( dump_params() );
+    BuildArrFromRings_node->set_params( dump_params() );
     
     N.run(DetectPlanes_node);
 
-    // note: the following will crash if the flowchart specified above is stopped halfway for some reason (eg missing output/connection)
-    auto cells = Arr2LinearRings_node->output("linear_rings").get<LinearRingCollection>();
-    auto attributes = Arr2LinearRings_node->output("attributes").get<AttributeMap>();
     auto classf = DetectPlanes_node->output("classf").get<float>();
-    building_class["building_class"].push_back(classf);
+    auto horiz = DetectPlanes_node->output("horiz_roofplane_cnt").get<float>();
+    auto slant = DetectPlanes_node->output("slant_roofplane_cnt").get<float>();
+    building_class["bclass"].push_back(classf);
+    building_class["horiz"].push_back(horiz);
+    building_class["slant"].push_back(slant);
+    // note: the following will crash if the flowchart specified above is stopped halfway for some reason (eg missing output/connection)
+    if (!param<bool>("only_classify")) {
+      auto cells = Arr2LinearRings_node->output("linear_rings").get<LinearRingCollection>();
+      auto attributes = Arr2LinearRings_node->output("attributes").get<AttributeMap>();
 
-    for (int i=0; i<cells.size(); i++) {
-      // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
-      all_cells.push_back(cells[i]);
-      all_attributes["height"].push_back(attributes["height"][i]);
-      all_attributes["rms_error"].push_back(attributes["rms_error"][i]);
-      all_attributes["max_error"].push_back(attributes["max_error"][i]);
-      all_attributes["count"].push_back(attributes["count"][i]);
-      all_attributes["coverage"].push_back(attributes["coverage"][i]);
-      all_attributes["building_class"].push_back(classf);
-      // }
+      for (int i=0; i<cells.size(); i++) {
+        // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
+        all_cells.push_back(cells[i]);
+        all_attributes["height"].push_back(attributes["height"][i]);
+        all_attributes["rms_error"].push_back(attributes["rms_error"][i]);
+        all_attributes["max_error"].push_back(attributes["max_error"][i]);
+        all_attributes["count"].push_back(attributes["count"][i]);
+        all_attributes["coverage"].push_back(attributes["coverage"][i]);
+        all_attributes["bclass"].push_back(classf);
+        // }
+      }
     }
   }
   output("decomposed_footprints").set(all_cells);

@@ -22,6 +22,7 @@ namespace geoflow::nodes::stepedge {
     R.register_node<RegulariseRingsNode>("RegulariseRings");
     R.register_node<SimplifyFootprintNode>("SimplifyFootprint");
     R.register_node<LOD13GeneratorNode>("LOD13Generator");
+    R.register_node<Ring2SegmentsNode>("Ring2Segments");
     return R;
   }
 
