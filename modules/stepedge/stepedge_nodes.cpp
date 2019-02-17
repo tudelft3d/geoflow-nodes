@@ -1512,6 +1512,8 @@ void LOD13GeneratorNode::process(){
     // auto ProcessArrangement_node = N.create_node(R, "ProcessArrangement");
     auto Arr2LinearRings_node = N.create_node(R, "Arr2LinearRings");
     auto SimplifyFootprint_node = N.create_node(R, "SimplifyFootprint");
+    auto SimplifyFootprint_node_postfp = N.create_node(R, "SimplifyFootprint");
+    auto SimplifyFootprint_node_postr = N.create_node(R, "SimplifyFootprint");
     auto Ring2Segments_node = N.create_node(R, "Ring2Segments");
 
     DetectPlanes_node->input("points").set(points);
@@ -1524,13 +1526,16 @@ void LOD13GeneratorNode::process(){
       connect(DetectPlanes_node, BuildArrFromRings_node, "pts_per_roofplane", "pts_per_roofplane");
       
       if (param<bool>("direct_alpharing")) {
-        SimplifyFootprint_node->set_param("threshold_stop_cost", float(0.3));
+        SimplifyFootprint_node->set_param("threshold_stop_cost", float(0.18));
         connect(AlphaShape_node, SimplifyFootprint_node, "alpha_rings", "polygons");
         connect(SimplifyFootprint_node, Ring2Segments_node, "polygons", "rings");
         connect(Ring2Segments_node, RegulariseRings_node, "edge_segments", "rings");
         connect(Ring2Segments_node, RegulariseRings_node, "ring_idx", "ring_idx");
-        connect(RegulariseRings_node, BuildArrFromRings_node, "rings_out", "rings");
-        BuildArrFromRings_node->input("footprint").set(lrc);
+        connect(RegulariseRings_node, SimplifyFootprint_node_postr, "rings_out", "polygons");
+        connect(SimplifyFootprint_node_postr, BuildArrFromRings_node, "polygons_simp", "rings");
+        connect(SimplifyFootprint_node_postfp, BuildArrFromRings_node, "polygons_simp", "footprint");
+        
+        SimplifyFootprint_node_postfp->input("polygons").set(lrc);
       } else {
         connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
         connect(DetectLines_node, RegulariseRings_node, "edge_segments", "edge_segments");

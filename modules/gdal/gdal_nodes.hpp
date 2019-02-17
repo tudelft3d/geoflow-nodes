@@ -1,6 +1,7 @@
 #include <geoflow/core/geoflow.hpp>
 
 #include <ogrsf_frmts.h>
+#include <geos_c.h>
 
 namespace geoflow::nodes::gdal {
 
