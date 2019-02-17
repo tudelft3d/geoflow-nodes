@@ -38,7 +38,7 @@ public:
   ~AproximateLine();
   bool canMerge(AproximateLine &l2, double threshold);
   bool merge(AproximateLine &l2);
-  std::pair<double, double> AproximateLine::calulateC(double A, std::vector<Point2> points);
+  std::pair<double, double> calulateC(double A, std::vector<Point2> points);
   static bool compare(const AproximateLine& l1, const AproximateLine& l2);
   std::vector<Point2> points;
   std::vector<Line> lines;

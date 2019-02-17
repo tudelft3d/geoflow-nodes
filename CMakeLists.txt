@@ -9,7 +9,7 @@ cmake_minimum_required (VERSION 3.10)
 #   link_directories("/usr/local/opt/llvm/lib")
 # endif()
 
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules/" ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/" ${CMAKE_MODULE_PATH})
 
 project( geoflow_nodes )
 
@@ -81,7 +81,7 @@ if (CGAL_FOUND)
   include_directories(modules/cgal)
 endif()
 
-if (GDAL_FOUND AND Boost_FOUND)
+if (GDAL_FOUND AND Boost_FOUND AND GEOS_FOUND)
   # include helper file
   add_subdirectory(modules/gdal)
   include_directories(modules/gdal)
@@ -104,7 +104,7 @@ if (CGAL_FOUND)
   add_subdirectory(apps/gf_viewer)
 endif()
 
-if (CGAL_FOUND AND Boost_FOUND AND GDAL_FOUND)
+if (CGAL_FOUND AND Boost_FOUND AND GDAL_FOUND AND GEOS_FOUND)
   add_subdirectory(apps/rws-noise)
 endif()
 
