@@ -45,7 +45,7 @@ int main(int ac, const char * av[])
     auto tin_creator_lines = N.create_node(cgal, "CDT");
     auto height_difference_calc = N.create_node(cgal, "PointDistance");
     auto tin_creator_difference = N.create_node(cgal, "CDT");
-    auto iso_lines = N.create_node(cgal, "IsoLineSlicer");
+    auto iso_lines = N.create_node(cgal, "IsoLine");
     auto line_merger = N.create_node(gdal, "GEOSMergeLines");
     auto add_height_to_lines = N.create_node(cgal, "LineHeight");
     auto tin_simp_lines = N.create_node(cgal, "TinSimp");
