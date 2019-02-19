@@ -153,7 +153,7 @@ namespace geoflow::nodes::stepedge {
     void init() {
       add_input("rings", TT_linear_ring_collection);
       add_input("pts_per_roofplane", TT_any);
-      add_input("footprint", TT_linear_ring_collection);
+      add_input("footprint", TT_linear_ring);
       add_output("arrangement", TT_any);
       add_output("arr_segments", TT_line_string_collection);
 
@@ -251,7 +251,7 @@ namespace geoflow::nodes::stepedge {
       add_param("metrics_plane_min_points", (int) 50);
       add_param("metrics_plane_epsilon", (float) 0.15);
       add_param("metrics_plane_normal_threshold", (float) 0.75);
-      add_param("metrics_is_horizontal_threshold", (float) 0.99);
+      add_param("metrics_is_horizontal_threshold", (float) 0.96);
       add_param("metrics_is_wall_threshold", (float) 0.3);
     }
 
@@ -329,9 +329,9 @@ namespace geoflow::nodes::stepedge {
       add_input("point_clouds", TT_point_collection_list);
       add_input("polygons", TT_linear_ring_collection);
       add_output("point_cloud", TT_point_collection);
-      add_output("polygon", TT_linear_ring_collection);
+      add_output("polygon", TT_linear_ring);
 
-      add_param("building_id", (int) 0);
+      // add_param("building_id", (int) 0);
     }
 
     void gui() {
@@ -373,7 +373,7 @@ namespace geoflow::nodes::stepedge {
     using Node::Node;
     void init() {
       add_input("edge_segments", TT_segment_collection);
-      add_input("footprint", TT_linear_ring_collection);
+      add_input("footprint", TT_linear_ring);
       add_output("edges_out", TT_line_string_collection);
       add_output("merged_edges_out", TT_line_string_collection);
       add_output("cluster_labels", TT_vec1i);
@@ -401,10 +401,10 @@ namespace geoflow::nodes::stepedge {
       // add_input("ring_id", TT_vec1i);
       // add_input("ring_order", TT_vec1i);
       // add_input("edge_segments", TT_segment_collection);
-      add_input("footprint", TT_linear_ring_collection);
+      add_input("footprint", TT_linear_ring);
       add_output("edges_out", TT_segment_collection);
       add_output("rings_out", TT_linear_ring_collection);
-      add_output("footprint_out", TT_linear_ring_collection);
+      add_output("footprint_out", TT_linear_ring);
       // add_output("footprint_labels", TT_vec1i);
       // add_output("line_clusters", TT_any); // ie a LineCluster
       // add_output("tmp_vec3f", TT_vec3f);
@@ -422,12 +422,26 @@ namespace geoflow::nodes::stepedge {
   };
 
 
+  class PrintResultNode:public Node {
+    public:
+    using Node::Node;
+    void init() {
+      add_input("in", {TT_float});
+    }
+    void gui() {
+      ImGui::Text("Result: %f", input("in").get<float>());
+    }
+    void process(){};
+  };
+
+
   class SimplifyFootprintNode:public Node {
     public:
     using Node::Node;
     void init() {
-      add_input("polygons", TT_linear_ring_collection);
+      add_input("polygons", {TT_linear_ring_collection, TT_linear_ring});
       add_output("polygons_simp", TT_linear_ring_collection);
+      add_output("polygon_simp", TT_linear_ring);
 
       add_param("threshold_stop_cost", (float) 0.01);
     }

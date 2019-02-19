@@ -58,7 +58,7 @@ int main(int ac, const char * av[])
     connect(DetectLines, RegulariseRings, "ring_idx", "ring_idx");
     connect(RegulariseRings, BuildArrangement, "rings_out", "rings");
     connect(RegulariseRings, PolygonSimp_post, "footprint_out", "polygons");
-    connect(PolygonSimp_post, BuildArrangement, "polygons_simp", "footprint");
+    connect(PolygonSimp_post, BuildArrangement, "polygon_simp", "footprint");
     connect(DetectPlanes, BuildArrangement, "pts_per_roofplane", "pts_per_roofplane");
     // connect(BuildArrangement, ProcessArrangement, "arrangement", "arrangement");
     // connect(ProcessArrangement, Extruder, "arrangement", "arrangement");

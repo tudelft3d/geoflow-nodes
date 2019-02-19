@@ -576,8 +576,7 @@ void LinearRingtoRingsNode::process(){
 
 void BuildArrFromRingsNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto lrc = input("footprint").get<LinearRingCollection>();
-  auto footprint = lrc[0];
+  auto footprint = input("footprint").get<LinearRing>();
   auto rings = input("rings").get<LinearRingCollection>();
   // auto plane_idx = input("plane_idx").get<vec1i>();
   auto points_per_plane = input("pts_per_roofplane").get<std::unordered_map<int, std::vector<Point>>>();
@@ -1105,9 +1104,7 @@ void BuildingSelectorNode::process() {
   auto& polygons = input("polygons").get<LinearRingCollection&>();
   polygon_count = polygons.size();
   output("point_cloud").set(point_clouds[building_id]);
-  LinearRingCollection lrc;
-  lrc.push_back(polygons[building_id]);
-  output("polygon").set(lrc);
+  output("polygon").set(polygons[building_id]);
 };
 
 void RegulariseLinesNode::process(){
@@ -1364,8 +1361,7 @@ void RegulariseRingsNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto edges = input("edge_segments").get<SegmentCollection>();
   auto ring_idx = input("ring_idx").get<std::vector<std::vector<size_t>>>();
-  auto lrc = input("footprint").get<LinearRingCollection>();
-  auto footprint = lrc[0];
+  auto footprint = input("footprint").get<LinearRing>();
   // auto ring_id = input("ring_id").get<vec1i>();
   // auto ring_order = input("ring_order").get<vec1i>();
 
@@ -1412,18 +1408,14 @@ void RegulariseRingsNode::process(){
     chain(all_edges[i-1], all_edges[i], new_fp, param<float>("snap_threshold"));
   }
   chain(all_edges[fpi_end], all_edges[fpi_begin], new_fp, param<float>("snap_threshold"));
-  LinearRingCollection lrc2;
-  lrc2.push_back(new_fp);
 
   // output("merged_edges_out").set(merged_edges_out);
   output("edges_out").set(all_edges);
   output("rings_out").set(new_rings);
-  output("footprint_out").set(lrc2);
+  output("footprint_out").set(new_fp);
 }
 
-void SimplifyFootprintNode::process(){
-  // Set up vertex data (and buffer(s)) and attribute pointers
-
+LinearRing simplify_footprint(LinearRing& polygon, float& threshold_stop_cost) {
   namespace PS = CGAL::Polyline_simplification_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef K::Point_2 Point_2;
@@ -1432,14 +1424,7 @@ void SimplifyFootprintNode::process(){
   typedef PS::Stop_above_cost_threshold        Stop_cost;
   typedef PS::Squared_distance_cost            Cost;
 
-  auto polygons = input("polygons").get<LinearRingCollection>();
-
-  auto threshold_stop_cost = param<float>("threshold_stop_cost");
-
-  LinearRingCollection polygons_out;
-  
-  for (auto& polygon : polygons) {
-    if (polygon.size()>2) {
+  if (polygon.size()>2) {
       Polygon_2 cgal_polygon;
       Cost cost;
 
@@ -1452,7 +1437,7 @@ void SimplifyFootprintNode::process(){
 
       cgal_polygon = PS::simplify(cgal_polygon, cost, Stop_cost(threshold_stop_cost));
       
-      vec3f footprint_vec3f;
+      LinearRing footprint_vec3f;
       for (auto v = cgal_polygon.vertices_begin(); v!=cgal_polygon.vertices_end(); v++){
         footprint_vec3f.push_back({float(v->x()),float(v->y()),0});
       }
@@ -1466,12 +1451,35 @@ void SimplifyFootprintNode::process(){
         footprint_vec3f.erase(footprint_vec3f.begin());
       }
 
-      // auto bv = cgal_polygon.vertices_begin(); // repeat first pt as last
-      // footprint_vec3f.push_back({float(bv->x()),float(bv->y()),0});
-      polygons_out.push_back(footprint_vec3f);
-    } else polygons_out.push_back(polygon);
+      return footprint_vec3f;
+    } else 
+      return polygon;
+}
+
+void SimplifyFootprintNode::process(){
+  // Set up vertex data (and buffer(s)) and attribute pointers
+
+  auto geom_term = input("polygons");
+
+  auto threshold_stop_cost = param<float>("threshold_stop_cost");
+
+  if (geom_term.connected_type==TT_linear_ring) {
+    auto& polygon = geom_term.get<LinearRing&>();
+    output("polygon_simp").set(
+      simplify_footprint(polygon, threshold_stop_cost)
+    );
+  } else if (geom_term.connected_type==TT_linear_ring_collection) {
+    auto& polygons = geom_term.get<LinearRingCollection&>();
+    LinearRingCollection polygons_out;
+    for (auto& polygon : polygons) {
+      polygons_out.push_back(
+        simplify_footprint(polygon, threshold_stop_cost)
+      );
+    }
+    output("polygons_simp").set(polygons_out);
   }
-  output("polygons_simp").set(polygons_out);
+  
+  
 }
 
 void LOD13GeneratorNode::process(){
@@ -1487,7 +1495,7 @@ void LOD13GeneratorNode::process(){
   AttributeMap all_attributes, building_class;
   
   for(int i=0; i<point_clouds.size(); i++) {
-    std::cout << "b id: " << i << "\n";
+    // std::cout << "b id: " << i << "\n";
     auto& points = point_clouds[i];
     auto& polygon = polygons[i];
 
@@ -1517,9 +1525,7 @@ void LOD13GeneratorNode::process(){
     auto Ring2Segments_node = N.create_node(R, "Ring2Segments");
 
     DetectPlanes_node->input("points").set(points);
-    LinearRingCollection lrc;
-    lrc.push_back(polygon);
-    RegulariseRings_node->input("footprint").set(lrc);
+    RegulariseRings_node->input("footprint").set(polygon);
 
     if (!param<bool>("only_classify")) {
       connect(DetectPlanes_node, AlphaShape_node, "pts_per_roofplane", "pts_per_roofplane");
@@ -1528,21 +1534,21 @@ void LOD13GeneratorNode::process(){
       if (param<bool>("direct_alpharing")) {
         SimplifyFootprint_node->set_param("threshold_stop_cost", float(0.18));
         connect(AlphaShape_node, SimplifyFootprint_node, "alpha_rings", "polygons");
-        connect(SimplifyFootprint_node, Ring2Segments_node, "polygons", "rings");
+        connect(SimplifyFootprint_node, Ring2Segments_node, "polygons_simp", "rings");
         connect(Ring2Segments_node, RegulariseRings_node, "edge_segments", "rings");
         connect(Ring2Segments_node, RegulariseRings_node, "ring_idx", "ring_idx");
         connect(RegulariseRings_node, SimplifyFootprint_node_postr, "rings_out", "polygons");
         connect(SimplifyFootprint_node_postr, BuildArrFromRings_node, "polygons_simp", "rings");
-        connect(SimplifyFootprint_node_postfp, BuildArrFromRings_node, "polygons_simp", "footprint");
+        connect(SimplifyFootprint_node_postfp, BuildArrFromRings_node, "polygon_simp", "footprint");
         
-        SimplifyFootprint_node_postfp->input("polygons").set(lrc);
+        SimplifyFootprint_node_postfp->input("polygons").set(polygon);
       } else {
         connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
         connect(DetectLines_node, RegulariseRings_node, "edge_segments", "edge_segments");
         connect(DetectLines_node, RegulariseRings_node, "ring_idx", "ring_idx");
         connect(RegulariseRings_node, BuildArrFromRings_node, "rings_out", "rings");
         connect(RegulariseRings_node, SimplifyFootprint_node, "footprint_out", "polygons");
-        connect(SimplifyFootprint_node, BuildArrFromRings_node, "polygons_simp", "footprint");
+        connect(SimplifyFootprint_node, BuildArrFromRings_node, "polygon_simp", "footprint");
       } 
         connect(BuildArrFromRings_node, Arr2LinearRings_node, "arrangement", "arrangement");
     }
