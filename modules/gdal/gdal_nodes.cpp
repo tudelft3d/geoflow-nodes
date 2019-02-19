@@ -322,7 +322,6 @@ void GEOSMergeLinesNode::process() {
     auto lines = input("lines").get<LineStringCollection>();
     GEOSContextHandle_t gc = GEOS_init_r();
     std::vector<GEOSGeometry*> linearray;
-    assert(geometries = malloc(lines.size() * sizeof(GEOSGeometry *)));
     for (int i = 0; i < lines.size(); i++) {
       GEOSCoordSequence* points = GEOSCoordSeq_create_r(gc, 2, 3);
       for (int j = 0; j < 2; j++) {
