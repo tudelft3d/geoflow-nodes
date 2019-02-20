@@ -56,7 +56,7 @@ target_link_libraries( lod10
   stepedge_nodes
   gdal_nodes
   Boost::program_options
-  LASlib
+  ${LASlib}
 )
 set_target_properties(
   lod13 lod10
