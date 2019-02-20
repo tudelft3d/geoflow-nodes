@@ -8,7 +8,7 @@ namespace geoflow::nodes::gdal {
     R.register_node<OGRWriterNoAttributesNode>("OGRWriterNoAttributes");
     R.register_node<CSVLoaderNode>("CSVLoader");
     R.register_node<CSVWriterNode>("CSVWriter");
+    R.register_node<GEOSMergeLinesNode>("GEOSMergeLines");
     return R;
   }
-  
 }

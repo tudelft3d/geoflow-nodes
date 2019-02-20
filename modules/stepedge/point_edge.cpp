@@ -271,7 +271,7 @@ void detect_lines(std::vector<std::pair<Point,Point>> & edge_segments, std::vect
 }
 
 void build_arrangement(geoflow::LinearRing &footprint, geoflow::LineStringCollection & edge_segments, Arrangement_2 &arr, bool remove_unsupported){
-  Face_index_observer obs (arr, false);
+  Face_split_observer obs (arr);
   // const double s = 100;
 
   // insert footprint segments

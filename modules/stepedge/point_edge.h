@@ -132,20 +132,32 @@ typedef Arrangement_2::Face_handle                    Face_handle;
 typedef Arrangement_2::Vertex_const_handle            Vertex_const_handle;
 typedef Arrangement_2::Halfedge_const_handle          Halfedge_const_handle;
 typedef Arrangement_2::Face_const_handle              Face_const_handle;
+typedef Arrangement_2::Ccb_halfedge_circulator        Ccb_halfedge_circulator;
 typedef CGAL::Arr_accessor<Arrangement_2>             Arr_accessor;
 typedef Arr_accessor::Dcel_vertex                     DVertex;
 typedef Arrangement_2::Face                           Face;
 struct overlay_functor {
   FaceInfo operator()(const FaceInfo a, const FaceInfo b) const { 
     auto r = FaceInfo();
+    r.segid=0;
     // if (a.is_finite && b.is_finite)
     r.is_finite = true;
-    if (a.segid!=0 && b.segid==0)
+
+    if (a.segid!=0 && b.segid==0) {
       r.segid = a.segid;
-    else if (a.segid==0 && b.segid!=0)
+      r.elevation_avg = a.elevation_avg;
+    } else if (a.segid==0 && b.segid!=0) {
       r.segid = b.segid;
-    else if (a.segid!=0 && b.segid!=0)
-      r.segid = 999;
+      r.elevation_avg = b.elevation_avg;
+    } else if (a.segid!=0 && b.segid!=0) { // we need to merge 2 faces with a plane
+      if (a.elevation_avg > b.elevation_avg) {
+        r.elevation_avg = a.elevation_avg;
+        r.segid = a.segid;
+      } else {
+        r.elevation_avg = b.elevation_avg;
+        r.segid = b.segid;
+      }
+    }
 
     if (a.in_footprint || b.in_footprint) {
       r.in_footprint = true;
@@ -169,18 +181,18 @@ class Face_index_observer : public CGAL::Arr_observer<Arrangement_2>
 {
 private:
   int     n_faces;          // The current number of faces.
-  int     plane_id;
+  size_t  plane_id;
   bool    in_footprint;
+  float   elevation=0;
 public:
-  Face_index_observer (Arrangement_2& arr, bool is_footprint) :
+  Face_index_observer (Arrangement_2& arr, bool is_footprint, size_t pid, float elevation) :
     CGAL::Arr_observer<Arrangement_2> (arr),
-    n_faces (0), in_footprint(is_footprint)
+    n_faces (0), in_footprint(is_footprint), plane_id(pid), elevation(elevation)
   {
     CGAL_precondition (arr.is_empty());
     arr.unbounded_face()->data().is_finite=false;
     n_faces++;
   };
-  void set_plane_id(int pid) { plane_id=pid; };
   virtual void after_split_face (Face_handle old_face,
                                  Face_handle new_face, bool )
   {
@@ -188,9 +200,12 @@ public:
     new_face->data().in_footprint = in_footprint;
     if(n_faces == 1) {
       new_face->data().is_finite = true;
+      new_face->data().segid = plane_id;
+      new_face->data().elevation_avg = elevation;
     } else if(old_face->data().is_finite) {
       new_face->data().is_finite = true;
       new_face->data().segid = plane_id;
+      new_face->data().elevation_avg = elevation;
     } else
       new_face->data().is_finite = false;
     n_faces++;

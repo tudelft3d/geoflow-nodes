@@ -7,6 +7,7 @@
 
 #include <lasreader.hpp>
 #include <fstream>
+#include <algorithm>
 
 // CDT
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
@@ -58,6 +59,9 @@ void CDTNode::process(){
   typedef CDT::Point													          Point;
 
   auto geom_term = input("geometries");
+
+  auto create_triangles = param<bool>("create_triangles");
+
   CDT cdt;
 
   if (geom_term.connected_type == TT_point_collection) {
@@ -85,18 +89,20 @@ void CDTNode::process(){
   std::cout << "Completed CDT with " << cdt.number_of_faces() << " triangles...\n";
   // assert(cdt.is_valid());
   TriangleCollection triangles;
-  for (CDT::Finite_faces_iterator fit = cdt.finite_faces_begin();
-    fit != cdt.finite_faces_end();
-    ++fit)
-  {
-    auto& p0 = fit->vertex(0)->point();
-    auto& p1 = fit->vertex(1)->point();
-    auto& p2 = fit->vertex(2)->point();
-    triangles.push_back({
-      to_arr3f<Point>(p0),
-      to_arr3f<Point>(p1),
-      to_arr3f<Point>(p2)
-    });
+  if (create_triangles) {
+    for (CDT::Finite_faces_iterator fit = cdt.finite_faces_begin();
+      fit != cdt.finite_faces_end();
+      ++fit) {
+      auto& p0 = fit->vertex(0)->point();
+      auto& p1 = fit->vertex(1)->point();
+      auto& p2 = fit->vertex(2)->point();
+      triangles.push_back({
+        to_arr3f<Point>(p0),
+        to_arr3f<Point>(p1),
+        to_arr3f<Point>(p2)
+        });
+    }
+    cdt.clear();
   }
 
   output("cgal_cdt").set(cdt);
@@ -277,8 +283,12 @@ void PointDistanceNode::process(){
   lasreader->close();
   delete lasreader;
 
+ auto minmax = std::minmax_element(distances.begin(), distances.end());
+
   output("points").set(points);
   output("distances").set(distances);
+  output("distance_min").set(sqrt(*(minmax.first)));
+  output("distance_max").set(sqrt(*(minmax.second)));
 }
 
 LineStringCollection densify_linestrings(LineStringCollection line_strings, float interval)
@@ -389,7 +399,6 @@ void TinSimpNode::process(){
 
   output("triangles").set(triangles);
   output("normals").set(normals);
-
 }
 
 void SimplifyLine3DNode::process(){
@@ -470,8 +479,8 @@ void SimplifyLinesNode::process() {
   typedef PS::Stop_above_cost_threshold                   Stop_cost;
   typedef PS::Visvalingam_cost                            Cost;
 
-  Cost cost;
   CT ct;
+  Stop_cost stop = Stop_cost(threshold_stop_cost);
 
   size_t s_index = 0;
   for (auto& linestring : lines) {
@@ -489,13 +498,13 @@ void SimplifyLinesNode::process() {
     ct.insert_constraint(line.begin(), line.end());
   }
 
-  size_t n_removed = PS::simplify(ct, cost, Stop_cost(threshold_stop_cost));
+  PS::simplify(ct, Cost(), stop);
   LineStringCollection lines_out;
 
   for (auto cit = ct.constraints_begin(); cit != ct.constraints_end(); ++cit) {
     vec3f ls;
-    for (auto vit = ct.points_in_constraint_begin(*cit); vit != ct.points_in_constraint_end(*cit); ++vit) {
-      ls.push_back({ float(vit->x()), float(vit->y()), float(vit->z()) });
+    for (auto vit = ct.vertices_in_constraint_begin(*cit); vit != ct.vertices_in_constraint_end(*cit); ++vit) {
+      ls.push_back({ float((*vit)->point().x()), float((*vit)->point().y()), float((*vit)->point().z()) });
     }
     lines_out.push_back(ls);
   }
@@ -503,54 +512,48 @@ void SimplifyLinesNode::process() {
   output("lines").set(lines_out);
 }
 
-void SimplifyFootprintNode::process(){
-  // Set up vertex data (and buffer(s)) and attribute pointers
-
-  namespace PS = CGAL::Polyline_simplification_2;
-  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-  typedef K::Point_2 Point_2;
-  typedef CGAL::Polygon_2<K>                   Polygon_2;
-  typedef PS::Stop_below_count_ratio_threshold Stop_count_ratio;
-  typedef PS::Stop_above_cost_threshold        Stop_cost;
-  typedef PS::Squared_distance_cost            Cost;
-
+void SimplifyFootprintsCDTNode::process(){
   auto polygons = input("polygons").get<LinearRingCollection>();
 
   auto threshold_stop_cost = param<float>("threshold_stop_cost");
 
-  LinearRingCollection polygons_out;
-  
-  for (auto& polygon : polygons) {
-    Polygon_2 cgal_polygon;
-    Cost cost;
+  namespace PS = CGAL::Polyline_simplification_2;
+  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+  typedef CGAL::Polygon_2<K>                              Polygon_2;
+  typedef PS::Vertex_base_2<K>                            Vb;
+  typedef CGAL::Constrained_triangulation_face_base_2<K>  Fb;
+  typedef CGAL::Triangulation_data_structure_2<Vb, Fb>    TDS;
+  typedef CGAL::Exact_predicates_tag                      Itag;
+  typedef CGAL::Constrained_Delaunay_triangulation_2<K, TDS, Itag> CDT;
+  typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
+  typedef CT::Point                                       Point;
+  typedef CT::Constraint_iterator                         Cit;
+  typedef PS::Stop_above_cost_threshold                   Stop_cost;
+  typedef PS::Squared_distance_cost                       Cost;
 
-    for (auto& p : polygon) {
-      cgal_polygon.push_back(Point_2(p[0], p[1]));
+  CT ct;
+  Stop_cost stop = Stop_cost(threshold_stop_cost * threshold_stop_cost);
+
+  for (auto& linearring : polygons) {
+    Polygon_2 polygon;
+    for (auto& p : linearring) {
+      polygon.push_back(Point(p[0], p[1]));
     }
-    // cgal_polygon.erase(cgal_polygon.vertices_end()-1); // remove repeated point from the boost polygon
-    
-    // polygon = PS::simplify(polygon, cost, Stop_count_ratio(0.5));
-
-    cgal_polygon = PS::simplify(cgal_polygon, cost, Stop_cost(threshold_stop_cost));
-    
-    vec3f footprint_vec3f;
-    for (auto v = cgal_polygon.vertices_begin(); v!=cgal_polygon.vertices_end(); v++){
-      footprint_vec3f.push_back({float(v->x()),float(v->y()),0});
-    }
-
-    // HACK: CGAL does not seem to remove the first point of the input polygon in any case, so we need to check ourselves
-    auto p_0 = *(cgal_polygon.vertices_begin());
-    auto p_1 = *(cgal_polygon.vertices_begin()+1);
-    auto p_end = *(cgal_polygon.vertices_end()-1);
-    // check the distance between the first vertex and the line between its 2 neighbours
-    if (CGAL::squared_distance(Point_2(p_0), K::Segment_2(p_end, p_1)) < threshold_stop_cost) {
-      footprint_vec3f.erase(footprint_vec3f.begin());
-    }
-
-    // auto bv = cgal_polygon.vertices_begin(); // repeat first pt as last
-    // footprint_vec3f.push_back({float(bv->x()),float(bv->y()),0});
-    polygons_out.push_back(footprint_vec3f);
+    // keep constraint id to link results back to input
+    ct.insert_constraint(polygon);
   }
+
+  PS::simplify(ct, Cost(), stop);
+  LinearRingCollection polygons_out;
+
+  for (Cit cit = ct.constraints_begin(); cit != ct.constraints_end(); ++cit) {
+    vec3f ls;
+    for (auto vit = ct.vertices_in_constraint_begin(*cit); vit != ct.vertices_in_constraint_end(*cit); ++vit) {
+      ls.push_back({ float((*vit)->point().x()), float((*vit)->point().y()) });
+    }
+    polygons_out.push_back(ls);
+  }
+
   output("polygons_simp").set(polygons_out);
 }
 
@@ -593,10 +596,14 @@ void PLYWriterNode::process() {
 
 void IsoLineNode::process() {
   auto cdt = input("cgal_cdt").get<isolines::CDT>();
-  //auto heights = input("heights").get<vec1f>();
+  float min = input("min").get<float>();
+  float max = input("max").get<float>();
+
+  int start = std::floor(min);
+  int end = std::ceil(max);
 
   vec1f heights;
-  for (int i = 1; i < 10; i++) {
+  for (int i = start; i < end; i++) {
     heights.push_back(i);
   }
 
@@ -605,6 +612,7 @@ void IsoLineNode::process() {
   std::map< double, std::vector< CGAL::Segment_3<isolines::K> > > segmentVec;
 
   for (auto isoDepth : heights) {
+    std::cout << "Slicing ISO lines at height " << isoDepth << "\n";
     // faceCache is used to ensure line segments are outputted only once. It will contain faces that have an edge exactly on the contouring depth.
     std::set<isolines::Face_handle> faceCache;
 
@@ -687,7 +695,6 @@ void IsoLineNode::process() {
 }
 
 void IsoLineSlicerNode::process() {
-  //typedef CGAL::Simple_cartesian<double> K;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef K::Point_3 Point;
   typedef K::Plane_3 Plane;
@@ -714,7 +721,7 @@ void IsoLineSlicerNode::process() {
   std::cout << "Start slicing\n";
   CGAL::Polygon_mesh_slicer<Mesh, K> slicer(mesh);
   for (auto h : heights) {
-    std::cout << "Slicing ISO line at height "<< h << "\n";
+    std::cout << "Slicing ISO ring at height "<< h << "\n";
     std::vector< std::vector< Point > > polylines;
     slicer(Plane(0, 0, 1, -h), std::back_inserter(polylines));
 
@@ -783,4 +790,45 @@ void LineHeightNode::process() {
   output("lines").set(lines_out);
 }
 
+void SimplifyLinesBufferNode::process() {
+  typedef linesimp::AproximateLine AproximateLine;
+  typedef linesimp::Point2 Point2;
+
+  auto polygons = input("polygons").get<LinearRingCollection>();
+
+  auto threshold = param<float>("threshold");
+  LinearRingCollection polygonssimp;
+
+  std::cout << "Creating simplified polylines by buffering and joining\n";
+  for (auto& poly : polygons) {
+    std::vector<AproximateLine> lines;
+    // Create lines from polygon
+    for (auto it = poly.begin(); it != poly.end() - 1; it++) {
+      AproximateLine line = AproximateLine(Point2((*it)[0], (*it)[1]), Point2((*(it + 1))[0], (*(it + 1))[1]));
+      lines.push_back(line);
+    }
+    
+    // sort lines on length
+    std::sort(lines.begin(), lines.end(), AproximateLine::compare);
+
+    // Start merging lines
+    std::cout << "Lines count: " << lines.size() << std::endl;
+    int i = 0;
+    while (i + 1 < lines.size()) {
+      if (lines[i].canMerge(lines[i + 1], threshold)) {
+        lines[i].merge(lines[i + 1]);
+        auto it = lines.begin() + i + 1;
+        lines.erase(it);
+      }
+      else {
+        i++;
+      }
+    }
+    std::cout << "Lines count: " << lines.size() << std::endl;
+
+    // Create new lines
+
+  }
+  output("polygons_simp").set(polygonssimp);
+}
 }
