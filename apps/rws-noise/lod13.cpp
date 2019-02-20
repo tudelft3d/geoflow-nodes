@@ -49,7 +49,7 @@ int main(int ac, const char * av[])
     auto cgal = gfn::cgal::create_register();
 
     auto ogr_loader = N.create_node(gdal, "OGRLoader", {75,75});
-    auto footprint_simp = N.create_node(stepedge, "SimplifyFootprint", {75,175});
+    auto footprint_simp = N.create_node(stepedge, "SimplifyPolygon", {75,175});
     auto las_in_poly = N.create_node(stepedge, "LASInPolygons", {300,75});
     auto lod13generator = N.create_node(stepedge, "LOD13Generator", {650,75});
     auto ogr_writer = N.create_node(gdal, "OGRWriter", {1000,75});

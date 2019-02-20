@@ -72,7 +72,7 @@ namespace geoflow::nodes::stepedge {
 
       add_param("step_height_threshold", (float) 2.0);
       add_param("only_classify", (bool) false);
-      add_param("direct_alpharing", (bool) false);
+      add_param("direct_alpharing", (bool) true);
       add_param("z_percentile", (float) 0.9);
       add_param("flood_to_unsegmented", (bool) true);
       add_param("dissolve_edges", (bool) true);
