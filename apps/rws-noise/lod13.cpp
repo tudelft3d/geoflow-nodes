@@ -18,7 +18,7 @@ namespace gfn = geoflow::nodes;
 //viewer nodes
 
 int main(int ac, const char * av[])
-{   
+{
     std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg");
     std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las");
     std::string footprints_classes_file("out_bclass.shp");

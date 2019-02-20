@@ -50,7 +50,15 @@ target_link_libraries( lod13
   Boost::program_options
   LASlib
 )
+add_executable(lod10 lod10.cpp)
+target_link_libraries( lod10 
+  # geoflow-gui
+  stepedge_nodes
+  gdal_nodes
+  Boost::program_options
+  LASlib
+)
 set_target_properties(
-  lod13
+  lod13 lod10
   PROPERTIES CXX_STANDARD 17
 )

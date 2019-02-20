@@ -154,6 +154,77 @@ namespace geoflow::nodes::stepedge {
     }
   };
 
+  class LOD10GeneratorNode:public Node {
+    public:
+    using Node::Node;
+    void init() {
+      add_input("point_clouds", TT_point_collection_list);
+      add_output("attributes", TT_attribute_map_f);
+
+      add_param("z_percentile", (float) 0.9);
+    }
+
+    void gui(){
+      ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
+    }
+
+    void process(){
+      auto point_clouds = input("point_clouds").get<std::vector<PointCollection>>();
+
+      AttributeMap all_attributes;
+
+      NodeRegister R("Nodes");
+      R.register_node<DetectPlanesNode>("DetectPlanes");
+      
+      for(int i=0; i<point_clouds.size(); i++) {
+        // std::cout << "b id: " << i << "\n";
+        auto& point_cloud = point_clouds[i];
+        
+        NodeManager N;
+        auto detect_planes_node = N.create_node(R, "DetectPlanes");
+        detect_planes_node->input("points").set(point_cloud);
+
+        N.run(detect_planes_node);
+
+        auto classf = detect_planes_node->output("classf").get<float>();
+        auto horiz = detect_planes_node->output("horiz_roofplane_cnt").get<float>();
+        auto slant = detect_planes_node->output("slant_roofplane_cnt").get<float>();
+        all_attributes["bclass"].push_back(classf);
+        // all_attributes["horiz"].push_back(horiz);
+        // all_attributes["slant"].push_back(slant);
+        // note: the following will crash if the flowchart specified above is stopped halfway for some reason (eg missing output/connection)
+
+        auto roofplanepts_per_fp = detect_planes_node->output("pts_per_roofplane").get<std::unordered_map<int, std::vector<Point>>>();
+
+        std::vector<Point> points;
+        for (auto& kv : roofplanepts_per_fp) {
+          points.insert(points.end(), kv.second.begin(), kv.second.end());
+        }
+        if(points.size() == 0) {
+          all_attributes["height"].push_back(0);
+          all_attributes["rms_error"].push_back(0);
+        } else {
+          // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
+          std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
+            return p1.z() < p2.z();
+          });
+          auto elevation_id = int(param<float>("z_percentile")*float(points.size()));
+          // std::cout << "id: " << elevation_id << ", size: " << points.size() << "\n";
+          double elevation = points[elevation_id].z();
+          double square_sum = 0;
+          for (auto& p : points) {
+            float d = elevation - p.z();
+            square_sum += d*d;
+          }
+          all_attributes["rms_error"].push_back(CGAL::sqrt(square_sum/points.size()));
+          all_attributes["height"].push_back(elevation);
+        }
+
+      }
+      output("attributes").set(all_attributes);
+    }
+  };
+
   NodeRegister create_register() {
     auto R = NodeRegister("Step edge");
     R.register_node<AlphaShapeNode>("AlphaShape");
@@ -173,6 +244,7 @@ namespace geoflow::nodes::stepedge {
     R.register_node<RegulariseLinesNode>("RegulariseLines");
     R.register_node<RegulariseRingsNode>("RegulariseRings");
     R.register_node<SimplifyPolygonNode>("SimplifyPolygon");
+    R.register_node<LOD10GeneratorNode>("LOD10Generator");
     R.register_node<LOD13GeneratorNode>("LOD13Generator");
     R.register_node<Ring2SegmentsNode>("Ring2Segments");
     R.register_node<PrintResultNode>("PrintResult");
