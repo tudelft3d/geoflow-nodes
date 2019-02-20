@@ -435,7 +435,7 @@ namespace geoflow::nodes::stepedge {
   };
 
 
-  class SimplifyFootprintNode:public Node {
+  class SimplifyPolygonNode:public Node {
     public:
     using Node::Node;
     void init() {
@@ -449,44 +449,6 @@ namespace geoflow::nodes::stepedge {
       if(ImGui::DragFloat("stop cost", &param<float>("threshold_stop_cost"),0.01, 0,1000)) {
         manager.run(*this);
       }
-    }
-    void process();
-  };
-
-  class LOD13GeneratorNode:public Node {
-    public:
-    using Node::Node;
-    void init() {
-      add_input("point_clouds", TT_point_collection_list);
-      add_input("polygons", TT_linear_ring_collection);
-      add_output("decomposed_footprints", TT_linear_ring_collection);
-      add_output("attributes", TT_attribute_map_f);
-      add_output("building_class", TT_attribute_map_f);
-
-      add_param("step_height_threshold", (float) 2.0);
-      add_param("only_classify", (bool) false);
-      add_param("direct_alpharing", (bool) false);
-      add_param("z_percentile", (float) 0.9);
-      add_param("flood_to_unsegmented", (bool) true);
-      add_param("dissolve_edges", (bool) true);
-      add_param("dissolve_stepedges", (bool) true);
-      // add_param("zrange_threshold", (float) 0.2);
-      // add_param("merge_segid", (bool) true);
-      // add_param("merge_zrange", (bool) false);
-      // add_param("merge_step_height", (bool) true);
-      // add_param("merge_unsegmented", (bool) false);
-      // add_param("merge_dangling_egdes", (bool) false);
-    }
-
-    void gui(){
-      ImGui::Checkbox("only_classify", &param<bool>("only_classify"));
-      ImGui::Checkbox("direct_alpharing", &param<bool>("direct_alpharing"));
-      
-      ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
-      ImGui::Checkbox("Flood to unsegmented", &param<bool>("flood_to_unsegmented"));
-      ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
-      ImGui::Checkbox("Dissolve stepedges", &param<bool>("dissolve_stepedges"));
-      ImGui::SliderFloat("step_height_threshold", &param<float>("step_height_threshold"), 0, 100);
     }
     void process();
   };

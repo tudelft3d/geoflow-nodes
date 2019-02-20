@@ -1456,7 +1456,7 @@ LinearRing simplify_footprint(LinearRing& polygon, float& threshold_stop_cost) {
       return polygon;
 }
 
-void SimplifyFootprintNode::process(){
+void SimplifyPolygonNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
 
   auto geom_term = input("polygons");
@@ -1482,110 +1482,6 @@ void SimplifyFootprintNode::process(){
   
 }
 
-void LOD13GeneratorNode::process(){
-  auto point_clouds = input("point_clouds").get<std::vector<PointCollection>>();
-  auto polygons = input("polygons").get<LinearRingCollection>();
-  
-  // for each pair of polygon and point_cloud
-    //create nodes and connections
-    //run the thing
-  if (point_clouds.size()!=polygons.size()) return;
-
-  LinearRingCollection all_cells;
-  AttributeMap all_attributes, building_class;
-  
-  for(int i=0; i<point_clouds.size(); i++) {
-    // std::cout << "b id: " << i << "\n";
-    auto& points = point_clouds[i];
-    auto& polygon = polygons[i];
-
-    NodeRegister R("Nodes");
-    R.register_node<AlphaShapeNode>("AlphaShape");
-    R.register_node<SimplifyFootprintNode>("SimplifyFootprint");
-    R.register_node<DetectPlanesNode>("DetectPlanes");
-    R.register_node<DetectLinesNode>("DetectLines");
-    R.register_node<RegulariseRingsNode>("RegulariseRings");
-    R.register_node<BuildArrFromRingsNode>("BuildArrFromRings");
-    // R.register_node<ProcessArrangementNode>("ProcessArrangement");
-    R.register_node<Arr2LinearRingsNode>("Arr2LinearRings");
-    R.register_node<Ring2SegmentsNode>("Ring2Segments");
-
-    NodeManager N = NodeManager();
-
-    auto DetectPlanes_node = N.create_node(R, "DetectPlanes");
-    auto AlphaShape_node = N.create_node(R, "AlphaShape");
-    auto DetectLines_node = N.create_node(R, "DetectLines");
-    auto RegulariseRings_node = N.create_node(R, "RegulariseRings");
-    auto BuildArrFromRings_node = N.create_node(R, "BuildArrFromRings");
-    // auto ProcessArrangement_node = N.create_node(R, "ProcessArrangement");
-    auto Arr2LinearRings_node = N.create_node(R, "Arr2LinearRings");
-    auto SimplifyFootprint_node = N.create_node(R, "SimplifyFootprint");
-    auto SimplifyFootprint_node_postfp = N.create_node(R, "SimplifyFootprint");
-    auto SimplifyFootprint_node_postr = N.create_node(R, "SimplifyFootprint");
-    auto Ring2Segments_node = N.create_node(R, "Ring2Segments");
-
-    DetectPlanes_node->input("points").set(points);
-    RegulariseRings_node->input("footprint").set(polygon);
-
-    if (!param<bool>("only_classify")) {
-      connect(DetectPlanes_node, AlphaShape_node, "pts_per_roofplane", "pts_per_roofplane");
-      connect(DetectPlanes_node, BuildArrFromRings_node, "pts_per_roofplane", "pts_per_roofplane");
-      
-      if (param<bool>("direct_alpharing")) {
-        SimplifyFootprint_node->set_param("threshold_stop_cost", float(0.18));
-        connect(AlphaShape_node, SimplifyFootprint_node, "alpha_rings", "polygons");
-        connect(SimplifyFootprint_node, Ring2Segments_node, "polygons_simp", "rings");
-        connect(Ring2Segments_node, RegulariseRings_node, "edge_segments", "rings");
-        connect(Ring2Segments_node, RegulariseRings_node, "ring_idx", "ring_idx");
-        connect(RegulariseRings_node, SimplifyFootprint_node_postr, "rings_out", "polygons");
-        connect(SimplifyFootprint_node_postr, BuildArrFromRings_node, "polygons_simp", "rings");
-        connect(SimplifyFootprint_node_postfp, BuildArrFromRings_node, "polygon_simp", "footprint");
-        
-        SimplifyFootprint_node_postfp->input("polygons").set(polygon);
-      } else {
-        connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
-        connect(DetectLines_node, RegulariseRings_node, "edge_segments", "edge_segments");
-        connect(DetectLines_node, RegulariseRings_node, "ring_idx", "ring_idx");
-        connect(RegulariseRings_node, BuildArrFromRings_node, "rings_out", "rings");
-        connect(RegulariseRings_node, SimplifyFootprint_node, "footprint_out", "polygons");
-        connect(SimplifyFootprint_node, BuildArrFromRings_node, "polygon_simp", "footprint");
-      } 
-        connect(BuildArrFromRings_node, Arr2LinearRings_node, "arrangement", "arrangement");
-    }
-    // config and run
-    // this should copy all parameters from this LOD13Generator node to the ProcessArrangement node
-    BuildArrFromRings_node->set_params( dump_params() );
-    
-    N.run(DetectPlanes_node);
-
-    auto classf = DetectPlanes_node->output("classf").get<float>();
-    auto horiz = DetectPlanes_node->output("horiz_roofplane_cnt").get<float>();
-    auto slant = DetectPlanes_node->output("slant_roofplane_cnt").get<float>();
-    building_class["bclass"].push_back(classf);
-    building_class["horiz"].push_back(horiz);
-    building_class["slant"].push_back(slant);
-    // note: the following will crash if the flowchart specified above is stopped halfway for some reason (eg missing output/connection)
-    if (!param<bool>("only_classify")) {
-      auto cells = Arr2LinearRings_node->output("linear_rings").get<LinearRingCollection>();
-      auto attributes = Arr2LinearRings_node->output("attributes").get<AttributeMap>();
-
-      for (int i=0; i<cells.size(); i++) {
-        // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
-        all_cells.push_back(cells[i]);
-        all_attributes["height"].push_back(attributes["height"][i]);
-        all_attributes["rms_error"].push_back(attributes["rms_error"][i]);
-        all_attributes["max_error"].push_back(attributes["max_error"][i]);
-        all_attributes["count"].push_back(attributes["count"][i]);
-        all_attributes["coverage"].push_back(attributes["coverage"][i]);
-        all_attributes["bclass"].push_back(classf);
-        // }
-      }
-    }
-  }
-  output("decomposed_footprints").set(all_cells);
-  output("attributes").set(all_attributes);
-  output("building_class").set(building_class);
-}
 
 // void PlaneDetectorNode::process() {
 //   auto points = input("point_clouds").get<Feature>();
