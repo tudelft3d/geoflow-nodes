@@ -191,14 +191,26 @@ namespace linereg {
 
   // void chain(Segment& a, Segment& b, LinearRing& ring, const float& snap_threshold) {
   Polygon_2 chain_ring(const std::vector<size_t>& idx, const std::vector<EK::Segment_2>& segments, const float& snap_threshold) {
-    Polygon_2 new_ring;
+    Polygon_2 ring, fixed_ring;
 
     if (idx.size()>1) {
       for (size_t i=idx[1]; i<idx[0]+idx.size(); ++i) {
-        chain(segments[i-1], segments[i], new_ring, snap_threshold);
+        chain(segments[i-1], segments[i], ring, snap_threshold);
       }
-      chain(segments[idx[idx.size()-1]], segments[idx[0]], new_ring, snap_threshold);
+      chain(segments[idx[idx.size()-1]], segments[idx[0]], ring, snap_threshold);
     }
-    return new_ring;
+
+    // get rid of segments with zero length
+    auto circ = ring.vertices_circulator();
+    auto curr = circ;
+    do {
+      auto d = CGAL::squared_distance(*circ, *(circ+1));
+      if (d > 1E-6) {
+        fixed_ring.push_back(*circ);
+      }
+      ++circ;
+    } while (curr != circ);
+
+    return fixed_ring;
   }
 }

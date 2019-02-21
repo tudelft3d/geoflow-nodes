@@ -198,16 +198,9 @@ public:
   {
     // Assign index to the new face.
     new_face->data().in_footprint = in_footprint;
-    if(n_faces == 1) {
-      new_face->data().is_finite = true;
-      new_face->data().segid = plane_id;
-      new_face->data().elevation_avg = elevation;
-    } else if(old_face->data().is_finite) {
-      new_face->data().is_finite = true;
-      new_face->data().segid = plane_id;
-      new_face->data().elevation_avg = elevation;
-    } else
-      new_face->data().is_finite = false;
+    new_face->data().is_finite = true;
+    new_face->data().segid = plane_id;
+    new_face->data().elevation_avg = elevation;
     n_faces++;
   }
 };

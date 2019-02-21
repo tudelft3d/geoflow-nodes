@@ -574,7 +574,7 @@ void LinearRingtoRingsNode::process(){
   output("linear_rings").set(lrc);
 }
 
-void fix_arrangement(Arrangement_2& arr, const bool& flood_unsegmented, const bool& dissolve_edges, const bool& dissolve_stepedges, const float& step_height_threshold) {
+void arr_process(Arrangement_2& arr, const bool& flood_unsegmented, const bool& dissolve_edges, const bool& dissolve_stepedges, const float& step_height_threshold) {
   if (flood_unsegmented) {
     std::map<float, Face_handle> face_map;
     for (auto& face : arr.face_handles()) {
@@ -642,6 +642,10 @@ void fix_arrangement(Arrangement_2& arr, const bool& flood_unsegmented, const bo
   }
 }
 
+void arr_repair_polygon(Arrangement_2& arr) {
+  // check number of faces
+}
+
 void BuildArrFromRingsExactNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto footprint = input("footprint").get<linereg::Polygon_2>();
@@ -656,8 +660,11 @@ void BuildArrFromRingsExactNode::process() {
     // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
     {
       Face_index_observer obs (arr_base, true, 0, 0);
-      // insert(arr_base, footprint.edges_begin(), footprint.edges_end());
-      insert_non_intersecting_curves(arr_base, footprint.edges_begin(), footprint.edges_end());
+      insert(arr_base, footprint.edges_begin(), footprint.edges_end());
+      // insert_non_intersecting_curves(arr_base, footprint.edges_begin(), footprint.edges_end());
+      if (!footprint.is_simple()) {
+        arr_repair_polygon(arr_base);
+      }
     }
     // insert step-edge lines
     {
@@ -667,7 +674,7 @@ void BuildArrFromRingsExactNode::process() {
       for (auto& kv : points_per_plane) {
         auto& polygon = rings[i++];
         if (polygon.size()>2) {
-          if (polygon.is_simple()) {
+          // if (polygon.is_simple()) {
             auto plane_id = kv.first;
             auto& points = kv.second;
             std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
@@ -680,11 +687,15 @@ void BuildArrFromRingsExactNode::process() {
             Face_index_observer obs (arr, false, plane_id, points[elevation_id].z());
             insert(arr, polygon.edges_begin(), polygon.edges_end());
 
+            if (!polygon.is_simple()) {
+              arr_repair_polygon(arr);
+            }
+
             Overlay_traits overlay_traits;
             arr_overlay.clear();
             overlay(arr_base, arr, arr_overlay, overlay_traits);
             arr_base = arr_overlay;
-          } else std::cout << "This alpha ring is no longer simple after regularisation!\n";
+          // } else std::cout << "This alpha ring is no longer simple after regularisation!\n";
           // std::cout << "overlay success\n";
           // std::cout << "facecount: " << arr_base.number_of_faces() << "\n\n";
         }
@@ -694,7 +705,7 @@ void BuildArrFromRingsExactNode::process() {
     std::cout << "This polygon is no longer simple after regularisation!\n";
   }
   // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
-  fix_arrangement(arr_base, 
+  arr_process(arr_base, 
     param<bool>("flood_to_unsegmented"), 
     param<bool>("dissolve_edges"),
     param<bool>("dissolve_stepedges"),
@@ -764,7 +775,7 @@ void BuildArrFromRingsNode::process() {
     std::cout << "This polygon is no longer simple after regularisation!\n";
   }
   // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
-  fix_arrangement(arr_base, 
+  arr_process(arr_base, 
     param<bool>("flood_to_unsegmented"), 
     param<bool>("dissolve_edges"),
     param<bool>("dissolve_stepedges"),

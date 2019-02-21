@@ -9,7 +9,8 @@ namespace geoflow::nodes::stepedge {
     R.register_node<DetectPlanesNode>("DetectPlanes");
     R.register_node<DetectLinesNode>("DetectLines");
     R.register_node<RegulariseRingsNode>("RegulariseRings");
-    R.register_node<BuildArrFromRingsNode>("BuildArrFromRings");
+    R.register_node<BuildArrFromRingsExactNode>("BuildArrFromRings");
+    // R.register_node<BuildArrFromRingsNode>("BuildArrFromRings");
     // R.register_node<ProcessArrangementNode>("ProcessArrangement");
     R.register_node<Arr2LinearRingsNode>("Arr2LinearRings");
     R.register_node<Ring2SegmentsNode>("Ring2Segments");
@@ -29,10 +30,10 @@ namespace geoflow::nodes::stepedge {
     N.name_node(Arr2LinearRings_node, "Arr2LinearRings_node");
     auto SimplifyPolygon_node = N.create_node(R, "SimplifyPolygon", {900,150});
     N.name_node(SimplifyPolygon_node, "SimplifyPolygon_node");
-    auto SimplifyPolygon_node_postfp = N.create_node(R, "SimplifyPolygon", {1200,-125});
-    N.name_node(SimplifyPolygon_node_postfp, "SimplifyPolygon_node_postfp");
-    auto SimplifyPolygon_node_postr = N.create_node(R, "SimplifyPolygon", {1200,175});
-    N.name_node(SimplifyPolygon_node_postr, "SimplifyPolygon_node_postr");
+    // auto SimplifyPolygon_node_postfp = N.create_node(R, "SimplifyPolygon", {1200,-125});
+    // N.name_node(SimplifyPolygon_node_postfp, "SimplifyPolygon_node_postfp");
+    // auto SimplifyPolygon_node_postr = N.create_node(R, "SimplifyPolygon", {1200,175});
+    // N.name_node(SimplifyPolygon_node_postr, "SimplifyPolygon_node_postr");
     auto Ring2Segments_node = N.create_node(R, "Ring2Segments", {900,50});
     N.name_node(Ring2Segments_node, "Ring2Segments_node");
 
@@ -45,10 +46,12 @@ namespace geoflow::nodes::stepedge {
       connect(SimplifyPolygon_node, Ring2Segments_node, "polygons_simp", "rings");
       connect(Ring2Segments_node, RegulariseRings_node, "edge_segments", "edge_segments");
       connect(Ring2Segments_node, RegulariseRings_node, "ring_idx", "ring_idx");
-      connect(RegulariseRings_node, SimplifyPolygon_node_postr, "rings_out", "polygons");
-      connect(RegulariseRings_node, SimplifyPolygon_node_postfp, "footprint_out", "polygons");
-      connect(SimplifyPolygon_node_postr, BuildArrFromRings_node, "polygons_simp", "rings");
-      connect(SimplifyPolygon_node_postfp, BuildArrFromRings_node, "polygon_simp", "footprint");
+      connect(RegulariseRings_node, BuildArrFromRings_node, "exact_rings_out", "rings");
+      connect(RegulariseRings_node, BuildArrFromRings_node, "exact_footprint_out", "footprint");
+      // connect(RegulariseRings_node, SimplifyPolygon_node_postr, "rings_out", "polygons");
+      // connect(RegulariseRings_node, SimplifyPolygon_node_postfp, "footprint_out", "polygons");
+      // connect(SimplifyPolygon_node_postr, BuildArrFromRings_node, "polygons_simp", "rings");
+      // connect(SimplifyPolygon_node_postfp, BuildArrFromRings_node, "polygon_simp", "footprint");
     } else {
       connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
       connect(DetectLines_node, RegulariseRings_node, "edge_segments", "edge_segments");
