@@ -642,8 +642,28 @@ void arr_process(Arrangement_2& arr, const bool& flood_unsegmented, const bool& 
   }
 }
 
-void arr_repair_polygon(Arrangement_2& arr) {
+void arr_filter_biggest_face(Arrangement_2& arr) {
   // check number of faces
+  Polygon_2 max_poly;
+  double max_area;
+  for (auto& fh : arr.face_handles()) {
+    if (fh->data().segid != 0) {
+      Polygon_2 poly;
+      auto he = fh->outer_ccb();
+      auto first = he;
+      do {
+        poly.push_back(he->target()->point());
+        he = he->next();
+      } while (he!=first);
+      double area = CGAL::to_double(CGAL::abs(poly.area()));
+      if (area > max_area) {
+        max_area = area;
+        max_poly = poly;
+      }
+    }
+  }
+  arr.clear();
+  insert_non_intersecting_curves(arr, max_poly.edges_begin(), max_poly.edges_end());
 }
 
 void BuildArrFromRingsExactNode::process() {
@@ -663,7 +683,7 @@ void BuildArrFromRingsExactNode::process() {
       insert(arr_base, footprint.edges_begin(), footprint.edges_end());
       // insert_non_intersecting_curves(arr_base, footprint.edges_begin(), footprint.edges_end());
       if (!footprint.is_simple()) {
-        arr_repair_polygon(arr_base);
+        arr_filter_biggest_face(arr_base);
       }
     }
     // insert step-edge lines
@@ -688,7 +708,7 @@ void BuildArrFromRingsExactNode::process() {
             insert(arr, polygon.edges_begin(), polygon.edges_end());
 
             if (!polygon.is_simple()) {
-              arr_repair_polygon(arr);
+              arr_filter_biggest_face(arr);
             }
 
             Overlay_traits overlay_traits;
