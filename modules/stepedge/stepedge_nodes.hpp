@@ -144,6 +144,35 @@ namespace geoflow::nodes::stepedge {
     void process();
   };
 
+  class BuildArrFromRingsExactNode:public Node {
+
+    public:
+    // bool remove_unsupported=false;
+
+    using Node::Node;
+    void init() {
+      add_input("rings", TT_any);
+      add_input("pts_per_roofplane", TT_any);
+      add_input("footprint", TT_any);
+      add_output("arrangement", TT_any);
+      add_output("arr_segments", TT_line_string_collection);
+
+      add_param("z_percentile", (float) 0.9);
+      add_param("flood_to_unsegmented", (bool) true);
+      add_param("dissolve_edges", (bool) true);
+      add_param("dissolve_stepedges", (bool) true);
+      add_param("step_height_threshold", (float) 1.0);
+    }
+    void gui() {
+      ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
+      ImGui::Checkbox("Flood to unsegmented", &param<bool>("flood_to_unsegmented"));
+      ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
+      ImGui::Checkbox("Dissolve stepedges", &param<bool>("dissolve_stepedges"));
+      ImGui::SliderFloat("step_height_threshold", &param<float>("step_height_threshold"), 0, 100);
+    }
+    void process();
+  };
+
   class BuildArrFromRingsNode:public Node {
 
     public:
@@ -405,6 +434,8 @@ namespace geoflow::nodes::stepedge {
       add_output("edges_out", TT_segment_collection);
       add_output("rings_out", TT_linear_ring_collection);
       add_output("footprint_out", TT_linear_ring);
+      add_output("exact_rings_out", TT_any);
+      add_output("exact_footprint_out", TT_any);
       // add_output("footprint_labels", TT_vec1i);
       // add_output("line_clusters", TT_any); // ie a LineCluster
       // add_output("tmp_vec3f", TT_vec3f);

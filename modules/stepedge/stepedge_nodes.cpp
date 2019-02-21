@@ -574,6 +574,142 @@ void LinearRingtoRingsNode::process(){
   output("linear_rings").set(lrc);
 }
 
+void fix_arrangement(Arrangement_2& arr, const bool& flood_unsegmented, const bool& dissolve_edges, const bool& dissolve_stepedges, const float& step_height_threshold) {
+  if (flood_unsegmented) {
+    std::map<float, Face_handle> face_map;
+    for (auto& face : arr.face_handles()) {
+      if (face->data().segid!=0)
+        face_map[face->data().elevation_avg] = face;
+    }
+    for (auto& kv : face_map) {
+      std::stack<Face_handle> candidate_stack;
+      // std::cout << "Growing face with elevation=" << kv.first << "\n";
+      auto& cur_segid = kv.second->data().segid;
+      auto& cur_elev = kv.second->data().elevation_avg;
+      candidate_stack.push(kv.second);
+      while (!candidate_stack.empty()) {
+        auto fh = candidate_stack.top(); candidate_stack.pop();
+        auto circ = fh->outer_ccb();
+        auto curr = circ;
+        do {
+          // std::cout << &(*curr) << "\n";
+          // ignore weird nullptrs (should not be possible...)
+          if (curr==nullptr) break;
+          auto candidate = curr->twin()->face();
+          if (candidate->data().segid == 0) {
+            candidate->data().segid = cur_segid;
+            candidate->data().elevation_avg = cur_elev;
+            candidate_stack.push(candidate);
+          }
+        } while (++curr != circ);
+      }
+    }
+  }
+  //remove edges that have the same segid on both sides
+  if (dissolve_edges) {
+    std::vector<Halfedge_handle> to_remove;
+    for (auto he : arr.edge_handles()) {
+      auto d1 = he->face()->data();
+      auto d2 = he->twin()->face()->data();
+      if ((d1.segid == d2.segid )&& (d1.in_footprint && d2.in_footprint))
+        to_remove.push_back(he);
+    }
+    for (auto he : to_remove) {
+      arr.remove_edge(he);
+    }
+  }
+  if (dissolve_stepedges) {
+    std::vector<Arrangement_2::Halfedge_handle> edges;
+    for (auto edge : arr.edge_handles()) {
+      edges.push_back(edge);
+    }
+    for (auto& edge : edges) {
+      auto f1 = edge->face();
+      auto f2 = edge->twin()->face();
+      if((f1->data().in_footprint && f2->data().in_footprint) && (f1->data().segid!=0 && f2->data().segid!=0)) {
+        if(std::abs(f1->data().elevation_avg - f2->data().elevation_avg) < step_height_threshold){
+          // should add face merge call back in face observer class...
+          // pick elevation of the segment with the highest count
+          if (f2->data().elevation_avg < f1->data().elevation_avg) {
+            f2->data().elevation_avg = f1->data().elevation_avg;
+          } else {
+            f1->data().elevation_avg = f2->data().elevation_avg;
+          }
+          arr.remove_edge(edge);
+        }
+      }
+    }
+  }
+}
+
+void BuildArrFromRingsExactNode::process() {
+  // Set up vertex data (and buffer(s)) and attribute pointers
+  auto footprint = input("footprint").get<linereg::Polygon_2>();
+  auto rings = input("rings").get<std::vector<linereg::Polygon_2>>();
+  // auto plane_idx = input("plane_idx").get<vec1i>();
+  auto points_per_plane = input("pts_per_roofplane").get<std::unordered_map<int, std::vector<Point>>>();
+
+
+  Arrangement_2 arr_base;
+  if (footprint.is_simple()) {
+      
+    // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
+    {
+      Face_index_observer obs (arr_base, true, 0, 0);
+      // insert(arr_base, footprint.edges_begin(), footprint.edges_end());
+      insert_non_intersecting_curves(arr_base, footprint.edges_begin(), footprint.edges_end());
+    }
+    // insert step-edge lines
+    {
+      Arrangement_2 arr_overlay;
+      size_t i=0;
+      // NOTE: rings and points_per_plane must be aligned!! (matching length and order)
+      for (auto& kv : points_per_plane) {
+        auto& polygon = rings[i++];
+        if (polygon.size()>2) {
+          if (polygon.is_simple()) {
+            auto plane_id = kv.first;
+            auto& points = kv.second;
+            std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
+              return p1.z() < p2.z();
+            });
+            auto elevation_id = int(param<float>("z_percentile")*float(points.size()));
+
+            // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
+            Arrangement_2 arr;
+            Face_index_observer obs (arr, false, plane_id, points[elevation_id].z());
+            insert(arr, polygon.edges_begin(), polygon.edges_end());
+
+            Overlay_traits overlay_traits;
+            arr_overlay.clear();
+            overlay(arr_base, arr, arr_overlay, overlay_traits);
+            arr_base = arr_overlay;
+          } else std::cout << "This alpha ring is no longer simple after regularisation!\n";
+          // std::cout << "overlay success\n";
+          // std::cout << "facecount: " << arr_base.number_of_faces() << "\n\n";
+        }
+      }
+    }
+  } else {
+    std::cout << "This polygon is no longer simple after regularisation!\n";
+  }
+  // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
+  fix_arrangement(arr_base, 
+    param<bool>("flood_to_unsegmented"), 
+    param<bool>("dissolve_edges"),
+    param<bool>("dissolve_stepedges"),
+    param<float>("step_height_threshold")
+  );
+
+  LineStringCollection segments;
+  for (auto& face: arr_base.face_handles()){
+    if (face->data().in_footprint)
+      arr2segments(face, segments);
+  }
+  output("arr_segments").set(segments);
+  output("arrangement").set(arr_base);
+}
+
 void BuildArrFromRingsNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto footprint = input("footprint").get<LinearRing>();
@@ -628,72 +764,12 @@ void BuildArrFromRingsNode::process() {
     std::cout << "This polygon is no longer simple after regularisation!\n";
   }
   // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
-
-  if (param<bool>("flood_to_unsegmented")) {
-    std::map<float, Face_handle> face_map;
-    for (auto& face : arr_base.face_handles()) {
-      if (face->data().segid!=0)
-        face_map[face->data().elevation_avg] = face;
-    }
-    for (auto& kv : face_map) {
-      std::stack<Face_handle> candidate_stack;
-      // std::cout << "Growing face with elevation=" << kv.first << "\n";
-      auto& cur_segid = kv.second->data().segid;
-      auto& cur_elev = kv.second->data().elevation_avg;
-      candidate_stack.push(kv.second);
-      while (!candidate_stack.empty()) {
-        auto fh = candidate_stack.top(); candidate_stack.pop();
-        auto circ = fh->outer_ccb();
-        auto curr = circ;
-        do {
-          // std::cout << &(*curr) << "\n";
-          // ignore weird nullptrs (should not be possible...)
-          if (curr==nullptr) break;
-          auto candidate = curr->twin()->face();
-          if (candidate->data().segid == 0) {
-            candidate->data().segid = cur_segid;
-            candidate->data().elevation_avg = cur_elev;
-            candidate_stack.push(candidate);
-          }
-        } while (++curr != circ);
-      }
-    }
-  }
-  //remove edges that have the same segid on both sides
-  if (param<bool>("dissolve_edges")) {
-    std::vector<Halfedge_handle> to_remove;
-    for (auto he : arr_base.edge_handles()) {
-      auto d1 = he->face()->data();
-      auto d2 = he->twin()->face()->data();
-      if ((d1.segid == d2.segid )&& (d1.in_footprint && d2.in_footprint))
-        to_remove.push_back(he);
-    }
-    for (auto he : to_remove) {
-      arr_base.remove_edge(he);
-    }
-  }
-  if (param<bool>("dissolve_stepedges")) {
-  std::vector<Arrangement_2::Halfedge_handle> edges;
-  for (auto edge : arr_base.edge_handles()) {
-    edges.push_back(edge);
-  }
-  for (auto& edge : edges) {
-    auto f1 = edge->face();
-    auto f2 = edge->twin()->face();
-    if((f1->data().in_footprint && f2->data().in_footprint) && (f1->data().segid!=0 && f2->data().segid!=0)) {
-      if(std::abs(f1->data().elevation_avg - f2->data().elevation_avg) < param<float>("step_height_threshold")){
-        // should add face merge call back in face observer class...
-        // pick elevation of the segment with the highest count
-        if (f2->data().elevation_avg < f1->data().elevation_avg) {
-          f2->data().elevation_avg = f1->data().elevation_avg;
-        } else {
-          f1->data().elevation_avg = f2->data().elevation_avg;
-        }
-        arr_base.remove_edge(edge);
-      }
-    }
-  }
-  }
+  fix_arrangement(arr_base, 
+    param<bool>("flood_to_unsegmented"), 
+    param<bool>("dissolve_edges"),
+    param<bool>("dissolve_stepedges"),
+    param<float>("step_height_threshold")
+  );
 
   LineStringCollection segments;
   for (auto& face: arr_base.face_handles()){
@@ -1381,10 +1457,24 @@ void RegulariseRingsNode::process(){
   size_t fpi_end = all_edges.size()-1;
 
   // get clusters from line regularisation 
-  auto LR = LineRegulariser(all_edges);
+  auto LR = linereg::LineRegulariser(all_edges);
   LR.dist_threshold = param<float>("dist_threshold");
   LR.angle_threshold = param<float>("angle_threshold");
   LR.cluster();
+
+  std::vector<linereg::Polygon_2> exact_polygons;
+  for (auto& idx : ring_idx) {
+    exact_polygons.push_back(
+      linereg::chain_ring(idx, LR.input_reg_exact, param<float>("snap_threshold"))
+    );
+  }
+  std::vector<size_t> fp_idx;
+  for (size_t i = fpi_begin; i <= fpi_end; ++i){
+    fp_idx.push_back(i);
+  }
+  auto exact_fp = linereg::chain_ring(fp_idx, LR.input_reg_exact, param<float>("snap_threshold"));
+  output("exact_rings_out").set(exact_polygons);
+  output("exact_footprint_out").set(exact_fp);
 
   // TODO: align to fp edges
   // LR.lines

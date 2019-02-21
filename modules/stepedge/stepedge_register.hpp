@@ -235,6 +235,7 @@ namespace geoflow::nodes::stepedge {
     R.register_node<LinearRingtoRingsNode>("LinearRingtoRings");
     R.register_node<BuildArrangementNode>("BuildArrangement");
     R.register_node<BuildArrFromRingsNode>("BuildArrFromRings");
+    R.register_node<BuildArrFromRingsExactNode>("BuildArrFromRingsExact");
     R.register_node<DetectLinesNode>("DetectLines");
     R.register_node<DetectPlanesNode>("DetectPlanes");
     R.register_node<ClassifyEdgePointsNode>("ClassifyEdgePoints");
