@@ -234,7 +234,7 @@ namespace geoflow::nodes::stepedge {
   };
 
   NodeRegister create_register() {
-    auto R = NodeRegister("Step edge");
+    auto R = NodeRegister("LoD13");
     R.register_node<AlphaShapeNode>("AlphaShape");
     R.register_node<PolygonExtruderNode>("PolygonExtruder");
     R.register_node<Arr2LinearRingsNode>("Arr2LinearRings");
