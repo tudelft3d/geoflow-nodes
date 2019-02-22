@@ -28,7 +28,9 @@ include_directories(${GDAL_INCLUDE_DIR})
 
 # GEOS
 find_package( GEOS )
-include_directories(${GEOS_INCLUDE_DIR})
+if (GEOS_FOUND)
+  include_directories(${GEOS_INCLUDE_DIR})
+endif()
 
 # CGAL
 find_package( CGAL QUIET COMPONENTS )
