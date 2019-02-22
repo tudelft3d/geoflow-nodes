@@ -632,8 +632,10 @@ void arr_process(Arrangement_2& arr, const bool& flood_unsegmented, const bool& 
           // pick elevation of the segment with the highest count
           if (f2->data().elevation_avg < f1->data().elevation_avg) {
             f2->data().elevation_avg = f1->data().elevation_avg;
+            f2->data().segid = f1->data().segid;
           } else {
             f1->data().elevation_avg = f2->data().elevation_avg;
+            f1->data().segid = f2->data().segid;
           }
           arr.remove_edge(edge);
         }
@@ -647,7 +649,7 @@ void arr_filter_biggest_face(Arrangement_2& arr) {
   Polygon_2 max_poly;
   double max_area;
   for (auto& fh : arr.face_handles()) {
-    if (fh->data().segid != 0) {
+    if (fh->data().segid != 0 || fh->data().in_footprint == true) {
       Polygon_2 poly;
       auto he = fh->outer_ccb();
       auto first = he;
@@ -675,7 +677,7 @@ void BuildArrFromRingsExactNode::process() {
 
 
   Arrangement_2 arr_base;
-  if (footprint.is_simple()) {
+  // if (footprint.is_simple()) {
       
     // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
     {
@@ -721,9 +723,9 @@ void BuildArrFromRingsExactNode::process() {
         }
       }
     }
-  } else {
-    std::cout << "This polygon is no longer simple after regularisation!\n";
-  }
+  // } else {
+    // std::cout << "This polygon is no longer simple after regularisation!\n";
+  // }
   // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
   arr_process(arr_base, 
     param<bool>("flood_to_unsegmented"), 
