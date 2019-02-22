@@ -154,10 +154,12 @@ namespace geoflow::nodes::stepedge {
       add_input("rings", TT_any);
       add_input("pts_per_roofplane", TT_any);
       add_input("footprint", TT_any);
+      add_output("nosegid_area", TT_float);
       add_output("arrangement", TT_any);
       add_output("arr_segments", TT_line_string_collection);
 
       add_param("z_percentile", (float) 0.9);
+      add_param("rel_area_thres", (float) 0.1);
       add_param("flood_to_unsegmented", (bool) true);
       add_param("dissolve_edges", (bool) true);
       add_param("dissolve_stepedges", (bool) true);
@@ -165,6 +167,7 @@ namespace geoflow::nodes::stepedge {
     }
     void gui() {
       ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
+      ImGui::SliderFloat("Preserve split ring area", &param<float>("rel_area_thres"), 0.01, 1);
       ImGui::Checkbox("Flood to unsegmented", &param<bool>("flood_to_unsegmented"));
       ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
       ImGui::Checkbox("Dissolve stepedges", &param<bool>("dissolve_stepedges"));

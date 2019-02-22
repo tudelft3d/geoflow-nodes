@@ -32,7 +32,7 @@ int main(int ac, const char * av[])
     // create some nodes and connections
     NodeManager N;
 
-    gfn::stepedge::create_lod13chart(N, true, false);
+    gfn::stepedge::create_lod13chart(N, true);
 
     NodeHandle OGRLoader = N.create_node(gdal, "OGRLoader", {-275,75});
     NodeHandle PolygonSimp = N.create_node(stepedge, "SimplifyPolygon", {-275,175});

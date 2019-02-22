@@ -200,15 +200,18 @@ namespace linereg {
       chain(segments[idx[idx.size()-1]], segments[idx[0]], ring, snap_threshold);
 
       // get rid of segments with zero length
-      auto circ = ring.vertices_circulator();
-      auto curr = circ;
-      do {
-        auto d = CGAL::squared_distance(*circ, *(circ+1));
-        if (d > 1E-6) {
-          fixed_ring.push_back(*circ);
-        }
-        ++circ;
-      } while (curr != circ);
+      // check again the size, to ignore degenerate case of input ring that consists of 3 co-linear segments (would get chained to eg 0 vertices)
+      if (ring.size()>2) {
+        auto circ = ring.vertices_circulator();
+        auto curr = circ;
+        do {
+          auto d = CGAL::squared_distance(*circ, *(circ+1));
+          if (d > 1E-6) {
+            fixed_ring.push_back(*circ);
+          }
+          ++circ;
+        } while (curr != circ);
+      }
     }
 
     return fixed_ring;

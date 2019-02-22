@@ -302,10 +302,11 @@ void Arr2LinearRingsNode::process(){
       }
       linear_rings.push_back(polygon3d);
       attributes["height"].push_back(face->data().elevation_avg);
-      attributes["rms_error"].push_back(face->data().rms_error_to_avg);
-      attributes["max_error"].push_back(face->data().max_error);
-      attributes["coverage"].push_back(face->data().segid_coverage);
+      // attributes["rms_error"].push_back(face->data().rms_error_to_avg);
+      // attributes["max_error"].push_back(face->data().max_error);
+      // attributes["coverage"].push_back(face->data().segid_coverage);
       attributes["count"].push_back(face->data().total_count);
+      attributes["segid"].push_back(face->data().segid);
     }
   }
   output("linear_rings").set(linear_rings);
@@ -385,11 +386,13 @@ void ExtruderNode::process(){
     vertex n;
     for (auto edge : arr.edge_handles()) {
       // skip if faces on both sides of this edge are not finite
-      bool left_finite = edge->twin()->face()->data().in_footprint;
-      bool right_finite = edge->face()->data().in_footprint;
-      if (left_finite || right_finite) {
+      // bool left = edge->twin()->face()->data().in_footprint;
+      // bool right = edge->face()->data().in_footprint;
+      bool left = edge->twin()->face()->data().segid!=0 && edge->twin()->face()->data().in_footprint;
+      bool right = edge->face()->data().segid!=0 && edge->face()->data().in_footprint;
+      if (left || right) {
         int wall_label = 2;
-        if (left_finite && right_finite)
+        if (left && right)
           wall_label = 3;
 
         auto h1 = edge->face()->data().elevation_avg;
@@ -549,6 +552,16 @@ void arr2segments(Face_handle& face, LineStringCollection& segments) {
     }
   });
 }
+Polygon_2 arr_cell2polygon(Face_handle& fh) {
+  Polygon_2 poly;
+  auto he = fh->outer_ccb();
+  auto first = he;
+  do {
+    poly.push_back(he->target()->point());
+    he = he->next();
+  } while (he!=first);
+  return poly;
+}
 
 void BuildArrangementNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
@@ -644,28 +657,43 @@ void arr_process(Arrangement_2& arr, const bool& flood_unsegmented, const bool& 
   }
 }
 
-void arr_filter_biggest_face(Arrangement_2& arr) {
+void arr_filter_biggest_face(Arrangement_2& arr, const float& rel_area_thres) {
   // check number of faces
-  Polygon_2 max_poly;
-  double max_area;
+  typedef std::pair<Polygon_2, double> polyar;
+  std::vector<polyar> polygons;
+  double total_area=0;
   for (auto& fh : arr.face_handles()) {
     if (fh->data().segid != 0 || fh->data().in_footprint == true) {
-      Polygon_2 poly;
-      auto he = fh->outer_ccb();
-      auto first = he;
-      do {
-        poly.push_back(he->target()->point());
-        he = he->next();
-      } while (he!=first);
+      auto poly = arr_cell2polygon(fh);
       double area = CGAL::to_double(CGAL::abs(poly.area()));
-      if (area > max_area) {
-        max_area = area;
-        max_poly = poly;
-      }
+      total_area += area;
+      polygons.push_back(std::make_pair(poly, area));
     }
   }
+  std::sort(polygons.begin(), polygons.end(), [](const polyar& a, const polyar& b) {
+    return a.second < b.second;   
+  });
   arr.clear();
-  insert_non_intersecting_curves(arr, max_poly.edges_begin(), max_poly.edges_end());
+  for (auto& poly_a : polygons) {
+    if (poly_a.second > rel_area_thres * total_area)
+      insert_non_intersecting_curves(arr, poly_a.first.edges_begin(), poly_a.first.edges_end());
+  }
+}
+std::pair<double, double> arr_measure_nosegid(Arrangement_2& arr) {
+  // check number of faces
+  double total_area=0;
+  double no_segid_area=0;
+  for (auto& fh : arr.face_handles()) {
+    if (fh->data().in_footprint) {
+      auto poly = arr_cell2polygon(fh);
+      double area = CGAL::to_double(CGAL::abs(poly.area()));
+      if (fh->data().segid == 0) {
+        no_segid_area += area;
+      }
+      total_area += area;
+    }
+  }
+  return std::make_pair(no_segid_area, no_segid_area/total_area);
 }
 
 void BuildArrFromRingsExactNode::process() {
@@ -677,56 +705,49 @@ void BuildArrFromRingsExactNode::process() {
 
 
   Arrangement_2 arr_base;
-  // if (footprint.is_simple()) {
-      
-    // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
-    {
-      Face_index_observer obs (arr_base, true, 0, 0);
-      insert(arr_base, footprint.edges_begin(), footprint.edges_end());
-      // insert_non_intersecting_curves(arr_base, footprint.edges_begin(), footprint.edges_end());
-      if (!footprint.is_simple()) {
-        arr_filter_biggest_face(arr_base);
-      }
+  {
+    Face_index_observer obs (arr_base, true, 0, 0);
+    insert(arr_base, footprint.edges_begin(), footprint.edges_end());
+    // insert_non_intersecting_curves(arr_base, footprint.edges_begin(), footprint.edges_end());
+    if (!footprint.is_simple()) {
+      arr_filter_biggest_face(arr_base, param<float>("rel_area_thres"));
     }
-    // insert step-edge lines
-    {
-      Arrangement_2 arr_overlay;
-      size_t i=0;
-      // NOTE: rings and points_per_plane must be aligned!! (matching length and order)
-      for (auto& kv : points_per_plane) {
-        auto& polygon = rings[i++];
-        if (polygon.size()>2) {
-          // if (polygon.is_simple()) {
-            auto plane_id = kv.first;
-            auto& points = kv.second;
-            std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
-              return p1.z() < p2.z();
-            });
-            auto elevation_id = int(param<float>("z_percentile")*float(points.size()));
+  }
+  // insert step-edge lines
+  {
+    Arrangement_2 arr_overlay;
+    size_t i=0;
+    // NOTE: rings and points_per_plane must be aligned!! (matching length and order)
+    for (auto& kv : points_per_plane) {
+      auto& polygon = rings[i++];
+      if (polygon.size()>2) {
+        auto plane_id = kv.first;
+        auto& points = kv.second;
+        std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
+          return p1.z() < p2.z();
+        });
+        auto elevation_id = int(param<float>("z_percentile")*float(points.size()));
 
-            // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
-            Arrangement_2 arr;
-            Face_index_observer obs (arr, false, plane_id, points[elevation_id].z());
-            insert(arr, polygon.edges_begin(), polygon.edges_end());
+        // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
+        Arrangement_2 arr;
+        Face_index_observer obs (arr, false, plane_id, points[elevation_id].z());
+        insert(arr, polygon.edges_begin(), polygon.edges_end());
 
-            if (!polygon.is_simple()) {
-              arr_filter_biggest_face(arr);
-            }
-
-            Overlay_traits overlay_traits;
-            arr_overlay.clear();
-            overlay(arr_base, arr, arr_overlay, overlay_traits);
-            arr_base = arr_overlay;
-          // } else std::cout << "This alpha ring is no longer simple after regularisation!\n";
-          // std::cout << "overlay success\n";
-          // std::cout << "facecount: " << arr_base.number_of_faces() << "\n\n";
+        if (!polygon.is_simple()) {
+          arr_filter_biggest_face(arr, param<float>("rel_area_thres"));
         }
+
+        Overlay_traits overlay_traits;
+        arr_overlay.clear();
+        overlay(arr_base, arr, arr_overlay, overlay_traits);
+        arr_base = arr_overlay;
       }
     }
-  // } else {
-    // std::cout << "This polygon is no longer simple after regularisation!\n";
-  // }
+  }
   // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
+
+  auto nosegid_area = arr_measure_nosegid(arr_base);
+
   arr_process(arr_base, 
     param<bool>("flood_to_unsegmented"), 
     param<bool>("dissolve_edges"),
@@ -739,6 +760,8 @@ void BuildArrFromRingsExactNode::process() {
     if (face->data().in_footprint)
       arr2segments(face, segments);
   }
+  output("noseg_area_a").set(float(nosegid_area.first));
+  output("noseg_area_r").set(float(nosegid_area.second));
   output("arr_segments").set(segments);
   output("arrangement").set(arr_base);
 }

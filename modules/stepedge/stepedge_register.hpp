@@ -2,7 +2,7 @@
 
 namespace geoflow::nodes::stepedge {
 
-  void create_lod13chart(NodeManager& N, bool direct_alpharing, bool only_classify) {
+  void create_lod13chart(NodeManager& N, bool direct_alpharing) {
     NodeRegister R("Nodes");
     R.register_node<AlphaShapeNode>("AlphaShape");
     R.register_node<SimplifyPolygonNode>("SimplifyPolygon");
@@ -74,7 +74,6 @@ namespace geoflow::nodes::stepedge {
       add_output("building_class", TT_attribute_map_f);
 
       add_param("step_height_threshold", (float) 2.0);
-      add_param("only_classify", (bool) false);
       add_param("direct_alpharing", (bool) true);
       add_param("z_percentile", (float) 0.9);
       add_param("flood_to_unsegmented", (bool) true);
@@ -89,7 +88,6 @@ namespace geoflow::nodes::stepedge {
     }
 
     void gui(){
-      ImGui::Checkbox("only_classify", &param<bool>("only_classify"));
       ImGui::Checkbox("direct_alpharing", &param<bool>("direct_alpharing"));
       
       ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
@@ -112,12 +110,12 @@ namespace geoflow::nodes::stepedge {
       AttributeMap all_attributes, building_class;
       
       for(int i=0; i<point_clouds.size(); i++) {
-        // std::cout << "b id: " << i << "\n";
+        std::cout << "b id: " << i << "\n";
         auto& points = point_clouds[i];
         auto& polygon = polygons[i];
         
         NodeManager N;
-        create_lod13chart(N, param<bool>("direct_alpharing"), param<bool>("only_classify"));
+        create_lod13chart(N, param<bool>("direct_alpharing"));
 
         // config and run
         // this should copy all parameters from this LOD13Generator node to the ProcessArrangement node
@@ -132,9 +130,13 @@ namespace geoflow::nodes::stepedge {
         auto classf = N.nodes["DetectPlanes_node"]->output("classf").get<float>();
         auto horiz = N.nodes["DetectPlanes_node"]->output("horiz_roofplane_cnt").get<float>();
         auto slant = N.nodes["DetectPlanes_node"]->output("slant_roofplane_cnt").get<float>();
+        auto noseg_area_r = N.nodes["BuildArrFromRings_node"]->output("noseg_area_r").get<float>();
+        auto noseg_area_a = N.nodes["BuildArrFromRings_node"]->output("noseg_area_a").get<float>();
         building_class["bclass"].push_back(classf);
         building_class["horiz"].push_back(horiz);
         building_class["slant"].push_back(slant);
+        building_class["noseg_area_a"].push_back(noseg_area_a);
+        building_class["noseg_area_r"].push_back(noseg_area_r);
         // note: the following will crash if the flowchart specified above is stopped halfway for some reason (eg missing output/connection)
 
         auto cells = N.nodes["Arr2LinearRings_node"]->output("linear_rings").get<LinearRingCollection>();
@@ -144,10 +146,13 @@ namespace geoflow::nodes::stepedge {
           // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
           all_cells.push_back(cells[i]);
           all_attributes["height"].push_back(attributes["height"][i]);
-          all_attributes["rms_error"].push_back(attributes["rms_error"][i]);
-          all_attributes["max_error"].push_back(attributes["max_error"][i]);
-          all_attributes["count"].push_back(attributes["count"][i]);
-          all_attributes["coverage"].push_back(attributes["coverage"][i]);
+          all_attributes["segid"].push_back(attributes["segid"][i]);
+          all_attributes["noseg_area_a"].push_back(noseg_area_a);
+          all_attributes["noseg_area_r"].push_back(noseg_area_r);
+          // all_attributes["rms_error"].push_back(attributes["rms_error"][i]);
+          // all_attributes["max_error"].push_back(attributes["max_error"][i]);
+          // all_attributes["count"].push_back(attributes["count"][i]);
+          // all_attributes["coverage"].push_back(attributes["coverage"][i]);
           all_attributes["bclass"].push_back(classf);
         }
       }
