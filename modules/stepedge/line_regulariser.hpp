@@ -20,8 +20,8 @@ namespace linereg {
       std::vector<size_t> idx;
     };
 
-    typedef std::tuple<double, Point_2, double> linetype; 
-      // new angle, midpoint, distance in angle cluster, id_cntr
+    typedef std::tuple<double, Point_2, double, size_t> linetype; 
+      // new angle, midpoint, distance in angle cluster, priority
 
     geoflow::SegmentCollection& input_segments;
     public:
@@ -30,7 +30,6 @@ namespace linereg {
     double angle_threshold, dist_threshold;
 
     LineRegulariser(geoflow::SegmentCollection& segments) : input_segments(segments) {
-      // size_t id_cntr = 0;
       input_reg_exact.resize(segments.size());
       for(auto& edge : segments) {
         auto source = Point_3(edge[0][0], edge[0][1], edge[0][2]);
@@ -41,9 +40,8 @@ namespace linereg {
         auto l = std::sqrt(v.squared_length()/2);
         auto angle = std::atan2(v.x(),v.y());
         if (angle < 0) angle += pi;
-        lines.push_back(std::make_tuple(angle,p,0));
+        lines.push_back(std::make_tuple(angle,p,0,0));
       }
-
     };
 
     void cluster() {
@@ -57,21 +55,24 @@ namespace linereg {
       });
 
       std::vector<ValueCluster> angle_clusters(1);
-      auto last_angle = std::get<0>(lines[edge_idx[0]]);
-      for(auto edge_id : edge_idx ) {
+      auto angle_sum = std::get<0>(lines[edge_idx[0]]);
+      angle_clusters.back().idx.push_back(edge_idx[0]);
+      for(size_t i=1; i < edge_idx.size(); ++i) {
+        auto& edge_id = edge_idx[i];
         auto& line = lines[edge_id];
-        if((std::get<0>(line) - last_angle) < angle_threshold)
+        auto& angle = std::get<0>(line);
+        auto mean_angle = angle_sum/angle_clusters.back().idx.size();
+        if(std::fmod((angle - mean_angle), pi) < angle_threshold) {
           angle_clusters.back().idx.push_back(edge_id);
-        else {
+          angle_sum += angle;
+        } else {
           angle_clusters.resize(angle_clusters.size()+1);
           angle_clusters.back().idx.push_back(edge_id);
-          }
-        last_angle=std::get<0>(line);
+          angle_sum = angle;
+        }
       }
 
       // get average angle for each cluster
-      // vec3f directions_before, directions_after;
-      // vec1i angles;
       for(auto& cluster : angle_clusters) {
         // average angle:
         double sum=0;
@@ -100,25 +101,29 @@ namespace linereg {
           // distances.push_back(v*n);
         }
         // sort by distance, ascending
-        auto sorted_by_dist = cluster.idx;
-        std::sort(sorted_by_dist.begin(), sorted_by_dist.end(), [&lines=lines](size_t a, size_t b){
+        auto dist_idx = cluster.idx;
+        std::sort(dist_idx.begin(), dist_idx.end(), [&lines=lines](size_t a, size_t b){
             return std::get<2>(lines[a]) < std::get<2>(lines[b]);
         });
         // cluster nearby lines using separation threshold
-        double last_dist = std::get<2>(lines[sorted_by_dist[0]]);
+        double dist_sum = std::get<2>(lines[dist_idx[0]]);
         dist_clusters.resize(dist_clusters.size()+1);
         dist_clusters.back().ref_vec = n;
-        for(auto& i : sorted_by_dist) {
-          auto& line = lines[i];
-          double dist_diff = std::get<2>(line) - last_dist;
-          if (dist_diff < dist_threshold) {
-            dist_clusters.back().idx.push_back(i);
+        dist_clusters.back().idx.push_back(dist_idx[0]);
+        for(size_t i=1; i < dist_idx.size(); ++i) {
+          auto& edge_id = dist_idx[i];
+          auto& line = lines[edge_id];
+          double mean_dist = dist_sum / dist_clusters.back().idx.size();
+          double& dist = std::get<2>(line);
+          if (std::abs(mean_dist-dist) < dist_threshold) {
+            dist_clusters.back().idx.push_back(edge_id);
+            dist_sum += dist;
           } else {
             dist_clusters.resize(dist_clusters.size()+1);
             dist_clusters.back().ref_vec = n;
-            dist_clusters.back().idx.push_back(i);
+            dist_clusters.back().idx.push_back(edge_id);
+            dist_sum = dist;
           }
-          last_dist = std::get<2>(line);
         }
       }
 
@@ -137,24 +142,19 @@ namespace linereg {
         cluster.ref_vec = Vector_2(cluster.ref_vec.y(), -cluster.ref_vec.x());
       }
 
+      // project input segments on the cluster lines
       for(auto& cluster : dist_clusters) {
         auto ref_v = EK::Vector_2(cluster.ref_vec.x(), cluster.ref_vec.y());
         auto ref_p = EK::Point_2(cluster.ref_point.x(), cluster.ref_point.y());
 
         EK::Line_2 ref_line(ref_p, ref_v);
 
-        // IntervalList interval_list;
         for(auto& i : cluster.idx) {
           auto& edge = input_segments[i];
           auto s = EK::Point_2(edge[0][0], edge[0][1]);
           auto t = EK::Point_2(edge[1][0], edge[1][1]);
           auto s_new = ref_line.projection(s);
           auto t_new = ref_line.projection(t);
-          // auto d1 = (s-ref_p)*ref_v;
-          // auto d2 = (t-ref_p)*ref_v;
-          // // interval_list.insert({d1,d2});
-          // auto source = ref_p + d1*ref_v;
-          // auto target = ref_p + d2*ref_v;
           input_reg_exact[i] = EK::Segment_2(s_new, t_new);
           input_segments[i][0] = 
             {float(CGAL::to_double(s_new.x())), float(CGAL::to_double(s_new.y())), 0};
@@ -193,23 +193,23 @@ namespace linereg {
   Polygon_2 chain_ring(const std::vector<size_t>& idx, const std::vector<EK::Segment_2>& segments, const float& snap_threshold) {
     Polygon_2 ring, fixed_ring;
 
-    if (idx.size()>1) {
+    if (idx.size()>2) {
       for (size_t i=idx[1]; i<idx[0]+idx.size(); ++i) {
         chain(segments[i-1], segments[i], ring, snap_threshold);
       }
       chain(segments[idx[idx.size()-1]], segments[idx[0]], ring, snap_threshold);
-    }
 
-    // get rid of segments with zero length
-    auto circ = ring.vertices_circulator();
-    auto curr = circ;
-    do {
-      auto d = CGAL::squared_distance(*circ, *(circ+1));
-      if (d > 1E-6) {
-        fixed_ring.push_back(*circ);
-      }
-      ++circ;
-    } while (curr != circ);
+      // get rid of segments with zero length
+      auto circ = ring.vertices_circulator();
+      auto curr = circ;
+      do {
+        auto d = CGAL::squared_distance(*circ, *(circ+1));
+        if (d > 1E-6) {
+          fixed_ring.push_back(*circ);
+        }
+        ++circ;
+      } while (curr != circ);
+    }
 
     return fixed_ring;
   }
