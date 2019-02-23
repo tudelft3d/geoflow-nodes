@@ -154,7 +154,8 @@ namespace geoflow::nodes::stepedge {
       add_input("rings", TT_any);
       add_input("pts_per_roofplane", TT_any);
       add_input("footprint", TT_any);
-      add_output("nosegid_area", TT_float);
+      add_output("noseg_area_a", TT_float);
+      add_output("noseg_area_r", TT_float);
       add_output("arrangement", TT_any);
       add_output("arr_segments", TT_line_string_collection);
 
@@ -413,7 +414,7 @@ namespace geoflow::nodes::stepedge {
       // add_output("line_clusters", TT_any); // ie a LineCluster
       // add_output("tmp_vec3f", TT_vec3f);
       add_param("dist_threshold", (float) 0.5);
-      add_param("angle_threshold", (float) 0.2);
+      add_param("angle_threshold", (float) 0.1);
     }
 
     void gui(){
@@ -435,15 +436,15 @@ namespace geoflow::nodes::stepedge {
       // add_input("edge_segments", TT_segment_collection);
       add_input("footprint", TT_linear_ring);
       add_output("edges_out", TT_segment_collection);
-      add_output("rings_out", TT_linear_ring_collection);
-      add_output("footprint_out", TT_linear_ring);
+      // add_output("rings_out", TT_linear_ring_collection);
+      // add_output("footprint_out", TT_linear_ring);
       add_output("exact_rings_out", TT_any);
       add_output("exact_footprint_out", TT_any);
       // add_output("footprint_labels", TT_vec1i);
       // add_output("line_clusters", TT_any); // ie a LineCluster
       // add_output("tmp_vec3f", TT_vec3f);
       add_param("dist_threshold", (float) 0.5);
-      add_param("angle_threshold", (float) 0.1);
+      add_param("angle_threshold", (float) 0.2);
       add_param("snap_threshold", (float) 1.0);
     }
 

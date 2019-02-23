@@ -135,8 +135,8 @@ namespace geoflow::nodes::stepedge {
         building_class["bclass"].push_back(classf);
         building_class["horiz"].push_back(horiz);
         building_class["slant"].push_back(slant);
-        building_class["noseg_area_a"].push_back(noseg_area_a);
-        building_class["noseg_area_r"].push_back(noseg_area_r);
+        building_class["noid_a"].push_back(noseg_area_a);
+        building_class["noid_r"].push_back(noseg_area_r);
         // note: the following will crash if the flowchart specified above is stopped halfway for some reason (eg missing output/connection)
 
         auto cells = N.nodes["Arr2LinearRings_node"]->output("linear_rings").get<LinearRingCollection>();
@@ -147,8 +147,8 @@ namespace geoflow::nodes::stepedge {
           all_cells.push_back(cells[i]);
           all_attributes["height"].push_back(attributes["height"][i]);
           all_attributes["segid"].push_back(attributes["segid"][i]);
-          all_attributes["noseg_area_a"].push_back(noseg_area_a);
-          all_attributes["noseg_area_r"].push_back(noseg_area_r);
+          all_attributes["noid_a"].push_back(noseg_area_a);
+          all_attributes["noid_r"].push_back(noseg_area_r);
           // all_attributes["rms_error"].push_back(attributes["rms_error"][i]);
           // all_attributes["max_error"].push_back(attributes["max_error"][i]);
           // all_attributes["count"].push_back(attributes["count"][i]);

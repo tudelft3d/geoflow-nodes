@@ -1500,20 +1500,23 @@ void RegulariseRingsNode::process(){
   SegmentCollection all_edges;
 
   // build vector of all input edges
-  for(auto edge : edges) {
-    all_edges.push_back(edge);
-  }
-  size_t fpi_begin = all_edges.size();
+  // for(auto edge : edges) {
+  //   all_edges.push_back(edge);
+  // }
+  // size_t fpi_begin = all_edges.size();
+  SegmentCollection fp_edges;
   for(size_t i=0; i<footprint.size()-1; ++i) {
-    all_edges.push_back(Segment({footprint[i], footprint[i+1]}));
+    fp_edges.push_back(Segment({footprint[i], footprint[i+1]}));
   }
-  all_edges.push_back(
+  fp_edges.push_back(
     Segment({footprint[footprint.size()-1], footprint[0]})
   );
-  size_t fpi_end = all_edges.size()-1;
+  // size_t fpi_end = all_edges.size()-1;
 
   // get clusters from line regularisation 
-  auto LR = linereg::LineRegulariser(all_edges);
+  auto LR = linereg::LineRegulariser();
+  LR.add_segments(0,edges);
+  LR.add_segments(1,fp_edges);
   LR.dist_threshold = param<float>("dist_threshold");
   LR.angle_threshold = param<float>("angle_threshold");
   LR.cluster();
@@ -1521,44 +1524,52 @@ void RegulariseRingsNode::process(){
   std::vector<linereg::Polygon_2> exact_polygons;
   for (auto& idx : ring_idx) {
     exact_polygons.push_back(
-      linereg::chain_ring(idx, LR.input_reg_exact, param<float>("snap_threshold"))
+      linereg::chain_ring(idx, LR.get_segments(0), param<float>("snap_threshold"))
     );
   }
   std::vector<size_t> fp_idx;
-  for (size_t i = fpi_begin; i <= fpi_end; ++i){
+  for (size_t i=0; i < LR.get_segments(1).size(); ++i) {
     fp_idx.push_back(i);
   }
-  auto exact_fp = linereg::chain_ring(fp_idx, LR.input_reg_exact, param<float>("snap_threshold"));
+  auto exact_fp = linereg::chain_ring(fp_idx, LR.get_segments(1), param<float>("snap_threshold"));
   output("exact_rings_out").set(exact_polygons);
   output("exact_footprint_out").set(exact_fp);
 
-  // TODO: align to fp edges
-  // LR.lines
 
-  LinearRingCollection new_rings;
-  for (auto& idx : ring_idx) {
-    LinearRing new_ring;
-    if (idx.size()>1) {
-      for (size_t i=idx[1]; i<idx[0]+idx.size(); ++i) {
-        chain(all_edges[i-1], all_edges[i], new_ring, param<float>("snap_threshold"));
-      }
-      chain(all_edges[idx[idx.size()-1]], all_edges[idx[0]], new_ring, param<float>("snap_threshold"));
+  // LinearRingCollection new_rings;
+  // for (auto& idx : ring_idx) {
+  //   LinearRing new_ring;
+  //   if (idx.size()>1) {
+  //     for (size_t i=idx[1]; i<idx[0]+idx.size(); ++i) {
+  //       chain(all_edges[i-1], all_edges[i], new_ring, param<float>("snap_threshold"));
+  //     }
+  //     chain(all_edges[idx[idx.size()-1]], all_edges[idx[0]], new_ring, param<float>("snap_threshold"));
+  //   }
+  //   new_rings.push_back(new_ring);
+  // }
+
+  // LinearRing new_fp;
+  // for (size_t i=fpi_begin+1; i<=fpi_end; ++i) {
+  //   chain(all_edges[i-1], all_edges[i], new_fp, param<float>("snap_threshold"));
+  // }
+  // chain(all_edges[fpi_end], all_edges[fpi_begin], new_fp, param<float>("snap_threshold"));
+
+  SegmentCollection new_segments;
+  vec1i priorities;
+  for(auto& kv : LR.segments) {
+    for(auto& ekseg : kv.second) {
+      new_segments.push_back(Segment());
+      new_segments.back() = {float(CGAL::to_double(ekseg.source().x())), float(CGAL::to_double(ekseg.source().y())), 0};
+      new_segments.back() = {float(CGAL::to_double(ekseg.target().x())), float(CGAL::to_double(ekseg.target().y())), 0};
+      priorities.push_back(kv.first);
+      priorities.push_back(kv.first);
     }
-    new_rings.push_back(new_ring);
   }
 
-  // TODO: check if we are not creating duplicate points when a linesegment becomes 0 length
-  // now solved with simplifier
-  LinearRing new_fp;
-  for (size_t i=fpi_begin+1; i<=fpi_end; ++i) {
-    chain(all_edges[i-1], all_edges[i], new_fp, param<float>("snap_threshold"));
-  }
-  chain(all_edges[fpi_end], all_edges[fpi_begin], new_fp, param<float>("snap_threshold"));
 
-  // output("merged_edges_out").set(merged_edges_out);
-  output("edges_out").set(all_edges);
-  output("rings_out").set(new_rings);
-  output("footprint_out").set(new_fp);
+  output("edges_out").set(new_segments);
+  // output("rings_out").set(new_rings);
+  // output("footprint_out").set(new_fp);
 }
 
 LinearRing simplify_footprint(LinearRing& polygon, float& threshold_stop_cost) {

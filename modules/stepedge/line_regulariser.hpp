@@ -20,29 +20,48 @@ namespace linereg {
       std::vector<size_t> idx;
     };
 
-    typedef std::tuple<double, Point_2, double, size_t> linetype; 
-      // new angle, midpoint, distance in angle cluster, priority
+    typedef std::tuple<double, Point_2, double, size_t, size_t, double> linetype; 
+      // new angle, midpoint, distance in angle cluster, priority, segment_id, sqlength
+    typedef std::vector<EK::Segment_2> vec_ek_seg;
 
-    geoflow::SegmentCollection& input_segments;
+    // geoflow::SegmentCollection& input_segments;
     public:
     std::vector<linetype> lines;
-    std::vector<EK::Segment_2> input_reg_exact;
+    // vec_ek_seg input_reg_exact;
     double angle_threshold, dist_threshold;
 
-    LineRegulariser(geoflow::SegmentCollection& segments) : input_segments(segments) {
-      input_reg_exact.resize(segments.size());
-      for(auto& edge : segments) {
-        auto source = Point_3(edge[0][0], edge[0][1], edge[0][2]);
-        auto target = Point_3(edge[1][0], edge[1][1], edge[1][2]);
+    std::unordered_map<size_t, vec_ek_seg> segments;
+
+    LineRegulariser() {};
+
+    void add_segments(size_t priority, geoflow::SegmentCollection& segs) {
+      size_t i=0;
+      segments[priority] = vec_ek_seg();
+      for(auto& edge : segs) {
+        auto source = EK::Point_2(edge[0][0], edge[0][1]);
+        auto target = EK::Point_2(edge[1][0], edge[1][1]);
         auto v = target-source;
         auto p_ = source + v/2;
-        auto p = Point_2(p_.x(),p_.y());
-        auto l = std::sqrt(v.squared_length()/2);
-        auto angle = std::atan2(v.x(),v.y());
+        auto p = Point_2(CGAL::to_double(p_.x()),CGAL::to_double(p_.y()));
+        auto l = CGAL::to_double(v.squared_length());
+        auto angle = std::atan2(CGAL::to_double(v.x()), CGAL::to_double(v.y()));
         if (angle < 0) angle += pi;
-        lines.push_back(std::make_tuple(angle,p,0,0));
+        lines.push_back(std::make_tuple(angle,p,0,priority,i++,l));
+        segments[priority].push_back(EK::Segment_2(source, target));
       }
-    };
+    }
+
+    vec_ek_seg& get_segments(const size_t& priority) {
+      return segments[priority];
+    }
+
+    // template<typename element> void get_max(const std::vector<size_t>& idx, const size_t element) {
+      
+    //   for(auto& i : idx) {
+    //     std::get<element>(lines[i]);
+        
+    //   }
+    // }
 
     void cluster() {
       // cluster by angle
@@ -72,14 +91,30 @@ namespace linereg {
         }
       }
 
-      // get average angle for each cluster
+      // determine angle for each cluster
       for(auto& cluster : angle_clusters) {
-        // average angle:
-        double sum=0;
-        for(auto& i : cluster.idx) {
-          sum+=std::get<0>(lines[i]);
+        // find maximum priority in this cluster
+        size_t max_pr=0;
+        for(auto& i : cluster.idx)
+          max_pr = std::max(max_pr, std::get<3>(lines[i]));
+
+        // collect all ids that have the max priority
+        std::vector<size_t> max_idx;
+        for(auto& i : cluster.idx)
+          if (std::get<3>(lines[i]) == max_pr)
+            max_idx.push_back(i);
+
+        // computed average angle weighted by segment length
+        double sum_len=0;
+        double sum_all=0;
+        std::vector<double> weighted_angles;
+        for(auto& i : max_idx) {
+          auto& len = std::get<5>(lines[i]);
+          auto& angle = std::get<0>(lines[i]);
+          sum_all += len * angle;
+          sum_len += len;
         }
-        double angle = sum/cluster.idx.size();
+        double angle = sum_all/sum_len;
         Vector_2 n(-1.0, std::tan(angle));
         cluster.ref_vec = n/std::sqrt(n.squared_length()); // normalize
         
@@ -129,16 +164,29 @@ namespace linereg {
 
       // find average direction and center point for each cluster
       for(auto& cluster : dist_clusters) {
-        // find average midpoint
-        // double sum=0;
-        Vector_2 sum_p(0,0);
-        for(auto& i : cluster.idx) {
-          // sum+=std::get<2>(lines[i]);
+        // find max priority
+        size_t max_pr=0;
+        for(auto& i : cluster.idx)
+          max_pr = std::max(max_pr, std::get<3>(lines[i]));
+
+        // collect all ids that have the max priority
+        std::vector<size_t> max_idx;
+        for(auto& i : cluster.idx)
+          if (std::get<3>(lines[i]) == max_pr)
+            max_idx.push_back(i);
+
+        // computed average angle weighted by segment length
+        double sum_len=0;
+        Vector_2 sum_all(0,0);
+        std::vector<double> weighted_angles;
+        for(auto& i : max_idx) {
+          auto& len = std::get<5>(lines[i]);
           auto& q = std::get<1>(lines[i]);
-          sum_p += Vector_2(q.x(), q.y());
+          sum_all += len*Vector_2(q.x(), q.y());
+          sum_len += len;
         }
         // cluster.distance = sum/cluster.idx.size();
-        cluster.ref_point = sum_p/cluster.idx.size();
+        cluster.ref_point = sum_all/sum_len;
         cluster.ref_vec = Vector_2(cluster.ref_vec.y(), -cluster.ref_vec.x());
       }
 
@@ -150,16 +198,16 @@ namespace linereg {
         EK::Line_2 ref_line(ref_p, ref_v);
 
         for(auto& i : cluster.idx) {
-          auto& edge = input_segments[i];
-          auto s = EK::Point_2(edge[0][0], edge[0][1]);
-          auto t = EK::Point_2(edge[1][0], edge[1][1]);
-          auto s_new = ref_line.projection(s);
-          auto t_new = ref_line.projection(t);
-          input_reg_exact[i] = EK::Segment_2(s_new, t_new);
-          input_segments[i][0] = 
-            {float(CGAL::to_double(s_new.x())), float(CGAL::to_double(s_new.y())), 0};
-          input_segments[i][1] = 
-            {float(CGAL::to_double(t_new.x())), float(CGAL::to_double(t_new.y())), 0};
+          auto pri = std::get<3>(lines[i]);
+          auto j = std::get<4>(lines[i]);
+          auto& edge = segments[pri][j];
+          auto s_new = ref_line.projection(edge.source());
+          auto t_new = ref_line.projection(edge.target());
+          segments[pri][j] = EK::Segment_2(s_new, t_new);
+          // input_segments[i][0] = 
+          //   {float(CGAL::to_double(s_new.x())), float(CGAL::to_double(s_new.y())), 0};
+          // input_segments[i][1] = 
+          //   {float(CGAL::to_double(t_new.x())), float(CGAL::to_double(t_new.y())), 0};
         }
       }
     };
