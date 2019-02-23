@@ -63,7 +63,7 @@ namespace linereg {
     //   }
     // }
 
-    void cluster() {
+    void cluster(bool weight_by_len) {
       // cluster by angle
       std::vector<size_t> edge_idx(lines.size());
       for (size_t i=0; i<lines.size(); ++i) {
@@ -80,8 +80,12 @@ namespace linereg {
         auto& edge_id = edge_idx[i];
         auto& line = lines[edge_id];
         auto& angle = std::get<0>(line);
-        auto mean_angle = angle_sum/angle_clusters.back().idx.size();
-        if(std::fmod((angle - mean_angle), pi) < angle_threshold) {
+        // mean angle
+        // auto repr_angle = angle_sum/angle_clusters.back().idx.size();
+        // median angle
+        auto mid = angle_clusters.back().idx.size()/2;
+        auto repr_angle = std::get<0>(lines[angle_clusters.back().idx[mid]]);
+        if(std::fmod((angle - repr_angle), pi) < angle_threshold) {
           angle_clusters.back().idx.push_back(edge_id);
           angle_sum += angle;
         } else {
@@ -107,14 +111,25 @@ namespace linereg {
         // computed average angle weighted by segment length
         double sum_len=0;
         double sum_all=0;
+        double max_len=-1;
+        size_t max_len_id;
         std::vector<double> weighted_angles;
         for(auto& i : max_idx) {
           auto& len = std::get<5>(lines[i]);
           auto& angle = std::get<0>(lines[i]);
           sum_all += len * angle;
           sum_len += len;
+          if (len > max_len) {
+            max_len = len;
+            max_len_id = i;
+          }
         }
-        double angle = sum_all/sum_len;
+        double angle;
+        if (weight_by_len) 
+          angle = sum_all/sum_len;
+        else 
+          angle = std::get<0>(lines[max_len_id]);
+
         Vector_2 n(-1.0, std::tan(angle));
         cluster.ref_vec = n/std::sqrt(n.squared_length()); // normalize
         
@@ -148,9 +163,11 @@ namespace linereg {
         for(size_t i=1; i < dist_idx.size(); ++i) {
           auto& edge_id = dist_idx[i];
           auto& line = lines[edge_id];
-          double mean_dist = dist_sum / dist_clusters.back().idx.size();
+          // double repr_dist = dist_sum / dist_clusters.back().idx.size();
+          auto mid = dist_clusters.back().idx.size()/2;
+          double repr_dist = std::get<2>(lines[dist_clusters.back().idx[mid]]);
           double& dist = std::get<2>(line);
-          if (std::abs(mean_dist-dist) < dist_threshold) {
+          if (std::abs(repr_dist-dist) < dist_threshold) {
             dist_clusters.back().idx.push_back(edge_id);
             dist_sum += dist;
           } else {
@@ -177,6 +194,8 @@ namespace linereg {
 
         // computed average angle weighted by segment length
         double sum_len=0;
+        double max_len=-1;
+        size_t max_len_id;
         Vector_2 sum_all(0,0);
         std::vector<double> weighted_angles;
         for(auto& i : max_idx) {
@@ -184,9 +203,18 @@ namespace linereg {
           auto& q = std::get<1>(lines[i]);
           sum_all += len*Vector_2(q.x(), q.y());
           sum_len += len;
+          if (len > max_len) {
+            max_len = len;
+            max_len_id = i;
+          }
         }
         // cluster.distance = sum/cluster.idx.size();
-        cluster.ref_point = sum_all/sum_len;
+        if (weight_by_len) 
+          cluster.ref_point = sum_all/sum_len;
+        else {
+          auto& p = std::get<1>(lines[max_len_id]);
+          cluster.ref_point = Vector_2(p.x(), p.y());
+        }
         cluster.ref_vec = Vector_2(cluster.ref_vec.y(), -cluster.ref_vec.x());
       }
 

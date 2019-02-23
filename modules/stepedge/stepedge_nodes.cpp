@@ -552,16 +552,6 @@ void arr2segments(Face_handle& face, LineStringCollection& segments) {
     }
   });
 }
-Polygon_2 arr_cell2polygon(Face_handle& fh) {
-  Polygon_2 poly;
-  auto he = fh->outer_ccb();
-  auto first = he;
-  do {
-    poly.push_back(he->target()->point());
-    he = he->next();
-  } while (he!=first);
-  return poly;
-}
 
 void BuildArrangementNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
@@ -587,6 +577,16 @@ void LinearRingtoRingsNode::process(){
   output("linear_rings").set(lrc);
 }
 
+Polygon_2 arr_cell2polygon(Face_handle& fh) {
+  Polygon_2 poly;
+  auto he = fh->outer_ccb();
+  auto first = he;
+  do {
+    poly.push_back(he->target()->point());
+    he = he->next();
+  } while (he!=first);
+  return poly;
+}
 void arr_process(Arrangement_2& arr, const bool& flood_unsegmented, const bool& dissolve_edges, const bool& dissolve_stepedges, const float& step_height_threshold) {
   if (flood_unsegmented) {
     std::map<float, Face_handle> face_map;
@@ -602,19 +602,20 @@ void arr_process(Arrangement_2& arr, const bool& flood_unsegmented, const bool& 
       candidate_stack.push(kv.second);
       while (!candidate_stack.empty()) {
         auto fh = candidate_stack.top(); candidate_stack.pop();
-        auto circ = fh->outer_ccb();
-        auto curr = circ;
+        auto he = fh->outer_ccb();
+        auto first = he;
         do {
           // std::cout << &(*curr) << "\n";
           // ignore weird nullptrs (should not be possible...)
-          if (curr==nullptr) break;
-          auto candidate = curr->twin()->face();
+          if (he==nullptr) break;
+          auto candidate = he->twin()->face();
           if (candidate->data().segid == 0) {
             candidate->data().segid = cur_segid;
             candidate->data().elevation_avg = cur_elev;
             candidate_stack.push(candidate);
           }
-        } while (++curr != circ);
+          he = he->next();
+        } while (he != first);
       }
     }
   }
@@ -698,11 +699,20 @@ std::pair<double, double> arr_measure_nosegid(Arrangement_2& arr) {
 
 void BuildArrFromRingsExactNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto footprint = input("footprint").get<linereg::Polygon_2>();
   auto rings = input("rings").get<std::vector<linereg::Polygon_2>>();
   // auto plane_idx = input("plane_idx").get<vec1i>();
   auto points_per_plane = input("pts_per_roofplane").get<std::unordered_map<int, std::vector<Point>>>();
 
+  auto fp_in = input("footprint");
+  linereg::Polygon_2 footprint;
+  if (fp_in.connected_type == TT_any)
+    footprint = fp_in.get<linereg::Polygon_2>();
+  else {
+    auto& lr = fp_in.get<LinearRing&>();
+    for (auto& p : lr) {
+      footprint.push_back(linereg::EK::Point_2(p[0], p[1]));
+    }
+  }
 
   Arrangement_2 arr_base;
   {
@@ -760,7 +770,7 @@ void BuildArrFromRingsExactNode::process() {
     if (face->data().in_footprint)
       arr2segments(face, segments);
   }
-  output("noseg_area_a").set(float(nosegid_area.first));
+  output("noseg_area_a").set(float(CGAL::sqrt(nosegid_area.first)));
   output("noseg_area_r").set(float(nosegid_area.second));
   output("arr_segments").set(segments);
   output("arrangement").set(arr_base);
@@ -1519,7 +1529,7 @@ void RegulariseRingsNode::process(){
   LR.add_segments(1,fp_edges);
   LR.dist_threshold = param<float>("dist_threshold");
   LR.angle_threshold = param<float>("angle_threshold");
-  LR.cluster();
+  LR.cluster(param<bool>("weighted_avg"));
 
   std::vector<linereg::Polygon_2> exact_polygons;
   for (auto& idx : ring_idx) {
@@ -1559,14 +1569,15 @@ void RegulariseRingsNode::process(){
   for(auto& kv : LR.segments) {
     for(auto& ekseg : kv.second) {
       new_segments.push_back(Segment());
-      new_segments.back() = {float(CGAL::to_double(ekseg.source().x())), float(CGAL::to_double(ekseg.source().y())), 0};
-      new_segments.back() = {float(CGAL::to_double(ekseg.target().x())), float(CGAL::to_double(ekseg.target().y())), 0};
+      new_segments.back()[0] = {float(CGAL::to_double(ekseg.source().x())), float(CGAL::to_double(ekseg.source().y())), 0};
+      new_segments.back()[1] = {float(CGAL::to_double(ekseg.target().x())), float(CGAL::to_double(ekseg.target().y())), 0};
       priorities.push_back(kv.first);
       priorities.push_back(kv.first);
     }
   }
 
 
+  output("priorities").set(priorities);
   output("edges_out").set(new_segments);
   // output("rings_out").set(new_rings);
   // output("footprint_out").set(new_fp);

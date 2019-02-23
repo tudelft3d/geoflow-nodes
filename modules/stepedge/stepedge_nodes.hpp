@@ -153,7 +153,7 @@ namespace geoflow::nodes::stepedge {
     void init() {
       add_input("rings", TT_any);
       add_input("pts_per_roofplane", TT_any);
-      add_input("footprint", TT_any);
+      add_input("footprint", {TT_any, TT_linear_ring});
       add_output("noseg_area_a", TT_float);
       add_output("noseg_area_r", TT_float);
       add_output("arrangement", TT_any);
@@ -436,6 +436,7 @@ namespace geoflow::nodes::stepedge {
       // add_input("edge_segments", TT_segment_collection);
       add_input("footprint", TT_linear_ring);
       add_output("edges_out", TT_segment_collection);
+      add_output("priorities", TT_vec1i);
       // add_output("rings_out", TT_linear_ring_collection);
       // add_output("footprint_out", TT_linear_ring);
       add_output("exact_rings_out", TT_any);
@@ -444,14 +445,16 @@ namespace geoflow::nodes::stepedge {
       // add_output("line_clusters", TT_any); // ie a LineCluster
       // add_output("tmp_vec3f", TT_vec3f);
       add_param("dist_threshold", (float) 0.5);
-      add_param("angle_threshold", (float) 0.2);
+      add_param("angle_threshold", (float) 0.10);
       add_param("snap_threshold", (float) 1.0);
+      add_param("weighted_avg", (bool) false);
     }
 
     void gui(){
       ImGui::DragFloat("Distance threshold", &param<float>("dist_threshold"), 0.1, 0);
       ImGui::DragFloat("Angle threshold", &param<float>("angle_threshold"), 0.01, 0.01, 3.1415);
       ImGui::DragFloat("Snap threshold", &param<float>("snap_threshold"), 0.01, 0.01, 10);
+      ImGui::Checkbox("weighted_avg", &param<bool>("weighted_avg"));
     }
     void process();
   };

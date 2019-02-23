@@ -19,10 +19,10 @@ namespace gfn = geoflow::nodes;
 
 int main(int ac, const char * av[])
 {
-    std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_0.gpkg");
-    // std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg");
-    std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las");
-    // std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las");
+    // std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_0.gpkg");
+    std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg");
+    // std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las");
+    std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las");
     std::string footprints_classes_file("out_bclass.shp");
     std::string decomposed_footprints_file("out_lod13.shp");
     float step_threshold = 1.0;
