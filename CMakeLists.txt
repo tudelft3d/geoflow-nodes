@@ -95,6 +95,9 @@ include_directories(modules/las)
 add_subdirectory(modules/masb)
 include_directories(modules/masb)
 
+# add_subdirectory(modules/cityjson)
+include_directories(modules/cityjson)
+
 if (CGAL_FOUND AND Boost_FOUND)
   add_subdirectory(modules/stepedge)
   include_directories(modules/stepedge)
@@ -111,6 +114,8 @@ if (CGAL_FOUND AND Boost_FOUND AND GDAL_FOUND AND GEOS_FOUND)
 endif()
 
 add_subdirectory(apps/mat)
+
+add_subdirectory(apps/cityjson)
 
 # add_subdirectory(point-based)
 # add_subdirectory(raster-based)
