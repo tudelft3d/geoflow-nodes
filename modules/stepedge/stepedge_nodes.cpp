@@ -2,7 +2,7 @@
 #include "region_growing_plane.h"
 // #include "gloo.h"
 #include "ptinpoly.h"
-#include "earcut.hpp"
+#include <earcut.hpp>
 
 // #include "nlohmann/json.hpp"
 // using json = nlohmann::json;

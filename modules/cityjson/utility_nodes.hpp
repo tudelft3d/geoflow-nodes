@@ -2,7 +2,7 @@
 
 #include <geoflow/core/geoflow.hpp>
 
-#include "earcut.hpp"
+#include <earcut.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 

@@ -74,6 +74,11 @@ include_directories(
   thirdparty/geoflow/thirdparty/glm
 )
 
+#earcut
+include_directories(
+  thirdparty/earcut
+)
+
 # MODULES
 
 if (CGAL_FOUND)
