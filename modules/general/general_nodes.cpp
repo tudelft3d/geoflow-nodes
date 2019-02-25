@@ -42,6 +42,18 @@ namespace geoflow::nodes::general {
       output("geometries").set(mergedGeometries);
     }
   }
+  
+  void MergeLinestringsNode::process() {
+    auto geometries1 = input("lines1");
+    auto geometries2 = input("lines2");
+
+    auto mergedLines = geometries1.get<geoflow::LineStringCollection>();
+    auto lines2 = geometries2.get<geoflow::LineStringCollection>();
+    for (auto& l : lines2) {
+      mergedLines.push_back(l);
+    }
+    output("lines").set(mergedLines);
+  }
 
   void LineStringFilterNode::process() {
     auto line_strings = input("line_strings").get<geoflow::LineStringCollection>();

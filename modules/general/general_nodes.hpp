@@ -18,6 +18,17 @@ namespace geoflow::nodes::general {
     void process();
   };
 
+  class MergeLinestringsNode:public Node {
+  public:
+    using Node::Node;
+    void init() {
+      add_input("lines1", { TT_line_string_collection });
+      add_input("lines2", { TT_line_string_collection });
+      add_output("lines", TT_line_string_collection);
+    }
+    void process();
+  };
+
   class LineStringFilterNode:public Node {
   public:
     using Node::Node;
