@@ -308,7 +308,7 @@ void CDTDistanceNode::process() {
       double height = tinsimp::compute_height(cp, face);
       double diff = height - cp.z();
       distances.push_back(diff);
-      points.push_back({ cp.x(), cp.y(), float(diff) });
+      points.push_back({ float(cp.x()), float(cp.y()), float(diff) });
     }
   }
 
