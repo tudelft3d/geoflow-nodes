@@ -6,12 +6,15 @@
 namespace geoflow::nodes::las {
 
 void LASLoaderNode::process(){
+  auto filepath = param<std::string>("filepath");
+  auto thin_nth = param<int>("thin_nth");
+
   PointCollection points;
   vec1i classification;
   vec1f intensity;
 
   LASreadOpener lasreadopener;
-  lasreadopener.set_file_name(filepath);
+  lasreadopener.set_file_name(filepath.c_str());
   LASreader* lasreader = lasreadopener.open();
   if (!lasreader)
     return;
@@ -48,7 +51,6 @@ void LASLoaderNode::process(){
 }
 
 void LASWriterNode::write_point_cloud_collection(PointCollection& point_cloud, std::string path) {
-
   LASwriteOpener laswriteopener;
   laswriteopener.set_file_name(path.c_str());
 
@@ -92,20 +94,21 @@ void LASWriterNode::write_point_cloud_collection(PointCollection& point_cloud, s
 }
 
 void LASWriterNode::process(){
+  auto filepath = param<std::string>("filepath");
+
   auto input_geom = input("point_clouds");
 
   if (input_geom.connected_type == TT_point_collection) {
     auto point_cloud = input_geom.get<PointCollection>();
-    write_point_cloud_collection(point_cloud, std::string(filepath));
+    write_point_cloud_collection(point_cloud, filepath);
 
   } else if (input_geom.connected_type == TT_point_collection_list) {
     auto point_clouds = input_geom.get< std::vector<PointCollection> >();
 
     int i=0;
     for (auto point_cloud : point_clouds) {
-      std::string fp (filepath);
-      fp += "." + std::to_string(i++) + ".las";
-      write_point_cloud_collection(point_cloud, fp);
+      filepath += "." + std::to_string(i++) + ".las";
+      write_point_cloud_collection(point_cloud, filepath);
     }
   }
 }
