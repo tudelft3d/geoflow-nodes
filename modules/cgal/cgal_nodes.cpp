@@ -53,11 +53,11 @@ template<typename T> inline std::array<float,3> to_arr3f(T& p) {
 
 void CDTNode::process(){
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-  typedef CGAL::Projection_traits_xy_3<K>								Gt;
-  typedef CGAL::Exact_predicates_tag									  Itag;
+  typedef CGAL::Projection_traits_xy_3<K>							        Gt;
+  typedef CGAL::Exact_predicates_tag									        Itag;
   typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, CGAL::Default, Itag>	CDT;
-  typedef CDT::Point													          Point;
-
+  typedef CDT::Point													                Point;
+  
   auto geom_term = input("geometries");
 
   auto create_triangles = param<bool>("create_triangles");
@@ -348,6 +348,7 @@ void TinSimpNode::process(){
   auto geom_term = input("geometries");
 
   auto thres_error = param<float>("thres_error");
+  auto densify_interval = param<float>("densify_interval");
   auto create_triangles = param<bool>("create_triangles");
 
   tinsimp::CDT cdt;
@@ -753,19 +754,11 @@ void IsoLineSlicerNode::process() {
   output("attributes").set(attributes);
 }
 
-void LineHeightCDTNode::process() {
-  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-  typedef CGAL::Projection_traits_xy_3<K>							        Gt;
-  typedef CGAL::Exact_predicates_tag									        Itag;
-  typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, CGAL::Default, Itag>	CDT;
-
-  auto cdt = input("cgal_cdt").get<CDT>();
+void LineHeightNode::process() {
   auto lines = input("lines").get<LineStringCollection>();
 
-  auto densify_interval = param<float>("densify_interval");
-  
-  auto denselines = densify_linestrings(lines, densify_interval);
-
+  auto filepath = param<std::string>("filepath").c_str();
+  auto thin_nth = param<int>("thin_nth");
 
   typedef CGAL::Simple_cartesian<float> K;
   typedef CGAL::Search_traits_3<K> TreeTraits;
@@ -803,6 +796,43 @@ void LineHeightCDTNode::process() {
 
   lasreader->close();
   delete lasreader;
+
+  output("lines").set(lines_out);
+}
+
+void LineHeightCDTNode::process() {
+  auto cdt = input("cgal_cdt").get<tinsimp::CDT>();
+  auto lines = input("line_strings").get<LineStringCollection>();
+
+  auto densify_interval = param<float>("densify_interval");
+  
+  auto denselines = densify_linestrings(lines, densify_interval);
+
+  LineStringCollection lines_out;
+  for (auto& line : lines) {
+    vec3f ls;
+    for (int i = 0; i < line.size(); i++) {
+      auto p = line[i];
+      tinsimp::Point cp = tinsimp::Point(p[0], p[1], p[2]);
+
+      tinsimp::CDT::Locate_type location;
+      int vertexid;
+      tinsimp::CDT::Face_handle face = cdt.locate(cp, location, vertexid);
+      // only calculate height if point is within the CDT convex or affine hull
+      if (location != tinsimp::CDT::OUTSIDE_CONVEX_HULL &&
+          location != tinsimp::CDT::OUTSIDE_AFFINE_HULL) {
+          auto plane = new CGAL::Plane_3<tinsimp::K>(
+            face->vertex(0)->point(),
+            face->vertex(1)->point(),
+            face->vertex(2)->point());
+          double height = -plane->a() / plane->c() * cp.x()
+                          -plane->b() / plane->c() * cp.y()
+                          -plane->d() / plane->c();
+          ls.push_back({ p[0], p[1], float(height) });
+      }
+    }
+    lines_out.push_back(ls);
+  }
 
   output("lines").set(lines_out);
 }
