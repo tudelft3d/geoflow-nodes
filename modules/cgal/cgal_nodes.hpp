@@ -92,11 +92,13 @@ namespace geoflow::nodes::cgal {
       add_output("triangles", TT_triangle_collection);
       add_output("normals", TT_vec3f);
       add_output("selected_lines", TT_line_string_collection);
+      add_output("cgal_cdt", TT_any);
       // add_output("count", TT_vec1ui);
       // add_output("error", TT_vec1f);
 
       add_param("thres_error", (float)2);
       add_param("densify_interval", (float)2);
+      add_param("create_triangles", (bool)true);
     }
     void gui() {
       if (ImGui::SliderFloat("Error threshold", &param<float>("thres_error"), 0, 100)) {
@@ -234,6 +236,22 @@ namespace geoflow::nodes::cgal {
     void gui() {
       ImGui::InputText("LAS file path", &param<std::string>("filepath"));
       ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 0, 100);
+    }
+    void process();
+  };  
+  
+  class LineHeightCDTNode:public Node {
+  public:
+    using Node::Node;
+    void init() {
+      add_input("cgal_cdt", TT_any);
+      add_input("lines", TT_line_string_collection);
+      add_output("lines", TT_line_string_collection);
+
+      add_param("densify_interval", (float)2);
+    }
+    void gui() {
+      ImGui::SliderFloat("Line densify", &param<float>("densify_interval"), 0, 100);
     }
     void process();
   };

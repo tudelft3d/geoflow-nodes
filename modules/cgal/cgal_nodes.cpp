@@ -348,7 +348,7 @@ void TinSimpNode::process(){
   auto geom_term = input("geometries");
 
   auto thres_error = param<float>("thres_error");
-  auto densify_interval = param<float>("densify_interval");
+  auto create_triangles = param<bool>("create_triangles");
 
   tinsimp::CDT cdt;
 
@@ -375,28 +375,37 @@ void TinSimpNode::process(){
     // output("error").set(line_errors);
   }
 
+  std::cout << "Completed CDT with " << cdt.number_of_faces() << " triangles...\n";
+
   TriangleCollection triangles;
-  for (tinsimp::CDT::Finite_faces_iterator fit = cdt.finite_faces_begin();
-    fit != cdt.finite_faces_end();
-    ++fit)
-  {
+  vec3f normals;
+  if (create_triangles) {
+    for (tinsimp::CDT::Finite_faces_iterator fit = cdt.finite_faces_begin();
+      fit != cdt.finite_faces_end();
+      ++fit) {
       auto& p0 = fit->vertex(0)->point();
       auto& p1 = fit->vertex(1)->point();
       auto& p2 = fit->vertex(2)->point();
-      triangles.push_back({to_arr3f<tinsimp::Point>(p0), to_arr3f<tinsimp::Point>(p1), to_arr3f<tinsimp::Point>(p2)});
-  }
-  vec3f normals;
-  for(auto& t : triangles){
-    auto a = glm::make_vec3(t[0].data());
-    auto b = glm::make_vec3(t[1].data());
-    auto c = glm::make_vec3(t[2].data());
-    auto n = glm::cross(b-a, c-b);
+      triangles.push_back({
+        to_arr3f<tinsimp::Point>(p0),
+        to_arr3f<tinsimp::Point>(p1),
+        to_arr3f<tinsimp::Point>(p2)
+        });
+    }
+    for (auto& t : triangles) {
+      auto a = glm::make_vec3(t[0].data());
+      auto b = glm::make_vec3(t[1].data());
+      auto c = glm::make_vec3(t[2].data());
+      auto n = glm::cross(b - a, c - b);
 
-    normals.push_back({n.x,n.y,n.z});
-    normals.push_back({n.x,n.y,n.z});
-    normals.push_back({n.x,n.y,n.z});
+      normals.push_back({ n.x,n.y,n.z });
+      normals.push_back({ n.x,n.y,n.z });
+      normals.push_back({ n.x,n.y,n.z });
+    }
+    cdt.clear();
   }
 
+  output("cgal_cdt").set(cdt);
   output("triangles").set(triangles);
   output("normals").set(normals);
 }
@@ -744,11 +753,19 @@ void IsoLineSlicerNode::process() {
   output("attributes").set(attributes);
 }
 
-void LineHeightNode::process() {
+void LineHeightCDTNode::process() {
+  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+  typedef CGAL::Projection_traits_xy_3<K>							        Gt;
+  typedef CGAL::Exact_predicates_tag									        Itag;
+  typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, CGAL::Default, Itag>	CDT;
+
+  auto cdt = input("cgal_cdt").get<CDT>();
   auto lines = input("lines").get<LineStringCollection>();
 
-  auto filepath = param<std::string>("filepath").c_str();
-  auto thin_nth = param<int>("thin_nth");
+  auto densify_interval = param<float>("densify_interval");
+  
+  auto denselines = densify_linestrings(lines, densify_interval);
+
 
   typedef CGAL::Simple_cartesian<float> K;
   typedef CGAL::Search_traits_3<K> TreeTraits;
