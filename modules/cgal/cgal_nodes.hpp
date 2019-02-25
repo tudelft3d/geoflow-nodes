@@ -69,6 +69,18 @@ namespace geoflow::nodes::cgal {
     void process();
   };
 
+  class CDTDistanceNode:public Node {
+  public:
+    using Node::Node;
+    void init() {
+      add_input("triangles", TT_triangle_collection);
+      add_output("points", TT_point_collection);
+      add_output("distance_min", TT_float);
+      add_output("distance_max", TT_float);
+    }
+    void process();
+  };
+
   class DensifyNode:public Node {
   public:
     using Node::Node;
@@ -208,6 +220,8 @@ namespace geoflow::nodes::cgal {
       add_input("max", TT_float);
       add_output("lines", TT_line_string_collection);
       add_output("attributes", TT_attribute_map_f);
+
+      add_param("interval", (float)1.0);
     }
     void process();
   };

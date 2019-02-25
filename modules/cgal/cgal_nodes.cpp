@@ -217,7 +217,7 @@ void ComparePointDistanceNode::process(){
   output("distances2").set(distances2);
 }
 
-void PointDistanceNode::process(){
+void PointDistanceNode::process() {
   typedef CGAL::Simple_cartesian<double> K;
   typedef K::FT FT;
   typedef K::Ray_3 Ray;
@@ -235,15 +235,15 @@ void PointDistanceNode::process(){
 
   auto trin = input("triangles").get<TriangleCollection>();
   std::list<Triangle> triangles;
-  for(auto& t : trin){
+  for (auto& t : trin) {
     auto a = Point(t[0][0], t[0][1], t[0][2]);
     auto b = Point(t[1][0], t[1][1], t[1][2]);
     auto c = Point(t[2][0], t[2][1], t[2][2]);
-    triangles.push_back(Triangle(a,b,c));
+    triangles.push_back(Triangle(a, b, c));
   }
-  
+
   // constructs AABB tree
-  Tree tree(triangles.begin(),triangles.end());
+  Tree tree(triangles.begin(), triangles.end());
   tree.accelerate_distance_queries();
 
   LASreadOpener lasreadopener;
@@ -252,12 +252,12 @@ void PointDistanceNode::process(){
 
   vec1f distances;
   PointCollection points;
-  size_t i=0;
-  auto offset = manager.data_offset.value_or(std::array<double,3>({0,0,0}));
+  size_t i = 0;
+  auto offset = manager.data_offset.value_or(std::array<double, 3>({ 0,0,0 }));
   while (lasreader->read_point()) {
-    if (lasreader->point.get_classification() == 2){
+    if (lasreader->point.get_classification() == 2) {
 
-      if (i++ % thin_nth == 0){
+      if (i++ % thin_nth == 0) {
         auto q = Point(lasreader->point.get_x() - offset[0], lasreader->point.get_y() - offset[1], lasreader->point.get_z() - offset[2]);
         FT sqd = tree.squared_distance(q);
         distances.push_back(sqd);
@@ -276,19 +276,47 @@ void PointDistanceNode::process(){
           );
         }
       }
-      if(i%100000==0) std::cout << "Read " << i << " points...\n";
+      if (i % 100000 == 0) std::cout << "Read " << i << " points...\n";
       // laswriter->write_point(&lasreader->point);
     }
   }
   lasreader->close();
   delete lasreader;
 
- auto minmax = std::minmax_element(distances.begin(), distances.end());
+  auto minmax = std::minmax_element(distances.begin(), distances.end());
 
   output("points").set(points);
   output("distances").set(distances);
   output("distance_min").set(sqrt(*(minmax.first)));
   output("distance_max").set(sqrt(*(minmax.second)));
+}
+
+void CDTDistanceNode::process() {
+  auto cdt_base = input("cgal_cdt_base").get<tinsimp::CDT>();
+  auto cdt_target = input("cgal_cdt_target").get<tinsimp::CDT>();
+
+  vec1f distances;
+  PointCollection points;
+  for (auto& v = cdt_target.finite_vertices_begin(); v != cdt_target.finite_vertices_end(); v++) {
+    tinsimp::Point cp = v->point();
+    tinsimp::CDT::Locate_type location;
+    int vertexid;
+    tinsimp::CDT::Face_handle face = cdt_base.locate(cp, location, vertexid);
+    // only calculate height if point is within the CDT convex or affine hull
+    if (location != tinsimp::CDT::OUTSIDE_CONVEX_HULL &&
+      location != tinsimp::CDT::OUTSIDE_AFFINE_HULL) {
+      double height = tinsimp::compute_height(cp, face);
+      double diff = height - cp.z();
+      distances.push_back(diff);
+      points.push_back({ cp.x(), cp.y(), float(diff) });
+    }
+  }
+
+  auto minmax = std::minmax_element(distances.begin(), distances.end());
+
+  output("points").set(points);
+  output("distance_min").set(*(minmax.first));
+  output("distance_max").set(*(minmax.second));
 }
 
 LineStringCollection densify_linestrings(LineStringCollection line_strings, float interval)
@@ -604,16 +632,25 @@ void PLYWriterNode::process() {
   f.close();
 }
 
+vec3f create_line(CGAL::Point_3<isolines::K> p1, CGAL::Point_3<isolines::K> p2, float z) {
+  vec3f line_vec3f;
+  line_vec3f.push_back({ float(p1.x()),float(p1.y()), z });
+  line_vec3f.push_back({ float(p2.x()),float(p2.y()), z });
+  return line_vec3f;
+}
+
 void IsoLineNode::process() {
   auto cdt = input("cgal_cdt").get<isolines::CDT>();
   float min = input("min").get<float>();
   float max = input("max").get<float>();
 
-  int start = std::floor(min);
-  int end = std::ceil(max);
+  float interval = param<float>("interval");
+
+  float start = std::floor(min);
+  float end = std::ceil(max);
 
   vec1f heights;
-  for (int i = start; i < end; i++) {
+  for (float i = start; i < end; i+interval) {
     heights.push_back(i);
   }
 
@@ -638,7 +675,6 @@ void IsoLineNode::process() {
       int v2_ = isolines::cntrEvalVertex(v2, isoDepth);
 
       // following is a big if-else-if statement to identify the basic triangle configuration (wrt the contouring depth)
-
       //its on a horizontal plane: skip it
       if (v0_ == v1_ && v1_ == v2_)
         continue;
@@ -646,25 +682,32 @@ void IsoLineNode::process() {
       //one edge is equal to isodepth: extract that edge. Use faceCache to check if this segment hasn't been extracted earlier.
       else if (v0_ == 0 && v1_ == 0) {
         faceCache.insert(ib);
-        if (faceCache.find(ib->neighbor(2)) == faceCache.end())
-          segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(v0->point(), v1->point()));
+        if (faceCache.find(ib->neighbor(2)) == faceCache.end()) {
+          lines.push_back(create_line(v0->point(), v1->point(), isoDepth));
+          attributes["height"].push_back(isoDepth);
+        }
       }
       else if (v1_ == 0 && v2_ == 0) {
         faceCache.insert(ib);
-        if (faceCache.find(ib->neighbor(0)) == faceCache.end())
-          segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(v1->point(), v2->point()));
+        if (faceCache.find(ib->neighbor(0)) == faceCache.end()) {
+          lines.push_back(create_line(v1->point(), v2->point(), isoDepth));
+          attributes["height"].push_back(isoDepth);
+        }
       }
       else if (v2_ == 0 && v0_ == 0) {
         faceCache.insert(ib);
-        if (faceCache.find(ib->neighbor(1)) == faceCache.end())
-          segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(v2->point(), v0->point()));
+        if (faceCache.find(ib->neighbor(1)) == faceCache.end()) {
+          lines.push_back(create_line(v2->point(), v0->point(), isoDepth));
+          attributes["height"].push_back(isoDepth);
+        }
 
         //there is an intersecting line segment in between the interiors of 2 edges: calculate intersection points and extract that edge
       }
       else if ((v0_ == -1 && v1_ == 1 && v2_ == 1) || (v0_ == 1 && v1_ == -1 && v2_ == -1)) {
         isolines::Point p1 = isolines::cntrIntersectEdge(v0, v1, isoDepth);
         isolines::Point p2 = isolines::cntrIntersectEdge(v0, v2, isoDepth);
-        segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(p1, p2));
+        lines.push_back(create_line(p1, p2, isoDepth));
+        attributes["height"].push_back(isoDepth);
       }
       else if ((v0_ == 1 && v1_ == -1 && v2_ == 1) || (v0_ == -1 && v1_ == 1 && v2_ == -1)) {
         isolines::Point p1 = isolines::cntrIntersectEdge(v1, v0, isoDepth);
@@ -674,29 +717,26 @@ void IsoLineNode::process() {
       else if ((v0_ == 1 && v1_ == 1 && v2_ == -1) || (v0_ == -1 && v1_ == -1 && v2_ == 1)) {
         isolines::Point p1 = isolines::cntrIntersectEdge(v2, v0, isoDepth);
         isolines::Point p2 = isolines::cntrIntersectEdge(v2, v1, isoDepth);
-        segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(p1, p2));
+        lines.push_back(create_line(p1, p2, isoDepth));
+        attributes["height"].push_back(isoDepth);
 
         // one vertex is on the isodepth the others are above and below: return segment, consisting out of the vertex on the isodepth and the intersection on the opposing edge
       }
       else if (v0_ == 0 && v1_ != v2_) {
         isolines::Point p = isolines::cntrIntersectEdge(v1, v2, isoDepth);
-        segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(v0->point(), p));
+        lines.push_back(create_line(v0->point(), p, isoDepth));
+        attributes["height"].push_back(isoDepth);
       }
       else if (v1_ == 0 && v0_ != v2_) {
         isolines::Point p = isolines::cntrIntersectEdge(v0, v2, isoDepth);
-        segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(v1->point(), p));
+        lines.push_back(create_line(v1->point(), p, isoDepth));
+        attributes["height"].push_back(isoDepth);
       }
       else if (v2_ == 0 && v0_ != v1_) {
         isolines::Point p = isolines::cntrIntersectEdge(v0, v1, isoDepth);
-        segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(v2->point(), p));
+        lines.push_back(create_line(v2->point(), p, isoDepth));
+        attributes["height"].push_back(isoDepth);
       }
-    }
-    for (auto s : segmentVec[isoDepth]) {
-      vec3f line_vec3f;
-      line_vec3f.push_back({ float(s.start().x()),float(s.start().y()), isoDepth });
-      line_vec3f.push_back({ float(s.end().x()),float(s.end().y()), isoDepth });
-      lines.push_back(line_vec3f);
-      attributes["height"].push_back(isoDepth);
     }
   }
 
@@ -821,13 +861,7 @@ void LineHeightCDTNode::process() {
       // only calculate height if point is within the CDT convex or affine hull
       if (location != tinsimp::CDT::OUTSIDE_CONVEX_HULL &&
           location != tinsimp::CDT::OUTSIDE_AFFINE_HULL) {
-          auto plane = new CGAL::Plane_3<tinsimp::K>(
-            face->vertex(0)->point(),
-            face->vertex(1)->point(),
-            face->vertex(2)->point());
-          double height = -plane->a() / plane->c() * cp.x()
-                          -plane->b() / plane->c() * cp.y()
-                          -plane->d() / plane->c();
+          double height = tinsimp::compute_height(cp, face);
           ls.push_back({ p[0], p[1], float(height) });
       }
     }
