@@ -1,5 +1,5 @@
 if (MSVC)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:precise")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:precise /Zi /DEBUG")
 endif()
 
 add_executable(hoogtelijnen hoogtelijnen.cpp)
