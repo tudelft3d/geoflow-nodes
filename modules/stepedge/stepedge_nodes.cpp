@@ -156,6 +156,7 @@ void AlphaShapeNode::process(){
   TriangleCollection alpha_triangles;
   vec1i segment_ids, plane_idx;
   for (auto& it : points_per_segment ) {
+    if (it.first == -1) continue; // skip points if they put at index -1 (eg if we care not about slanted surfaces for ring extraction)
     plane_idx.push_back(it.first);
     auto points = it.second;
     as::Triangulation_2 T;
@@ -388,8 +389,8 @@ void ExtruderNode::process(){
       // skip if faces on both sides of this edge are not finite
       // bool left = edge->twin()->face()->data().in_footprint;
       // bool right = edge->face()->data().in_footprint;
-      bool left = edge->twin()->face()->data().segid!=0 && edge->twin()->face()->data().in_footprint;
-      bool right = edge->face()->data().segid!=0 && edge->face()->data().in_footprint;
+      bool left = edge->twin()->face()->data().in_footprint;
+      bool right = edge->face()->data().in_footprint;
       if (left || right) {
         int wall_label = 2;
         if (left && right)
@@ -696,6 +697,41 @@ std::pair<double, double> arr_measure_nosegid(Arrangement_2& arr) {
   }
   return std::make_pair(no_segid_area, no_segid_area/total_area);
 }
+// size_t get_percentile(const std::vector<linedect::Point>& points, const float& percentile) {
+//   std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
+//     return p1.z() < p2.z();
+//   });
+//   return int(percentile*float(points.size()/2));
+// }
+void arr_assign_pts_to_unsegmented(Arrangement_2& arr, std::vector<Point>& points, const float& percentile) {
+  typedef CGAL::Arr_walk_along_line_point_location<Arrangement_2> Point_location;
+
+  std::unordered_map<Face_handle, std::vector<Point>> points_per_face;
+
+  // collect for each face the points it contains
+  Point_location pl(arr);
+  for (auto& p : points){
+    auto obj = pl.locate( Point_2(p.x(), p.y()) );
+    if (auto f = boost::get<Face_const_handle>(&obj)) {
+      auto fh = arr.non_const_handle(*f);
+      if (fh->data().segid==0) {
+        points_per_face[fh].push_back(p);
+      }
+    }
+  }
+  // find elevation percentile for each face
+  for(auto& ppf : points_per_face) {
+    if (ppf.second.size()>0) {
+      std::sort(ppf.second.begin(), ppf.second.end(), [](linedect::Point& p1, linedect::Point& p2) {
+        return p1.z() < p2.z();
+      });
+      auto pid = int(percentile*float(points.size()/2));
+      // auto pid = get_percentile(ppf.second, percentile);
+      ppf.first->data().segid = -1;
+      ppf.first->data().elevation_avg = ppf.second[pid].z();
+    }
+  }
+}
 
 void BuildArrFromRingsExactNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
@@ -729,6 +765,7 @@ void BuildArrFromRingsExactNode::process() {
     size_t i=0;
     // NOTE: rings and points_per_plane must be aligned!! (matching length and order)
     for (auto& kv : points_per_plane) {
+      if (kv.first==-1) continue;
       auto& polygon = rings[i++];
       if (polygon.size()>2) {
         auto plane_id = kv.first;
@@ -758,6 +795,9 @@ void BuildArrFromRingsExactNode::process() {
 
   auto nosegid_area = arr_measure_nosegid(arr_base);
 
+  if(param<bool>("extrude_unsegmented") && points_per_plane.count(-1))
+    arr_assign_pts_to_unsegmented(arr_base, points_per_plane[-1], param<float>("z_percentile"));
+  
   arr_process(arr_base, 
     param<bool>("flood_to_unsegmented"), 
     param<bool>("dissolve_edges"),
@@ -1084,6 +1124,8 @@ void DetectPlanesNode::process() {
   std::unordered_map<int, std::vector<Point>> pts_per_roofplane;
   size_t horiz_roofplane_cnt=0;
   size_t slant_roofplane_cnt=0;
+  if (param<bool>("only_horizontal"))
+    pts_per_roofplane[-1] = std::vector<Point>();
   for(auto seg: PD.segment_shapes){
     auto& plane = seg.second;
     Vector n = plane.orthogonal_vector();
@@ -1091,9 +1133,21 @@ void DetectPlanesNode::process() {
     auto horizontality = CGAL::abs(n*Vector(0,0,1));
     bool is_wall = horizontality < metrics_is_wall_threshold;
     bool is_horizontal = horizontality > metrics_is_horizontal_threshold;
-    if (!is_wall)
-      pts_per_roofplane[seg.first] = PD.get_points(seg.first);
 
+    // put slanted surface points at index -1 if we care only about horzontal surfaces
+    if (!is_wall) {
+      auto segpts = PD.get_points(seg.first);
+      if (!param<bool>("only_horizontal") ||
+          (param<bool>("only_horizontal") && is_horizontal)) {
+        pts_per_roofplane[seg.first] = segpts;
+      } else if (!is_horizontal) {
+        pts_per_roofplane[-1].insert(
+          pts_per_roofplane[-1].end(),
+          segpts.begin(),
+          segpts.end()
+        );
+      }
+    }
     if (is_horizontal)
       ++horiz_roofplane_cnt;
     else if (!is_wall && !is_horizontal)

@@ -21,7 +21,7 @@ int main(int ac, const char * av[])
     // std::string las_path = "/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las";
     // std::string fp_path = "/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg";
     std::string las_path = "/Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las";
-    std::string fp_path = "/Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_0.gpkg";
+    std::string fp_path = "/Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_1.gpkg";
     // register nodes from various modules
     NodeRegister stepedge = gfn::stepedge::create_register();
     NodeRegister cgal = gfn::cgal::create_register();

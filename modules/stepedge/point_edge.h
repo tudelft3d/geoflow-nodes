@@ -110,7 +110,7 @@ struct FaceInfo {
   bool in_footprint=false;
   float elevation_avg=0;
   float elevation_min, elevation_max;
-  size_t segid=0;
+  int segid=0;
   float segid_coverage;
   float segid_count;
   PNL_vector points;
