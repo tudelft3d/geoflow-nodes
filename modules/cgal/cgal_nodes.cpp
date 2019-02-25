@@ -842,7 +842,7 @@ void LineHeightNode::process() {
 
 void LineHeightCDTNode::process() {
   auto cdt = input("cgal_cdt").get<tinsimp::CDT>();
-  auto lines = input("line_strings").get<LineStringCollection>();
+  auto lines = input("lines").get<LineStringCollection>();
 
   auto densify_interval = param<float>("densify_interval");
   

@@ -73,7 +73,8 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("triangles", TT_triangle_collection);
+      add_input("cgal_cdt_base", TT_any);
+      add_input("cgal_cdt_target", TT_any);
       add_output("points", TT_point_collection);
       add_output("distance_min", TT_float);
       add_output("distance_max", TT_float);
