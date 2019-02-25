@@ -47,7 +47,7 @@ typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, Tds, Itag>	CDT;
 typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
 typedef CDT::Point													Point;
 
-inline double compute_height(Point &p, CDT::Face_handle &face);
+double compute_height(Point &p, CDT::Face_handle &face);
 
 void greedy_insert(CDT &T, const std::vector<std::array<float,3>> &pts, double threshold);
 std::pair<std::vector<size_t>, std::vector<float>> 

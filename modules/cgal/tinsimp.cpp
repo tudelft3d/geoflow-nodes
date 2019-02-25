@@ -40,19 +40,17 @@ inline double compute_error(Point &p, CDT::Face_handle &face) {
     face->info().points_inside = new std::vector<heap_handle>();
 
   auto plane = face->info().plane;
-  auto interpolate = - plane->a()/plane->c() * p.x() - plane->b()/plane->c()*p.y() - plane->d()/plane->c();
+  auto interpolate = -plane->a()/plane->c() * p.x() - plane->b()/plane->c()*p.y() - plane->d()/plane->c();
   double error = std::fabs(interpolate - p.z());
   return error;
 }
 
-inline double compute_height(Point &p, CDT::Face_handle &face) {
+double compute_height(Point &p, CDT::Face_handle &face) {
   auto plane = new CGAL::Plane_3<tinsimp::K>(
     face->vertex(0)->point(),
     face->vertex(1)->point(),
     face->vertex(2)->point());
-  double height = -plane->a() / plane->c() * p.x()
-    - plane->b() / plane->c() * p.y()
-    - plane->d() / plane->c();
+  double height = -plane->a()/plane->c() * p.x() - plane->b()/plane->c() * p.y() - plane->d()/plane->c();
 
   return height;
 }
