@@ -103,6 +103,9 @@ include_directories(modules/masb)
 # add_subdirectory(modules/cityjson)
 include_directories(modules/cityjson)
 
+add_subdirectory(modules/general)
+include_directories(modules/general)
+
 if (CGAL_FOUND AND Boost_FOUND)
   add_subdirectory(modules/stepedge)
   include_directories(modules/stepedge)
