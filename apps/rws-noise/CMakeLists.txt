@@ -6,8 +6,10 @@ add_executable(hoogtelijnen hoogtelijnen.cpp)
 target_link_libraries( hoogtelijnen
   geoflow-gui
   Boost::program_options
+  general_nodes
   gdal_nodes
   cgal_nodes
+  las_nodes
 )
 set_target_properties(
   hoogtelijnen
