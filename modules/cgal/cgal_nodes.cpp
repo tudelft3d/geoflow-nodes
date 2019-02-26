@@ -53,10 +53,10 @@ template<typename T> inline std::array<float,3> to_arr3f(T& p) {
 
 void CDTNode::process(){
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-  typedef CGAL::Projection_traits_xy_3<K>							        Gt;
-  typedef CGAL::Exact_predicates_tag									        Itag;
+  typedef CGAL::Projection_traits_xy_3<K>                     Gt;
+  typedef CGAL::Exact_predicates_tag                          Itag;
   typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, CGAL::Default, Itag>	CDT;
-  typedef CDT::Point													                Point;
+  typedef CDT::Point                                          Point;
   
   auto geom_term = input("geometries");
 
@@ -111,8 +111,8 @@ void CDTNode::process(){
 
 void DTNode::process() {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-  typedef CGAL::Delaunay_triangulation_3<K>	            DT;
-  typedef K::Point_3													          Point;
+  typedef CGAL::Delaunay_triangulation_3<K>                   DT;
+  typedef K::Point_3                                          Point;
 
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto points = input("points").get<PointCollection>();
@@ -508,15 +508,15 @@ void SimplifyLinesNode::process() {
 
   namespace PS = CGAL::Polyline_simplification_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-  typedef CGAL::Projection_traits_xy_3<K>								  Gt;
-  typedef PS::Vertex_base_2<Gt>                           Vb;
-  typedef CGAL::Constrained_triangulation_face_base_2<Gt> Fb;
-  typedef CGAL::Triangulation_data_structure_2<Vb, Fb>    TDS;
-  typedef CGAL::Exact_predicates_tag                      Itag;
+  typedef CGAL::Projection_traits_xy_3<K>                     Gt;
+  typedef PS::Vertex_base_2<Gt>                               Vb;
+  typedef CGAL::Constrained_triangulation_face_base_2<Gt>     Fb;
+  typedef CGAL::Triangulation_data_structure_2<Vb, Fb>        TDS;
+  typedef CGAL::Exact_predicates_tag                          Itag;
   typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, TDS, Itag> CDT;
-  typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
-  typedef PS::Stop_above_cost_threshold                   Stop_cost;
-  typedef PS::Visvalingam_cost                            Cost;
+  typedef CGAL::Constrained_triangulation_plus_2<CDT>         CT;
+  typedef PS::Stop_above_cost_threshold                       Stop_cost;
+  typedef PS::Visvalingam_cost                                Cost;
 
   CT ct;
   Stop_cost stop = Stop_cost(threshold_stop_cost);
