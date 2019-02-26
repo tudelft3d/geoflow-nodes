@@ -109,7 +109,7 @@ int main(int ac, const char * av[])
     //geoflow::connect(simplify_lines_cdt->output("lines"), ogr_writer->input("geometries"));
 
     // Create nodes
-    auto las_loader = N.create_node(las, "LASLoader");
+    auto las_loader = N.create_node(las, "LASGroundLoader");
     auto tin_creator_lidar = N.create_node(cgal, "TinSimp");
     auto ogr_loader = N.create_node(gdal, "OGRLoader");
   // TEST: line height from CDT calculator -> add Bounding Box!!! see build_initial_tin()
@@ -125,7 +125,7 @@ int main(int ac, const char * av[])
   // lineheight from CDT calculator
   auto line_height_adder_iso = N.create_node(cgal, "LineHeightCDT"); 
   // TEST: merge height lines + ISO lines
-  auto geometry_merger = N.create_node(general, "MergeGeometries");
+  auto line_string_merger = N.create_node(general, "MergeLinestrings");
     auto tin_simp_lines = N.create_node(cgal, "TinSimp");
     auto simplify_lines_cdt = N.create_node(cgal, "SimplifyLines");
     auto ogr_writer = N.create_node(gdal, "OGRWriterNoAttributes");
@@ -166,42 +166,47 @@ int main(int ac, const char * av[])
         {"threshold_stop_cost", simplification_threshold}
     });
 
-    // Connect nodes
-    // Create TIN from lidar using tinsimp
-    geoflow::connect(las_loader->output("points"), tin_creator_lidar->input("points"));
-    // Add heights to input lines from TIN
-    geoflow::connect(tin_creator_lidar->output("cgal_cdt"), line_height_adder_input->input("cgal_cdt"));
-    geoflow::connect(ogr_loader->output("line_strings"), line_height_adder_input->input("line_strings"));
-    // Create TIN from height lines
-    geoflow::connect(line_height_adder_input->output("line_strings"), tin_creator_lines->input("geometries"));
-    // Calculate height difference of vertices in lidar TIN with height lines TIN
-    geoflow::connect(tin_creator_lines->output("cgal_cdt"), height_difference_calc->input("cgal_cdt_base"));
-    geoflow::connect(tin_creator_lidar->output("cgal_cdt"), height_difference_calc->input("cgal_cdt_target"));
-    // Create TIN from height differences
-    geoflow::connect(height_difference_calc->output("points"), tin_creator_difference->input("geometries"));
-    // Create ISO lines of difference TIN and merge line segments
-    geoflow::connect(height_difference_calc->output("distance_min"), iso_lines->input("min"));
-    geoflow::connect(height_difference_calc->output("distance_max"), iso_lines->input("max"));
-    geoflow::connect(tin_creator_difference->output("cgal_cdt"), iso_lines->input("cgal_cdt"));
-    geoflow::connect(iso_lines->output("lines"), line_merger->input("lines"));
-    // Add heights to ISO lines based on lidar TIN (also densify?)
-    geoflow::connect(line_merger->output("lines"), line_height_adder_iso->input("lines"));
-    // merge height lines + ISO lines
-    geoflow::connect(line_height_adder_input->output("lines"), geometry_merger->input("geometries1"));
-    geoflow::connect(line_height_adder_iso->output("lines"), geometry_merger->input("geometries2"));
-    // Filter height lines + ISO lines using tinsimp
-    geoflow::connect(geometry_merger->output("geometries"), tin_simp_lines->input("geometries"));
-    // Simplify height lines + ISO lines using CDT Visvalingam
-    geoflow::connect(tin_simp_lines->output("selected_lines"), simplify_lines_cdt->input("lines"));
-    // Filter lines < 10m
-    geoflow::connect(simplify_lines_cdt->output("lines"), line_string_filter->input("line_strings"));
-    // Write lines
-    geoflow::connect(line_string_filter->output("line_strings"), ogr_writer->input("geometries"));
+    try {
+        // Connect nodes
+        // Create TIN from lidar using tinsimp
+        geoflow::connect(las_loader->output("points"), tin_creator_lidar->input("geometries"));
+        // Add heights to input lines from TIN
+        geoflow::connect(tin_creator_lidar->output("cgal_cdt"), line_height_adder_input->input("cgal_cdt"));
+        geoflow::connect(ogr_loader->output("line_strings"), line_height_adder_input->input("lines"));
+        // Create TIN from height lines
+        geoflow::connect(line_height_adder_input->output("lines"), tin_creator_lines->input("geometries"));
+        // Calculate height difference of vertices in lidar TIN with height lines TIN
+        geoflow::connect(tin_creator_lines->output("cgal_cdt"), height_difference_calc->input("cgal_cdt_base"));
+        geoflow::connect(tin_creator_lidar->output("cgal_cdt"), height_difference_calc->input("cgal_cdt_target"));
+        // Create TIN from height differences
+        geoflow::connect(height_difference_calc->output("points"), tin_creator_difference->input("geometries"));
+        // Create ISO lines of difference TIN and merge line segments
+        geoflow::connect(height_difference_calc->output("distance_min"), iso_lines->input("min"));
+        geoflow::connect(height_difference_calc->output("distance_max"), iso_lines->input("max"));
+        geoflow::connect(tin_creator_difference->output("cgal_cdt"), iso_lines->input("cgal_cdt"));
+        geoflow::connect(iso_lines->output("lines"), line_merger->input("lines"));
+        // Add heights to ISO lines based on lidar TIN (also densify?)
+        geoflow::connect(line_merger->output("lines"), line_height_adder_iso->input("lines"));
+        // merge height lines + ISO lines
+        geoflow::connect(line_height_adder_input->output("lines"), line_string_merger->input("lines1"));
+        geoflow::connect(line_height_adder_iso->output("lines"), line_string_merger->input("lines2"));
+        // Filter height lines + ISO lines using tinsimp
+        geoflow::connect(line_string_merger->output("lines"), tin_simp_lines->input("geometries"));
+        // Simplify height lines + ISO lines using CDT Visvalingam
+        geoflow::connect(tin_simp_lines->output("selected_lines"), simplify_lines_cdt->input("lines"));
+        // Filter lines < 10m
+        geoflow::connect(simplify_lines_cdt->output("lines"), line_string_filter->input("line_strings"));
+        // Write lines
+        geoflow::connect(line_string_filter->output("line_strings"), ogr_writer->input("geometries"));
 
-    if (gui)
-        geoflow::launch_flowchart(N, {cgal, gdal});
-    else {
-      N.run(*tin_creator_lidar);
-      N.run(*ogr_loader);
+        if (gui)
+            geoflow::launch_flowchart(N, {cgal, gdal});
+        else {
+            N.run(*las_loader);
+            N.run(*ogr_loader);
+        }
+    }
+    catch (Exception e) {
+      std::cout << e.what();
     }
 }
