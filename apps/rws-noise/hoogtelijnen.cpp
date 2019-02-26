@@ -186,6 +186,7 @@ int main(int ac, const char * av[])
         geoflow::connect(tin_creator_difference->output("cgal_cdt"), iso_lines->input("cgal_cdt"));
         geoflow::connect(iso_lines->output("lines"), line_merger->input("lines"));
         // Add heights to ISO lines based on lidar TIN (also densify?)
+        geoflow::connect(tin_creator_lidar->output("cgal_cdt"), line_height_adder_iso->input("cgal_cdt"));
         geoflow::connect(line_merger->output("lines"), line_height_adder_iso->input("lines"));
         // merge height lines + ISO lines
         geoflow::connect(line_height_adder_input->output("lines"), line_string_merger->input("lines1"));

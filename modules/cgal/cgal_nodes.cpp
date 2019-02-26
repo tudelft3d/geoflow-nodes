@@ -11,10 +11,10 @@
 
 // CDT
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Constrained_Delaunay_triangulation_2.h>
+//#include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Projection_traits_xy_3.h>
-#include <CGAL/Triangulation_vertex_base_with_id_2.h>
-#include <CGAL/Triangulation_face_base_with_info_2.h>
+//#include <CGAL/Triangulation_vertex_base_2.h>
+//#include <CGAL/Triangulation_face_base_2.h>
 
 // DT
 #include <CGAL/Delaunay_triangulation_3.h>
@@ -27,7 +27,6 @@
 
 // line simplification
 #include <CGAL/Polyline_simplification_2/simplify.h>
-#include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Constrained_triangulation_plus_2.h>
 
 // PLY writing
@@ -46,18 +45,17 @@
 #include <CGAL/Search_traits_2.h>
 
 namespace geoflow::nodes::cgal {
+typedef tinsimp::K    K;
+typedef tinsimp::Gt   Gt;
+typedef tinsimp::Itag Itag;
+typedef tinsimp::CDT  CDT;
+typedef CDT::Point    Point;
 
 template<typename T> inline std::array<float,3> to_arr3f(T& p) {
   return {float(p.x()), float(p.y()), float(p.z())};
 }
 
 void CDTNode::process(){
-  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-  typedef CGAL::Projection_traits_xy_3<K>                     Gt;
-  typedef CGAL::Exact_predicates_tag                          Itag;
-  typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, CGAL::Default, Itag>	CDT;
-  typedef CDT::Point                                          Point;
-  
   auto geom_term = input("geometries");
 
   auto create_triangles = param<bool>("create_triangles");
@@ -110,9 +108,7 @@ void CDTNode::process(){
 }
 
 void DTNode::process() {
-  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef CGAL::Delaunay_triangulation_3<K>                   DT;
-  typedef K::Point_3                                          Point;
 
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto points = input("points").get<PointCollection>();
@@ -291,21 +287,31 @@ void PointDistanceNode::process() {
   output("distance_max").set(sqrt(*(minmax.second)));
 }
 
+double compute_height(Point &p, CDT::Face_handle &face) {
+  auto plane = new CGAL::Plane_3<K>(
+    face->vertex(0)->point(),
+    face->vertex(1)->point(),
+    face->vertex(2)->point());
+  double height = -plane->a() / plane->c() * p.x() - plane->b() / plane->c() * p.y() - plane->d() / plane->c();
+
+  return height;
+}
+
 void CDTDistanceNode::process() {
-  auto cdt_base = input("cgal_cdt_base").get<tinsimp::CDT>();
-  auto cdt_target = input("cgal_cdt_target").get<tinsimp::CDT>();
+  auto cdt_base = input("cgal_cdt_base").get<CDT>();
+  auto cdt_target = input("cgal_cdt_target").get<CDT>();
 
   vec1f distances;
   PointCollection points;
   for (auto& v = cdt_target.finite_vertices_begin(); v != cdt_target.finite_vertices_end(); v++) {
-    tinsimp::Point cp = v->point();
-    tinsimp::CDT::Locate_type location;
+    CGAL::Point_3 cp = v->point();
+    CDT::Locate_type location;
     int vertexid;
-    tinsimp::CDT::Face_handle face = cdt_base.locate(cp, location, vertexid);
+    CDT::Face_handle face = cdt_base.locate(cp, location, vertexid);
     // only calculate height if point is within the CDT convex or affine hull
-    if (location != tinsimp::CDT::OUTSIDE_CONVEX_HULL &&
-      location != tinsimp::CDT::OUTSIDE_AFFINE_HULL) {
-      double height = tinsimp::compute_height(cp, face);
+    if (location != CDT::OUTSIDE_CONVEX_HULL &&
+      location != CDT::OUTSIDE_AFFINE_HULL) {
+      double height = compute_height(cp, face);
       double diff = height - cp.z();
       distances.push_back(diff);
       points.push_back({ float(cp.x()), float(cp.y()), float(diff) });
@@ -353,7 +359,6 @@ void DensifyNode::process(){
     auto lines = geom_term.get<geoflow::LineStringCollection>();
     output("dense_linestrings").set(densify_linestrings(lines, interval));
   }
-
 }
 
 void build_initial_tin(tinsimp::CDT& cdt, geoflow::Box& bbox){ 
@@ -462,15 +467,15 @@ void SimplifyLineNode::process(){
   
   namespace PS = CGAL::Polyline_simplification_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-  typedef PS::Vertex_base_2<K>  Vb;
-  typedef CGAL::Constrained_triangulation_face_base_2<K> Fb;
-  typedef CGAL::Triangulation_data_structure_2<Vb, Fb> TDS;
+  typedef PS::Vertex_base_2<K>                                Vb;
+  typedef CGAL::Constrained_triangulation_face_base_2<K>      Fb;
+  typedef CGAL::Triangulation_data_structure_2<Vb, Fb>        TDS;
   typedef CGAL::Exact_predicates_tag                          Itag;
   typedef CGAL::Constrained_Delaunay_triangulation_2<K,TDS, Itag> CDT;
-  typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
-  typedef PS::Stop_below_count_ratio_threshold Stop_count_ratio;
-  typedef PS::Stop_above_cost_threshold        Stop_cost;
-  typedef PS::Squared_distance_cost            Cost;
+  typedef CGAL::Constrained_triangulation_plus_2<CDT>         CT;
+  typedef PS::Stop_below_count_ratio_threshold                Stop_count_ratio;
+  typedef PS::Stop_above_cost_threshold                       Stop_cost;
+  typedef PS::Squared_distance_cost                           Cost;
 
   Cost cost;
 
@@ -502,7 +507,6 @@ void SimplifyLineNode::process(){
 void SimplifyLinesNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto lines = input("lines").get<LineStringCollection>();
-  auto lines2 = input("lines2").get<LineStringCollection>();
 
   auto threshold_stop_cost = param<float>("threshold_stop_cost");
 
@@ -529,13 +533,8 @@ void SimplifyLinesNode::process() {
     }
     ct.insert_constraint(line.begin(), line.end());
   }
-  for (auto& linestring : lines2) {
-    std::vector<CDT::Point> line;
-    for (auto& p : linestring) {
-      line.push_back(CDT::Point(p[0], p[1], p[2]));
-    }
-    ct.insert_constraint(line.begin(), line.end());
-  }
+
+  std::cout << "Simplifying " << std::distance(ct.constraints_begin(), ct.constraints_end()) << " lines...\n";
 
   PS::simplify(ct, Cost(), stop);
   LineStringCollection lines_out;
@@ -633,7 +632,7 @@ void PLYWriterNode::process() {
   f.close();
 }
 
-vec3f create_line(CGAL::Point_3<isolines::K> p1, CGAL::Point_3<isolines::K> p2, float z) {
+vec3f create_line(CGAL::Point_3<K> p1, CGAL::Point_3<K> p2, float z) {
   vec3f line_vec3f;
   line_vec3f.push_back({ float(p1.x()),float(p1.y()), z });
   line_vec3f.push_back({ float(p2.x()),float(p2.y()), z });
@@ -641,7 +640,7 @@ vec3f create_line(CGAL::Point_3<isolines::K> p1, CGAL::Point_3<isolines::K> p2, 
 }
 
 void IsoLineNode::process() {
-  auto cdt = input("cgal_cdt").get<isolines::CDT>();
+  auto cdt = input("cgal_cdt").get<CDT>();
   float min = input("min").get<float>();
   float max = input("max").get<float>();
 
@@ -651,26 +650,26 @@ void IsoLineNode::process() {
   float end = std::ceil(max);
 
   vec1f heights;
-  for (float i = start; i < end; i+interval) {
+  for (float i = start; i < end; i+=interval) {
     heights.push_back(i);
   }
 
   LineStringCollection lines;
   AttributeMap attributes;
-  std::map< double, std::vector< CGAL::Segment_3<isolines::K> > > segmentVec;
+  std::map< double, std::vector< CGAL::Segment_3<K> > > segmentVec;
 
   for (auto isoDepth : heights) {
     std::cout << "Slicing ISO lines at height " << isoDepth << "\n";
     // faceCache is used to ensure line segments are outputted only once. It will contain faces that have an edge exactly on the contouring depth.
-    std::set<isolines::Face_handle> faceCache;
+    std::set<CDT::Face_handle> faceCache;
 
     // iterate over all triangle faces
-    for (isolines::Face_iterator ib = cdt.finite_faces_begin();
+    for (CDT::Face_iterator ib = cdt.finite_faces_begin();
       ib != cdt.finite_faces_end(); ++ib) {
       // shorthand notations for the 3 triangle vertices and their position w.r.t. the contouring depth
-      isolines::Vertex_handle v0 = ib->vertex(0);
-      isolines::Vertex_handle v1 = ib->vertex(1);
-      isolines::Vertex_handle v2 = ib->vertex(2);
+      CDT::Vertex_handle v0 = ib->vertex(0);
+      CDT::Vertex_handle v1 = ib->vertex(1);
+      CDT::Vertex_handle v2 = ib->vertex(2);
       int v0_ = isolines::cntrEvalVertex(v0, isoDepth);
       int v1_ = isolines::cntrEvalVertex(v1, isoDepth);
       int v2_ = isolines::cntrEvalVertex(v2, isoDepth);
@@ -702,39 +701,39 @@ void IsoLineNode::process() {
           attributes["height"].push_back(isoDepth);
         }
 
-        //there is an intersecting line segment in between the interiors of 2 edges: calculate intersection points and extract that edge
+      //there is an intersecting line segment in between the interiors of 2 edges: calculate intersection points and extract that edge
       }
       else if ((v0_ == -1 && v1_ == 1 && v2_ == 1) || (v0_ == 1 && v1_ == -1 && v2_ == -1)) {
-        isolines::Point p1 = isolines::cntrIntersectEdge(v0, v1, isoDepth);
-        isolines::Point p2 = isolines::cntrIntersectEdge(v0, v2, isoDepth);
+        Point p1 = isolines::cntrIntersectEdge(v0, v1, isoDepth);
+        Point p2 = isolines::cntrIntersectEdge(v0, v2, isoDepth);
         lines.push_back(create_line(p1, p2, isoDepth));
         attributes["height"].push_back(isoDepth);
       }
       else if ((v0_ == 1 && v1_ == -1 && v2_ == 1) || (v0_ == -1 && v1_ == 1 && v2_ == -1)) {
-        isolines::Point p1 = isolines::cntrIntersectEdge(v1, v0, isoDepth);
-        isolines::Point p2 = isolines::cntrIntersectEdge(v1, v2, isoDepth);
-        segmentVec[isoDepth].push_back(CGAL::Segment_3<isolines::K>(p1, p2));
+        Point p1 = isolines::cntrIntersectEdge(v1, v0, isoDepth);
+        Point p2 = isolines::cntrIntersectEdge(v1, v2, isoDepth);
+        lines.push_back(create_line(p1, p2, isoDepth));
       }
       else if ((v0_ == 1 && v1_ == 1 && v2_ == -1) || (v0_ == -1 && v1_ == -1 && v2_ == 1)) {
-        isolines::Point p1 = isolines::cntrIntersectEdge(v2, v0, isoDepth);
-        isolines::Point p2 = isolines::cntrIntersectEdge(v2, v1, isoDepth);
+        Point p1 = isolines::cntrIntersectEdge(v2, v0, isoDepth);
+        Point p2 = isolines::cntrIntersectEdge(v2, v1, isoDepth);
         lines.push_back(create_line(p1, p2, isoDepth));
         attributes["height"].push_back(isoDepth);
 
         // one vertex is on the isodepth the others are above and below: return segment, consisting out of the vertex on the isodepth and the intersection on the opposing edge
       }
       else if (v0_ == 0 && v1_ != v2_) {
-        isolines::Point p = isolines::cntrIntersectEdge(v1, v2, isoDepth);
+        Point p = isolines::cntrIntersectEdge(v1, v2, isoDepth);
         lines.push_back(create_line(v0->point(), p, isoDepth));
         attributes["height"].push_back(isoDepth);
       }
       else if (v1_ == 0 && v0_ != v2_) {
-        isolines::Point p = isolines::cntrIntersectEdge(v0, v2, isoDepth);
+        Point p = isolines::cntrIntersectEdge(v0, v2, isoDepth);
         lines.push_back(create_line(v1->point(), p, isoDepth));
         attributes["height"].push_back(isoDepth);
       }
       else if (v2_ == 0 && v0_ != v1_) {
-        isolines::Point p = isolines::cntrIntersectEdge(v0, v1, isoDepth);
+        Point p = isolines::cntrIntersectEdge(v0, v1, isoDepth);
         lines.push_back(create_line(v2->point(), p, isoDepth));
         attributes["height"].push_back(isoDepth);
       }
@@ -746,12 +745,11 @@ void IsoLineNode::process() {
 }
 
 void IsoLineSlicerNode::process() {
-  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef K::Point_3 Point;
   typedef K::Plane_3 Plane;
-  typedef CGAL::Surface_mesh<K::Point_3> Mesh;
+  typedef CGAL::Surface_mesh<Point> Mesh;
 
-  auto cdt = input("cgal_cdt").get<isolines::CDT>();
+  auto cdt = input("cgal_cdt").get<CDT>();
   //auto heights = input("heights").get<vec1f>();
   //TODO get iso line seperation distance, get min/max height and create list of heights
   vec1f heights;
@@ -842,7 +840,7 @@ void LineHeightNode::process() {
 }
 
 void LineHeightCDTNode::process() {
-  auto cdt = input("cgal_cdt").get<tinsimp::CDT>();
+  auto cdt = input("cgal_cdt").get<CDT>();
   auto lines = input("lines").get<LineStringCollection>();
 
   auto densify_interval = param<float>("densify_interval");
@@ -856,15 +854,15 @@ void LineHeightCDTNode::process() {
     vec3f ls;
     for (int i = 0; i < line.size(); i++) {
       auto p = line[i];
-      tinsimp::Point cp = tinsimp::Point(p[0], p[1], p[2]);
+      Point cp = Point(p[0], p[1], p[2]);
 
-      tinsimp::CDT::Locate_type location;
+      CDT::Locate_type location;
       int vertexid;
-      tinsimp::CDT::Face_handle face = cdt.locate(cp, location, vertexid);
+      CDT::Face_handle face = cdt.locate(cp, location, vertexid);
       // only calculate height if point is within the CDT convex or affine hull
-      if (location != tinsimp::CDT::OUTSIDE_CONVEX_HULL &&
-        location != tinsimp::CDT::OUTSIDE_AFFINE_HULL) {
-        double height = tinsimp::compute_height(cp, face);
+      if (location != CDT::OUTSIDE_CONVEX_HULL &&
+        location != CDT::OUTSIDE_AFFINE_HULL) {
+        double height = compute_height(cp, face);
         ls.push_back({ p[0], p[1], float(height) });
       }
     }

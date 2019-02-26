@@ -47,6 +47,8 @@ namespace geoflow::nodes::general {
     auto geometries1 = input("lines1");
     auto geometries2 = input("lines2");
 
+    std::cout << "Merging two sets of line strings\n";
+
     auto mergedLines = geometries1.get<geoflow::LineStringCollection>();
     auto lines2 = geometries2.get<geoflow::LineStringCollection>();
     for (auto& l : lines2) {

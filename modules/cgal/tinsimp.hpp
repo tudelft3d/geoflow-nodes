@@ -1,3 +1,5 @@
+#pragma once
+
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Projection_traits_xy_3.h>
@@ -46,8 +48,6 @@ typedef CGAL::Exact_predicates_tag									Itag;
 typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, Tds, Itag>	CDT;
 typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
 typedef CDT::Point													Point;
-
-double compute_height(Point &p, CDT::Face_handle &face);
 
 void greedy_insert(CDT &T, const std::vector<std::array<float,3>> &pts, double threshold);
 std::pair<std::vector<size_t>, std::vector<float>> 

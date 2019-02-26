@@ -166,7 +166,6 @@ namespace geoflow::nodes::cgal {
     using Node::Node;
     void init() {
       add_input("lines", TT_line_string_collection);
-      add_input("lines2", TT_line_string_collection);
       add_output("lines", TT_line_string_collection);
 
       add_param("threshold_stop_cost", (float) 0.1);

@@ -1,20 +1,13 @@
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Constrained_Delaunay_triangulation_2.h>
-#include <CGAL/Projection_traits_xy_3.h>
-#include <CGAL/Triangulation_vertex_base_with_id_2.h>
-#include <CGAL/Triangulation_face_base_with_info_2.h>
-#include <CGAL/Constrained_triangulation_plus_2.h>
+#include "tinsimp.hpp"
 
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/boost/graph/Euler_operations.h>
 
+
 #include <geoflow/core/geoflow.hpp>
 
 namespace isolines {
-  typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-  typedef CGAL::Projection_traits_xy_3<K>							        Gt;
-  typedef CGAL::Exact_predicates_tag									        Itag;
-  typedef CGAL::Constrained_Delaunay_triangulation_2<Gt, CGAL::Default, Itag>	CDT;
+  typedef tinsimp::CDT          CDT;
   typedef CDT::Vertex_handle                                  Vertex_handle;
   typedef CDT::Face_handle                                    Face_handle;
   typedef CDT::Vertex_iterator                                Vertex_iterator;

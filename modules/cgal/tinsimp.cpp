@@ -45,16 +45,6 @@ inline double compute_error(Point &p, CDT::Face_handle &face) {
   return error;
 }
 
-double compute_height(Point &p, CDT::Face_handle &face) {
-  auto plane = new CGAL::Plane_3<tinsimp::K>(
-    face->vertex(0)->point(),
-    face->vertex(1)->point(),
-    face->vertex(2)->point());
-  double height = -plane->a()/plane->c() * p.x() - plane->b()/plane->c() * p.y() - plane->d()/plane->c();
-
-  return height;
-}
-
 void greedy_insert(CDT &T, const std::vector<std::array<float,3>> &pts, double threshold) {
   // assumes all lidar points are inside a triangle
   Heap heap;
