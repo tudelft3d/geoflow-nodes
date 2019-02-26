@@ -39,7 +39,9 @@ void LASLoaderNode::process(){
         float(lasreader->point.get_y() - (*manager.data_offset)[1]), 
         float(lasreader->point.get_z() - (*manager.data_offset)[2])}
       );
-      if(i%100000000==0) std::cout << "Read " << i << " points...\n";
+    }
+    if (i % 1000000 == 0) {
+      std::cout << "Read " << i << " points...\n";
     }
   }
   lasreader->close();
@@ -48,6 +50,52 @@ void LASLoaderNode::process(){
   output("points").set(points);
   output("classification").set(classification);
   output("intensity").set(intensity);
+}
+
+void LASGroundLoaderNode::process() {
+  auto filepath = param<std::string>("filepath");
+  auto thin_nth = param<int>("thin_nth");
+
+  PointCollection points;
+  vec1i classification;
+  vec1f intensity;
+
+  LASreadOpener lasreadopener;
+  lasreadopener.set_file_name(filepath.c_str());
+  LASreader* lasreader = lasreadopener.open();
+  if (!lasreader)
+    return;
+
+  // geometry.bounding_box.set(
+  //   {float(lasreader->get_min_x()), float(lasreader->get_min_y()), float(lasreader->get_min_z())},
+  //   {float(lasreader->get_max_x()), float(lasreader->get_max_y()), float(lasreader->get_max_z())}
+  // );
+  bool found_offset = manager.data_offset.has_value();
+
+  size_t i = 0;
+  while (lasreader->read_point()) {
+    if (!found_offset) {
+      manager.data_offset = { lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z() };
+      found_offset = true;
+    }
+
+    if (lasreader->point.get_classification() == 2) {
+      if (i++ % thin_nth == 0) {
+        points.push_back({
+          float(lasreader->point.get_x() - (*manager.data_offset)[0]),
+          float(lasreader->point.get_y() - (*manager.data_offset)[1]),
+          float(lasreader->point.get_z() - (*manager.data_offset)[2]) }
+        );
+      }
+      if (i % 1000000 == 0) {
+        std::cout << "Read " << i << " points...\n";
+      }
+    }
+  }
+  lasreader->close();
+  delete lasreader;
+
+  output("points").set(points);
 }
 
 void LASWriterNode::write_point_cloud_collection(PointCollection& point_cloud, std::string path) {

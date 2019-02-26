@@ -15,7 +15,23 @@ namespace geoflow::nodes::las {
     }
     void gui(){
       ImGui::InputText("LAS file path", &param<std::string>("filepath"));
-      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 0, 100);
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 1, 100);
+    }
+    void process();
+  };
+
+  class LASGroundLoaderNode:public Node {
+  public:
+    using Node::Node;
+    void init() {
+      add_output("points", TT_point_collection);
+
+      add_param("filepath", (std::string) "");
+      add_param("thin_nth", (int)5);
+    }
+    void gui() {
+      ImGui::InputText("LAS file path", &param<std::string>("filepath"));
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 1, 100);
     }
     void process();
   };
