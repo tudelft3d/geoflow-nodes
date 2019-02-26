@@ -381,6 +381,7 @@ void TinSimpNode::process(){
 
   tinsimp::CDT cdt;
 
+  std::cout << "Adding points to CDT\n";
   if (geom_term.connected_type == TT_point_collection) {
     auto points = geom_term.get<geoflow::PointCollection>();
     build_initial_tin(cdt, points.box());
@@ -845,11 +846,13 @@ void LineHeightCDTNode::process() {
   auto lines = input("lines").get<LineStringCollection>();
 
   auto densify_interval = param<float>("densify_interval");
+
+  std::cout << "Starting LineHeight with " << lines.size() << " lines\n";
   
   auto denselines = densify_linestrings(lines, densify_interval);
 
   LineStringCollection lines_out;
-  for (auto& line : lines) {
+  for (auto& line : denselines) {
     vec3f ls;
     for (int i = 0; i < line.size(); i++) {
       auto p = line[i];
@@ -860,13 +863,16 @@ void LineHeightCDTNode::process() {
       tinsimp::CDT::Face_handle face = cdt.locate(cp, location, vertexid);
       // only calculate height if point is within the CDT convex or affine hull
       if (location != tinsimp::CDT::OUTSIDE_CONVEX_HULL &&
-          location != tinsimp::CDT::OUTSIDE_AFFINE_HULL) {
-          double height = tinsimp::compute_height(cp, face);
-          ls.push_back({ p[0], p[1], float(height) });
+        location != tinsimp::CDT::OUTSIDE_AFFINE_HULL) {
+        double height = tinsimp::compute_height(cp, face);
+        ls.push_back({ p[0], p[1], float(height) });
       }
     }
-    lines_out.push_back(ls);
+    if (ls.size() > 0) {
+      lines_out.push_back(ls);
+    }
   }
+  std::cout << "Completed LineHeight with " << lines_out.size() << " lines\n";
 
   output("lines").set(lines_out);
 }

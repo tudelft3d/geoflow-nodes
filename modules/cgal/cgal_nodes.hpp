@@ -13,6 +13,9 @@ namespace geoflow::nodes::cgal {
 
       add_param("create_triangles", (bool)false);
     }
+    void gui() {
+      ImGui::Checkbox("Create triangles", &param<bool>("create_triangles"));
+    }
     void process();
   };
 
@@ -43,7 +46,7 @@ namespace geoflow::nodes::cgal {
     }
     void gui() {
       ImGui::InputText("LAS file path", &param<std::string>("las_filepath"));
-      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 0, 100);
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 1, 100);
     }
     void process();
   };
@@ -64,7 +67,7 @@ namespace geoflow::nodes::cgal {
     }
     void gui() {
       ImGui::InputText("LAS file path", &param<std::string>("filepath"));
-      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 0, 100);
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 1, 100);
     }
     void process();
   };
@@ -119,6 +122,7 @@ namespace geoflow::nodes::cgal {
       }
       if (input("geometries").connected_type == TT_line_string_collection)
         ImGui::SliderFloat("Line densify", &param<float>("densify_interval"), 0, 100);
+      ImGui::Checkbox("Create triangles", &param<bool>("create_triangles"));
     }
     void process();
   };
@@ -250,7 +254,7 @@ namespace geoflow::nodes::cgal {
     }
     void gui() {
       ImGui::InputText("LAS file path", &param<std::string>("filepath"));
-      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 0, 100);
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 1, 100);
     }
     void process();
   };  
