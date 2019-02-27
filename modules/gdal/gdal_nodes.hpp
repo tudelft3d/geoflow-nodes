@@ -10,12 +10,16 @@ namespace geoflow::nodes::gdal {
 
     std::string geometry_type_name;
     OGRwkbGeometryType geometry_type;
+    
+    void push_attributes(OGRFeature& poFeature);
 
   public:
     using Node::Node;
     void init() {
       add_output("line_strings", TT_line_string_collection);
       add_output("linear_rings", TT_linear_ring_collection);
+
+      add_output_group("attributes", {TT_vec1b, TT_vec1i, TT_vec1f, TT_vec1s});
 
       add_param("filepath", (std::string) "");
       add_param("layer_id", (int)0);
@@ -37,7 +41,8 @@ namespace geoflow::nodes::gdal {
     using Node::Node;
     void init() {
       add_input("geometries", { TT_line_string_collection, TT_linear_ring_collection });
-      add_input("attributes", TT_attribute_map_f);
+
+      add_input_group("attributes", {TT_vec1b, TT_vec1i, TT_vec1f, TT_vec1s});
 
       add_param("filepath", (std::string) "out");
     }
@@ -53,6 +58,8 @@ namespace geoflow::nodes::gdal {
     using Node::Node;
     void init() {
       add_input("geometries", { TT_line_string_collection, TT_linear_ring_collection });
+      
+      add_input_group("attributes", {TT_vec1b, TT_vec1i, TT_vec1f, TT_vec1s});
 
       add_param("filepath", (std::string) "out");
     }

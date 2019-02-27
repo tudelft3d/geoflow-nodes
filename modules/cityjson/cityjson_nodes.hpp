@@ -3,10 +3,8 @@
 #include <nlohmann/json.hpp>
 
 namespace geoflow::nodes::cityjson {
-
-  class CityJSONReaderNode:public Node {
-
-  std::unordered_map <std::string, int> st_map = 
+  
+  static std::unordered_map <std::string, int> st_map = 
   {
     {"RoofSurface", 0},
     {"GroundSurface",1},
@@ -18,7 +16,8 @@ namespace geoflow::nodes::cityjson {
     {"Door", 7}
   };
 
-  public:
+  class CityJSONReaderNode : public Node {
+    public:
     using Node::Node;
     
     void init() {
@@ -78,7 +77,7 @@ namespace geoflow::nodes::cityjson {
                 // get the surface type
               }
               int value = geom["semantics"]["values"][0][face_cnt++];
-              std::string type_string = geom["semantics"]["surfaces"][value]["type"];
+              const std::string type_string = geom["semantics"]["surfaces"][value]["type"];
               surface_types.push_back(st_map[type_string]);
               faces.push_back(ring);
             }
