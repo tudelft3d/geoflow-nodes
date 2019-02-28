@@ -10,6 +10,7 @@ namespace geoflow::nodes::cgal {
     R.register_node<CDTDistanceNode>("CDTDistance");
     R.register_node<DensifyNode>("Densify");
     R.register_node<TinSimpNode>("TinSimp");
+    R.register_node<TinSimpLASReaderNode>("TinSimpLASReader");
     R.register_node<SimplifyLine3DNode>("SimplifyLine3D");
     R.register_node<SimplifyLineNode>("SimplifyLine");
     R.register_node<SimplifyLinesNode>("SimplifyLines");
