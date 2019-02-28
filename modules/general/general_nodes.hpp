@@ -38,6 +38,9 @@ namespace geoflow::nodes::general {
 
       add_param("filter_length", (float)0.0);
     }
+    void gui() {
+      ImGui::DragFloat("Length filter ", &param<float>("filter_length"), 10.0);
+    }
     void process();
   };
 }

@@ -62,18 +62,26 @@ namespace geoflow::nodes::general {
 
     auto filter_length = param<float>("filter_length");
 
+    std::cout << "Filtering " << line_strings.size() << " lines\n";
     LineStringCollection out_line_strings;
     if (filter_length > 0.0) {
       for (auto& l : line_strings) {
         float length = 0.0;
-        for (int i = 0; i < l.size() - 1;i++) {
-          length += sqrt(((l[i + 1][0] + l[i][0])*(l[i + 1][0] + l[i][0])) + ((l[i + 1][1] + l[i][1]) * (l[i + 1][1] + l[i][1])));
+        float length2 = 0.0;
+        for (int i = 0; i < l.size() - 1; i++) {
+          //float x1 = l[i][0];
+          //float x2 = l[i + 1][0];
+          //float y1 = l[i][1];
+          //float y2 = l[i + 1][1];
+          //length2 += sqrt(((x2 - x1)*(x2 - x1)) + ((y2 - y1) * (y2 - y1)));
+          length += sqrt(((l[i + 1][0] - l[i][0])*(l[i + 1][0] - l[i][0])) + ((l[i + 1][1] - l[i][1]) * (l[i + 1][1] - l[i][1])));
         }
         if (length > filter_length) {
           out_line_strings.push_back(l);
         }
       }
     }
+    std::cout << "Filtered " << line_strings.size() - out_line_strings.size() << " lines\n";
 
     output("line_strings").set(out_line_strings);
   }
