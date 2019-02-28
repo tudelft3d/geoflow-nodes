@@ -19,7 +19,7 @@ int main(int ac, const char * av[])
     float selection_threshold = 0.5;
     float simplification_threshold = 10;
     float line_densification = 2.0;
-    int pointthinning = 10;
+    int pointthinning = 1;
     float iso_interval = 1.0;
     float min_line_length = 10;
     bool gui = false;
