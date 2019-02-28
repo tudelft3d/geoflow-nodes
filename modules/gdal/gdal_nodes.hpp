@@ -59,8 +59,6 @@ namespace geoflow::nodes::gdal {
     void init() {
       add_input("geometries", { TT_line_string_collection, TT_linear_ring_collection });
       
-      add_input_group("attributes", {TT_vec1b, TT_vec1i, TT_vec1f, TT_vec1s});
-
       add_param("filepath", (std::string) "out");
     }
     void gui() {

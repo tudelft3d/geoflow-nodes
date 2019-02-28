@@ -141,26 +141,27 @@ namespace geoflow::nodes::gdal {
       std::cout << "pushed " << linear_rings.size() << " linear_ring features...\n";
     }
     
-    for(auto& [name, term] : output_group("attributes").terminals) {
-      std::cout << "group_term " << name << "\n";
-      if (term->type == TT_vec1f)
-        for (auto& val : term->get<vec1f>()) {
-          std::cout << "\t" << val << "\n";
-        }
-      if (term->type == TT_vec1i)
-        for (auto& val : term->get<vec1i>()) {
-          std::cout << "\t" << val << "\n";
-        }
-      if (term->type == TT_vec1s)
-        for (auto& val : term->get<vec1s>()) {
-          std::cout << "\t" << val << "\n";
-        }
-    }
+//    for(auto& [name, term] : output_group("attributes").terminals) {
+//      std::cout << "group_term " << name << "\n";
+//      if (term->type == TT_vec1f)
+//        for (auto& val : term->get<vec1f>()) {
+//          std::cout << "\t" << val << "\n";
+//        }
+//      if (term->type == TT_vec1i)
+//        for (auto& val : term->get<vec1i>()) {
+//          std::cout << "\t" << val << "\n";
+//        }
+//      if (term->type == TT_vec1s)
+//        for (auto& val : term->get<vec1s>()) {
+//          std::cout << "\t" << val << "\n";
+//        }
+//    }
   }
 
 void OGRWriterNode::process() {
     auto geom_term = input("geometries");
 
+//    const char *gszDriverName = "ESRI Shapefile";
     const char *gszDriverName = "GPKG";
     GDALDriver *poDriver;
 
@@ -205,9 +206,10 @@ void OGRWriterNode::process() {
         exit( 1 );
     }
 
-  
+    std::unordered_map<std::string, size_t> attr_id_map;
+    int fcnt = poLayer->GetLayerDefn()->GetFieldCount();
     for(auto& [name, term] : input_group("attributes").terminals) {
-      std::cout << "group_term " << name << "\n";
+//      std::cout << "group_term " << name << "\n";
       if (term->connected_type == TT_vec1f) {
         OGRFieldDefn oField( name.c_str(), OFTReal );
         if( poLayer->CreateField( &oField ) != OGRERR_NONE )
@@ -215,6 +217,7 @@ void OGRWriterNode::process() {
             printf( "Creating Name field failed.\n" );
             exit( 1 );
         }
+        attr_id_map[name] = fcnt++;
       }else if (term->connected_type == TT_vec1i) {
         OGRFieldDefn oField( name.c_str(), OFTInteger64 );
         if( poLayer->CreateField( &oField ) != OGRERR_NONE )
@@ -222,6 +225,7 @@ void OGRWriterNode::process() {
           printf( "Creating Name field failed.\n" );
           exit( 1 );
         }
+        attr_id_map[name] = fcnt++;
       } else if (term->connected_type == TT_vec1s) {
         OGRFieldDefn oField( name.c_str(), OFTString );
         if( poLayer->CreateField( &oField ) != OGRERR_NONE )
@@ -229,6 +233,7 @@ void OGRWriterNode::process() {
           printf( "Creating Name field failed.\n" );
           exit( 1 );
         }
+        attr_id_map[name] = fcnt++;
       }
     }
   
@@ -239,13 +244,13 @@ void OGRWriterNode::process() {
         for(auto& [tname, term] : input_group("attributes").terminals) {
           if (term->connected_type == TT_vec1f) {
             auto& val = term->get<vec1f&>();
-            poFeature->SetField( tname.c_str(), val[i] );
+            poFeature->SetField( attr_id_map[tname], val[i] );
           } else if (term->connected_type == TT_vec1i) {
             auto& val = term->get<vec1i&>();
-            poFeature->SetField( tname.c_str(), val[i] );
+            poFeature->SetField( attr_id_map[tname], val[i] );
           } else if (term->connected_type == TT_vec1s) {
             auto& val = term->get<vec1s&>();
-            poFeature->SetField( tname.c_str(), val[i].c_str() );
+            poFeature->SetField( attr_id_map[tname], val[i].c_str() );
           }
         }
       

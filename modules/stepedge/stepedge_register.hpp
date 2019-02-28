@@ -69,16 +69,19 @@ namespace geoflow::nodes::stepedge {
     void init() {
       add_input("point_clouds", TT_point_collection_list);
       add_input("polygons", TT_linear_ring_collection);
+      add_input_group("attributes", {TT_vec1i, TT_vec1f, TT_vec1s, TT_vec1b});
       add_output("decomposed_footprints", TT_linear_ring_collection);
-      add_output("attributes", TT_attribute_map_f);
+//      add_output("attributes", TT_attribute_map_f);
       add_output("building_class", TT_attribute_map_f);
+      add_output_group("attributes", {TT_vec1i, TT_vec1f, TT_vec1s, TT_vec1b});
 
       add_param("step_height_threshold", (float) 2.0);
-      add_param("direct_alpharing", (bool) true);
+      // add_param("direct_alpharing", (bool) true);
       add_param("z_percentile", (float) 0.9);
       add_param("flood_to_unsegmented", (bool) true);
       add_param("dissolve_edges", (bool) true);
       add_param("dissolve_stepedges", (bool) true);
+      add_param("use_only_hplanes", (bool) false);
       // add_param("zrange_threshold", (float) 0.2);
       // add_param("merge_segid", (bool) true);
       // add_param("merge_zrange", (bool) false);
@@ -88,9 +91,10 @@ namespace geoflow::nodes::stepedge {
     }
 
     void gui(){
-      ImGui::Checkbox("direct_alpharing", &param<bool>("direct_alpharing"));
+      // ImGui::Checkbox("direct_alpharing", &param<bool>("direct_alpharing"));
       
       ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
+      ImGui::Checkbox("Use only horizontal planes", &param<bool>("use_only_hplanes"));
       ImGui::Checkbox("Flood to unsegmented", &param<bool>("flood_to_unsegmented"));
       ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
       ImGui::Checkbox("Dissolve stepedges", &param<bool>("dissolve_stepedges"));
@@ -101,25 +105,53 @@ namespace geoflow::nodes::stepedge {
       auto point_clouds = input("point_clouds").get<std::vector<PointCollection>>();
       auto polygons = input("polygons").get<LinearRingCollection>();
       
+      
       // for each pair of polygon and point_cloud
         //create nodes and connections
         //run the thing
       if (point_clouds.size()!=polygons.size()) return;
+      
+      output_group("attributes").clear();
+      
+      for(auto& [name, term] : input_group("attributes").terminals) {
+        auto& oT = output_group("attributes").add(name, term->connected_type);
+        if(oT.type == TT_vec1f)
+          oT.set(vec1f());
+        else if(oT.type == TT_vec1i)
+          oT.set(vec1i());
+        else if(oT.type == TT_vec1s)
+          oT.set(vec1s());
+        else if(oT.type == TT_vec1b)
+          oT.set(vec1b());
+      }
+      
+      auto noid_a_vec = vec1f();
+      output_group("attributes").add("noid_a", TT_vec1f);
+      auto noid_r_vec = vec1f();
+      output_group("attributes").add("noid_r", TT_vec1f);
+      auto height_vec = vec1f();
+      output_group("attributes").add("height", TT_vec1f);
+      auto bclass_vec = vec1i();
+      output_group("attributes").add("bclass", TT_vec1i);
+      auto segid_vec = vec1i();
+      output_group("attributes").add("segid", TT_vec1i);
 
       LinearRingCollection all_cells;
-      AttributeMap all_attributes, building_class;
+      AttributeMap all_attributes;
       
       for(int i=0; i<point_clouds.size(); i++) {
-        std::cout << "b id: " << i << "\n";
+       std::cout << "b id: " << i << "\n";
         auto& points = point_clouds[i];
         auto& polygon = polygons[i];
         
         NodeManager N;
-        create_lod13chart(N, param<bool>("direct_alpharing"));
+        create_lod13chart(N, true);
 
         // config and run
         // this should copy all parameters from this LOD13Generator node to the ProcessArrangement node
         N.nodes["BuildArrFromRings_node"]->set_params( dump_params() );
+        N.nodes["BuildArrFromRings_node"]->set_param("extrude_unsegmented", param<bool>("use_only_hplanes"));
+        N.nodes["DetectPlanes_node"]->set_param("only_horizontal", param<bool>("use_only_hplanes"));
 
         N.nodes["DetectPlanes_node"]->input("points").set(points);
         N.nodes["RegulariseRings_node"]->input("footprint").set(polygon);
@@ -132,33 +164,49 @@ namespace geoflow::nodes::stepedge {
         auto slant = N.nodes["DetectPlanes_node"]->output("slant_roofplane_cnt").get<float>();
         auto noseg_area_r = N.nodes["BuildArrFromRings_node"]->output("noseg_area_r").get<float>();
         auto noseg_area_a = N.nodes["BuildArrFromRings_node"]->output("noseg_area_a").get<float>();
-        building_class["bclass"].push_back(classf);
-        building_class["horiz"].push_back(horiz);
-        building_class["slant"].push_back(slant);
-        building_class["noid_a"].push_back(noseg_area_a);
-        building_class["noid_r"].push_back(noseg_area_r);
+//        building_class["bclass"].push_back(classf);
+//        building_class["horiz"].push_back(horiz);
+//        building_class["slant"].push_back(slant);
+//        building_class["noid_a"].push_back(noseg_area_a);
+//        building_class["noid_r"].push_back(noseg_area_r);
         // note: the following will crash if the flowchart specified above is stopped halfway for some reason (eg missing output/connection)
 
         auto cells = N.nodes["Arr2LinearRings_node"]->output("linear_rings").get<LinearRingCollection>();
         auto attributes = N.nodes["Arr2LinearRings_node"]->output("attributes").get<AttributeMap>();
 
-        for (int i=0; i<cells.size(); i++) {
-          // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
-          all_cells.push_back(cells[i]);
-          all_attributes["height"].push_back(attributes["height"][i]);
-          all_attributes["segid"].push_back(attributes["segid"][i]);
-          all_attributes["noid_a"].push_back(noseg_area_a);
-          all_attributes["noid_r"].push_back(noseg_area_r);
-          // all_attributes["rms_error"].push_back(attributes["rms_error"][i]);
-          // all_attributes["max_error"].push_back(attributes["max_error"][i]);
-          // all_attributes["count"].push_back(attributes["count"][i]);
-          // all_attributes["coverage"].push_back(attributes["coverage"][i]);
-          all_attributes["bclass"].push_back(classf);
+        for (int j=0; j<cells.size(); j++) {
+          all_cells.push_back(cells[j]);
+          height_vec.push_back(attributes["height"][j]);
+          segid_vec.push_back(attributes["segid"][j]);
+          noid_a_vec.push_back(noseg_area_a);
+          noid_r_vec.push_back(noseg_area_r);
+          bclass_vec.push_back(classf);
+          for(auto& [name, iT] : input_group("attributes").terminals) {
+            auto& oT = output_group("attributes").term(name);
+            if(oT.type == TT_vec1f) {
+              auto& veco = oT.get<vec1f&>();
+              auto& veci = iT->get<vec1f&>();
+              veco.push_back( veci[i] );
+            }
+            else if(oT.type == TT_vec1i) {
+              auto& veco = oT.get<vec1i&>();
+              auto& veci = iT->get<vec1i&>();
+              veco.push_back( veci[i] );
+            }
+            else if(oT.type == TT_vec1s) {
+              auto& veco = oT.get<vec1s&>();
+              auto& veci = iT->get<vec1s&>();
+              veco.push_back( veci[i] );
+            }
+          }
         }
       }
+      output_group("attributes").term("noid_a").set(std::move(noid_a_vec));
+      output_group("attributes").term("noid_r").set(std::move(noid_r_vec));
+      output_group("attributes").term("height").set(std::move(height_vec));
+      output_group("attributes").term("bclass").set(std::move(bclass_vec));
+      output_group("attributes").term("segid").set(std::move(segid_vec));
       output("decomposed_footprints").set(all_cells);
-      output("attributes").set(all_attributes);
-      output("building_class").set(building_class);
     }
   };
 

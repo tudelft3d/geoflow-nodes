@@ -725,7 +725,7 @@ void arr_assign_pts_to_unsegmented(Arrangement_2& arr, std::vector<Point>& point
       std::sort(ppf.second.begin(), ppf.second.end(), [](linedect::Point& p1, linedect::Point& p2) {
         return p1.z() < p2.z();
       });
-      auto pid = int(percentile*float(points.size()/2));
+      auto pid = int(percentile*float(ppf.second.size()/2));
       // auto pid = get_percentile(ppf.second, percentile);
       ppf.first->data().segid = -1;
       ppf.first->data().elevation_avg = ppf.second[pid].z();
@@ -793,10 +793,11 @@ void BuildArrFromRingsExactNode::process() {
   }
   // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
 
-  auto nosegid_area = arr_measure_nosegid(arr_base);
-
-  if(param<bool>("extrude_unsegmented") && points_per_plane.count(-1))
+  if(param<bool>("extrude_unsegmented") && points_per_plane.count(-1)) {
     arr_assign_pts_to_unsegmented(arr_base, points_per_plane[-1], param<float>("z_percentile"));
+  }
+  
+  auto nosegid_area = arr_measure_nosegid(arr_base);
   
   arr_process(arr_base, 
     param<bool>("flood_to_unsegmented"), 
