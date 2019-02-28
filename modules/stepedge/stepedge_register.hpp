@@ -41,7 +41,7 @@ namespace geoflow::nodes::stepedge {
     connect(DetectPlanes_node, BuildArrFromRings_node, "pts_per_roofplane", "pts_per_roofplane");
     
     if (direct_alpharing) {
-      SimplifyPolygon_node->set_param("threshold_stop_cost", float(0.18));
+      SimplifyPolygon_node->set_param("threshold_stop_cost", float(0.15));
       connect(AlphaShape_node, SimplifyPolygon_node, "alpha_rings", "polygons");
       connect(SimplifyPolygon_node, Ring2Segments_node, "polygons_simp", "rings");
       connect(Ring2Segments_node, RegulariseRings_node, "edge_segments", "edge_segments");
@@ -139,8 +139,8 @@ namespace geoflow::nodes::stepedge {
       LinearRingCollection all_cells;
       AttributeMap all_attributes;
       
-      for(int i=0; i<point_clouds.size(); i++) {
-       std::cout << "b id: " << i << "\n";
+      for(int i=0; i<point_clouds.size(); ++i) {
+       std::cout << "b fid: " << i << "\n";
         auto& points = point_clouds[i];
         auto& polygon = polygons[i];
         
@@ -149,7 +149,7 @@ namespace geoflow::nodes::stepedge {
 
         // config and run
         // this should copy all parameters from this LOD13Generator node to the ProcessArrangement node
-        N.nodes["BuildArrFromRings_node"]->set_params( dump_params() );
+        N.nodes["BuildArrFromRings_node"]->set_params( dump_params(), true );
         N.nodes["BuildArrFromRings_node"]->set_param("extrude_unsegmented", param<bool>("use_only_hplanes"));
         N.nodes["DetectPlanes_node"]->set_param("only_horizontal", param<bool>("use_only_hplanes"));
 
@@ -164,17 +164,12 @@ namespace geoflow::nodes::stepedge {
         auto slant = N.nodes["DetectPlanes_node"]->output("slant_roofplane_cnt").get<float>();
         auto noseg_area_r = N.nodes["BuildArrFromRings_node"]->output("noseg_area_r").get<float>();
         auto noseg_area_a = N.nodes["BuildArrFromRings_node"]->output("noseg_area_a").get<float>();
-//        building_class["bclass"].push_back(classf);
-//        building_class["horiz"].push_back(horiz);
-//        building_class["slant"].push_back(slant);
-//        building_class["noid_a"].push_back(noseg_area_a);
-//        building_class["noid_r"].push_back(noseg_area_r);
-        // note: the following will crash if the flowchart specified above is stopped halfway for some reason (eg missing output/connection)
 
+        // note: the following will crash if the flowchart specified above is stopped halfway for some reason (eg missing output/connection)
         auto cells = N.nodes["Arr2LinearRings_node"]->output("linear_rings").get<LinearRingCollection>();
         auto attributes = N.nodes["Arr2LinearRings_node"]->output("attributes").get<AttributeMap>();
 
-        for (int j=0; j<cells.size(); j++) {
+        for (int j=0; j<cells.size(); ++j) {
           all_cells.push_back(cells[j]);
           height_vec.push_back(attributes["height"][j]);
           segid_vec.push_back(attributes["segid"][j]);
@@ -206,7 +201,7 @@ namespace geoflow::nodes::stepedge {
       output_group("attributes").term("height").set(std::move(height_vec));
       output_group("attributes").term("bclass").set(std::move(bclass_vec));
       output_group("attributes").term("segid").set(std::move(segid_vec));
-      output("decomposed_footprints").set(all_cells);
+      output("decomposed_footprints").set(std::move(all_cells));
     }
   };
 
@@ -307,5 +302,4 @@ namespace geoflow::nodes::stepedge {
     R.register_node<PrintResultNode>("PrintResult");
     return R;
   }
-
 }

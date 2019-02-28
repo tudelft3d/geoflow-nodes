@@ -725,7 +725,7 @@ void arr_assign_pts_to_unsegmented(Arrangement_2& arr, std::vector<Point>& point
       std::sort(ppf.second.begin(), ppf.second.end(), [](linedect::Point& p1, linedect::Point& p2) {
         return p1.z() < p2.z();
       });
-      auto pid = int(percentile*float(ppf.second.size()/2));
+      auto pid = int(percentile*float(ppf.second.size()-1));
       // auto pid = get_percentile(ppf.second, percentile);
       ppf.first->data().segid = -1;
       ppf.first->data().elevation_avg = ppf.second[pid].z();
@@ -773,7 +773,7 @@ void BuildArrFromRingsExactNode::process() {
         std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
           return p1.z() < p2.z();
         });
-        auto elevation_id = int(param<float>("z_percentile")*float(points.size()));
+        int elevation_id = std::floor(param<float>("z_percentile")*float(points.size()-1));
 
         // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
         Arrangement_2 arr;
