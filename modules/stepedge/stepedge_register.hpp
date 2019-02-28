@@ -210,7 +210,8 @@ namespace geoflow::nodes::stepedge {
     using Node::Node;
     void init() {
       add_input("point_clouds", TT_point_collection_list);
-      add_output("attributes", TT_attribute_map_f);
+      // add_output("attributes", TT_attribute_map_f);
+      add_output_group("attributes", {TT_vec1i, TT_vec1f, TT_vec1s, TT_vec1b});
 
       add_param("z_percentile", (float) 0.9);
     }
@@ -222,13 +223,19 @@ namespace geoflow::nodes::stepedge {
     void process(){
       auto point_clouds = input("point_clouds").get<std::vector<PointCollection>>();
 
-      AttributeMap all_attributes;
+      // AttributeMap all_attributes;
+      vec1i bclass_vec;
+      output_group("attributes").add("bclass", TT_vec1i);
+      vec1f height_vec;
+      output_group("attributes").add("height", TT_vec1f);
+      vec1f rms_error_vec;
+      output_group("attributes").add("rms_error", TT_vec1f);
 
       NodeRegister R("Nodes");
       R.register_node<DetectPlanesNode>("DetectPlanes");
       
       for(int i=0; i<point_clouds.size(); i++) {
-        // std::cout << "b id: " << i << "\n";
+        std::cout << "b fid: " << i << "\n";
         auto& point_cloud = point_clouds[i];
         
         NodeManager N;
@@ -240,7 +247,7 @@ namespace geoflow::nodes::stepedge {
         auto classf = detect_planes_node->output("classf").get<float>();
         auto horiz = detect_planes_node->output("horiz_roofplane_cnt").get<float>();
         auto slant = detect_planes_node->output("slant_roofplane_cnt").get<float>();
-        all_attributes["bclass"].push_back(classf);
+        bclass_vec.push_back(classf);
         // all_attributes["horiz"].push_back(horiz);
         // all_attributes["slant"].push_back(slant);
         // note: the following will crash if the flowchart specified above is stopped halfway for some reason (eg missing output/connection)
@@ -251,15 +258,15 @@ namespace geoflow::nodes::stepedge {
         for (auto& kv : roofplanepts_per_fp) {
           points.insert(points.end(), kv.second.begin(), kv.second.end());
         }
-        if(points.size() == 0) {
-          all_attributes["height"].push_back(0);
-          all_attributes["rms_error"].push_back(0);
+        if(points.size() < 2) {
+          height_vec.push_back(0);
+          rms_error_vec.push_back(0);
         } else {
           // if(polygons_feature.attr["height"][i]!=0) { //FIXME this is a hack!!
           std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
             return p1.z() < p2.z();
           });
-          auto elevation_id = int(param<float>("z_percentile")*float(points.size()));
+          auto elevation_id = int(param<float>("z_percentile")*float(points.size()-1));
           // std::cout << "id: " << elevation_id << ", size: " << points.size() << "\n";
           double elevation = points[elevation_id].z();
           double square_sum = 0;
@@ -267,12 +274,14 @@ namespace geoflow::nodes::stepedge {
             float d = elevation - p.z();
             square_sum += d*d;
           }
-          all_attributes["rms_error"].push_back(CGAL::sqrt(square_sum/points.size()));
-          all_attributes["height"].push_back(elevation);
+          rms_error_vec.push_back(CGAL::sqrt(square_sum/points.size()));
+          height_vec.push_back(elevation);
         }
 
       }
-      output("attributes").set(all_attributes);
+      output_group("attributes").term("bclass").set(bclass_vec);
+      output_group("attributes").term("height").set(height_vec);
+      output_group("attributes").term("rms_error").set(rms_error_vec);
     }
   };
 

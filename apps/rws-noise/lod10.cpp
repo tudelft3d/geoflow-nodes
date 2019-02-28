@@ -39,7 +39,7 @@ int main(int ac, const char * av[])
     auto gdal = gfn::gdal::create_register();
 
     auto ogr_loader = N.create_node(gdal, "OGRLoader", {75,75});
-    auto footprint_simp = N.create_node(stepedge, "SimplifyPolygon", {75,175});
+    // auto footprint_simp = N.create_node(stepedge, "SimplifyPolygon", {75,175});
     auto las_in_poly = N.create_node(stepedge, "LASInPolygons", {300,75});
     auto lod10generator = N.create_node(stepedge, "LOD10Generator", {650,75});
     auto ogr_writer = N.create_node(gdal, "OGRWriter", {1000,75});
@@ -53,10 +53,6 @@ int main(int ac, const char * av[])
 
     geoflow::connect(
         ogr_loader->output("linear_rings"), 
-        footprint_simp->input("polygons")
-    );
-    geoflow::connect(
-        footprint_simp->output("polygons_simp"), 
         las_in_poly->input("polygons")
     );
     geoflow::connect(
@@ -64,12 +60,14 @@ int main(int ac, const char * av[])
         lod10generator->input("point_clouds")
     );
     geoflow::connect(
-        lod10generator->output("attributes"), 
-        ogr_writer->input("attributes")
-    );
-    geoflow::connect(
         ogr_loader->output("linear_rings"), 
         ogr_writer->input("geometries")
+    );
+    lod10generator->output_group("attributes").connect(
+        ogr_writer->input_group("attributes")
+    );
+    ogr_loader->output_group("attributes").connect(
+        ogr_writer->input_group("attributes")
     );
     
     
