@@ -18,8 +18,10 @@ int main(int ac, const char * av[])
     std::string las_file;
     float selection_threshold = 0.5;
     float simplification_threshold = 10;
+    float line_densification = 2.0;
     int pointthinning = 10;
     float iso_interval = 1.0;
+    float min_line_length = 10;
     bool gui = false;
     
     po::options_description desc("Allowed options");
@@ -109,41 +111,47 @@ int main(int ac, const char * av[])
     //geoflow::connect(simplify_lines_cdt->output("lines"), ogr_writer->input("geometries"));
 
     // Create nodes
-    auto las_loader = N.create_node(las, "LASGroundLoader");
-    auto tin_creator_lidar = N.create_node(cgal, "TinSimp");
-    auto ogr_loader = N.create_node(gdal, "OGRLoader");
-  // TEST: line height from CDT calculator -> add Bounding Box!!! see build_initial_tin()
-  auto line_height_adder_input = N.create_node(cgal, "LineHeightCDT"); 
-    auto tin_creator_lines = N.create_node(cgal, "CDT");
-  // TEST: CDT vertex - CDT distance calculator
-  auto height_difference_calc = N.create_node(cgal, "CDTDistance");
-    auto tin_creator_difference = N.create_node(cgal, "TinSimp");
-    auto iso_lines = N.create_node(cgal, "IsoLine");
-    auto line_merger = N.create_node(gdal, "GEOSMergeLines");
-  // TEST: filter lines based on length
-  auto line_string_filter = N.create_node(general, "LineStringFilter");
-  // lineheight from CDT calculator
-  auto line_height_adder_iso = N.create_node(cgal, "LineHeightCDT"); 
-  // TEST: merge height lines + ISO lines
-  auto line_string_merger = N.create_node(general, "MergeLinestrings");
-    auto tin_simp_lines = N.create_node(cgal, "TinSimp");
-    auto simplify_lines_cdt = N.create_node(cgal, "SimplifyLines");
-    auto ogr_writer = N.create_node(gdal, "OGRWriterNoAttributes");
+    //auto las_loader = N.create_node(las, "LASGroundLoader", { -200, 300 });
+    //auto tin_creator_lidar = N.create_node(cgal, "TinSimp", { 30, 300 });
+    auto tin_creator_lidar = N.create_node(cgal, "TinSimpLASReader", { 30, 300 });
+
+    auto ogr_loader = N.create_node(gdal, "OGRLoader", { -200, 50 });
+    auto line_height_adder_input = N.create_node(cgal, "LineHeightCDT", { 30, 50 }); 
+    auto tin_creator_lines = N.create_node(cgal, "CDT", { 275, 50 });
+
+    auto height_difference_calc = N.create_node(cgal, "CDTDistance", { 550, 150 });
+
+    auto tin_creator_difference = N.create_node(cgal, "TinSimp", { 900, 0 });
+    auto iso_lines = N.create_node(cgal, "IsoLine", { 900, 140 });
+    auto line_merger = N.create_node(gdal, "GEOSMergeLines", { 900, 260 });
+    auto line_height_adder_iso = N.create_node(cgal, "LineHeightCDT", { 900, 340 }); 
+
+    auto line_string_merger = N.create_node(general, "MergeLinestrings", { 1250, 0 });
+    auto tin_simp_lines = N.create_node(cgal, "TinSimp", { 1250, 110 });
+    auto simplify_lines_cdt = N.create_node(cgal, "SimplifyLines", { 1250, 215 });
+    auto line_string_filter = N.create_node(general, "LineStringFilter", { 1250, 285 });
+    auto ogr_writer = N.create_node(gdal, "OGRWriterNoAttributes", { 1250, 350 });
 
     // Setup nodes
     ogr_loader->set_param("filepath", lines_file_in);
     ogr_writer->set_param("filepath", lines_file_out);
 
-    las_loader->set_params({
-        {"filepath", las_file},
-        {"thin_nth", pointthinning}
-    }); 
+    //las_loader->set_params({
+    //    {"filepath", las_file},
+    //    {"thin_nth", pointthinning}
+    //}); 
+    //tin_creator_lidar->set_params({
+    //    {"thres_error", selection_threshold},
+    //    {"create_triangles", false}
+    //});
     tin_creator_lidar->set_params({
+        {"filepath", las_file},
+        {"thin_nth", pointthinning},
         {"thres_error", selection_threshold},
         {"create_triangles", false}
-    });
+      });
     line_height_adder_input->set_params({
-        {"densify_interval", selection_threshold}
+        {"densify_interval", line_densification}
     });
     tin_creator_lines->set_params({
         {"create_triangles", false}
@@ -156,20 +164,23 @@ int main(int ac, const char * av[])
         {"interval", iso_interval}
     });
     line_height_adder_iso->set_params({
-        {"densify_interval", selection_threshold}
+        {"densify_interval", line_densification}
     });
     tin_simp_lines->set_params({
         {"thres_error", selection_threshold},
-        {"densify_interval", selection_threshold}
+        {"densify_interval", line_densification}
     });
     simplify_lines_cdt->set_params({
         {"threshold_stop_cost", simplification_threshold}
+    });
+    line_string_filter->set_params({
+        {"filter_length", min_line_length}
     });
 
     try {
         // Connect nodes
         // Create TIN from lidar using tinsimp
-        geoflow::connect(las_loader->output("points"), tin_creator_lidar->input("geometries"));
+        //geoflow::connect(las_loader->output("points"), tin_creator_lidar->input("geometries"));
         // Add heights to input lines from TIN
         geoflow::connect(tin_creator_lidar->output("cgal_cdt"), line_height_adder_input->input("cgal_cdt"));
         geoflow::connect(ogr_loader->output("line_strings"), line_height_adder_input->input("lines"));
@@ -203,7 +214,8 @@ int main(int ac, const char * av[])
         if (gui)
             geoflow::launch_flowchart(N, {cgal, gdal});
         else {
-            N.run(*las_loader);
+            //N.run(*las_loader);
+            N.run(*tin_creator_lidar);
             N.run(*ogr_loader);
         }
     }
