@@ -127,6 +127,27 @@ namespace geoflow::nodes::cgal {
     void process();
   };
 
+  class TinSimpLASReaderNode:public Node {
+  public:
+    using Node::Node;
+    void init() {
+      add_output("triangles", TT_triangle_collection);
+      add_output("cgal_cdt", TT_any);
+
+      add_param("filepath", (std::string) "");
+      add_param("thin_nth", (int)5);
+      add_param("thres_error", (float)2);
+      add_param("create_triangles", (bool)true);
+    }
+    void gui() {
+      ImGui::InputText("LAS file path", &param<std::string>("filepath"));
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 1, 100);
+      ImGui::SliderFloat("Error threshold", &param<float>("thres_error"), 0, 100);
+      ImGui::Checkbox("Create triangles", &param<bool>("create_triangles"));
+    }
+    void process();
+  };
+
   class SimplifyLine3DNode:public Node {
   public:
     using Node::Node;
@@ -223,9 +244,14 @@ namespace geoflow::nodes::cgal {
       add_input("min", TT_float);
       add_input("max", TT_float);
       add_output("lines", TT_line_string_collection);
-      add_output("attributes", TT_attribute_map_f);
+      add_output("attributes", TT_vec1i);
 
       add_param("interval", (float)1.0);
+      add_param("exclude_begin", (float)-0.5);
+      add_param("exclude_end", (float)0.5);
+    }
+    void gui() {
+      ImGui::DragFloatRange2("range", &param<float>("exclude_begin"), &param<float>("exclude_end"), 0.5f, 0.0f, 100.0f, "Min: %.1f %%", "Max: %.1f %%");
     }
     void process();
   };
@@ -266,10 +292,12 @@ namespace geoflow::nodes::cgal {
       add_input("lines", TT_line_string_collection);
       add_output("lines", TT_line_string_collection);
 
+      add_param("add_bbox", (bool)false);
       add_param("densify_interval", (float)2);
     }
     void gui() {
       ImGui::SliderFloat("Line densify", &param<float>("densify_interval"), 0, 100);
+      ImGui::Checkbox("Add bounding box to lines", &param<bool>("add_bbox"));
     }
     void process();
   };

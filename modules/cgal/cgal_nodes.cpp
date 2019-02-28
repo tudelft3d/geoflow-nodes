@@ -13,6 +13,7 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 //#include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Projection_traits_xy_3.h>
+#include <CGAL/enum.h>
 //#include <CGAL/Triangulation_vertex_base_2.h>
 //#include <CGAL/Triangulation_face_base_2.h>
 
@@ -312,7 +313,7 @@ void CDTDistanceNode::process() {
     if (location != CDT::OUTSIDE_CONVEX_HULL &&
       location != CDT::OUTSIDE_AFFINE_HULL) {
       double height = compute_height(cp, face);
-      double diff = height - cp.z();
+      double diff = cp.z() - height;
       distances.push_back(diff);
       points.push_back({ float(cp.x()), float(cp.y()), float(diff) });
     }
@@ -377,6 +378,33 @@ void build_initial_tin(tinsimp::CDT& cdt, geoflow::Box& bbox){
   cdt.insert(initial_points.begin(), initial_points.end());
 }
 
+void delete_initial_tin(tinsimp::CDT& cdt, geoflow::Box& bbox) {
+  float min_x = bbox.min()[0] - 1;
+  float min_y = bbox.min()[1] - 1;
+  float max_x = bbox.max()[0] + 1;
+  float max_y = bbox.max()[1] + 1;
+  float center_z = (bbox.max()[2] - bbox.min()[2]) / 2;
+
+  std::vector<tinsimp::Point> initial_points = {
+    tinsimp::Point(min_x, min_y, center_z),
+    tinsimp::Point(max_x, min_y, center_z),
+    tinsimp::Point(max_x, max_y, center_z),
+    tinsimp::Point(min_x, max_y, center_z)
+  };
+  for (tinsimp::Point& p : initial_points) {
+    int vertexid;
+    tinsimp::CDT::Locate_type lt;
+    tinsimp::CDT::Face_handle fh = cdt.locate(p,lt, vertexid);
+    if (lt == tinsimp::CDT::VERTEX) {
+      for (int i = 0; i < 3; i++) {
+        if (cdt.compare_xy(p, fh->vertex(i)->point()) == CGAL::EQUAL) {
+          cdt.remove(fh->vertex(i));
+        }
+      }
+    }
+  }
+}
+
 void TinSimpNode::process(){
   auto geom_term = input("geometries");
 
@@ -391,12 +419,15 @@ void TinSimpNode::process(){
     auto points = geom_term.get<geoflow::PointCollection>();
     build_initial_tin(cdt, points.box());
     tinsimp::greedy_insert(cdt, points, double(thres_error));
+    delete_initial_tin(cdt, points.box());
   } else if (geom_term.connected_type == TT_line_string_collection) {
     auto lines = geom_term.get<geoflow::LineStringCollection>();
     build_initial_tin(cdt, lines.box());
     std::vector<size_t> line_counts, selected_line_counts;
     std::vector<float> line_errors, selected_line_errors;
     std::tie(line_counts, line_errors) = tinsimp::greedy_insert(cdt, densify_linestrings(lines, densify_interval), double(thres_error));
+    delete_initial_tin(cdt, lines.box());
+    
     LineStringCollection selected_lines;
     for (size_t i=0; i<lines.size(); ++i) {
       if (line_counts[i] > 0) {
@@ -443,6 +474,79 @@ void TinSimpNode::process(){
   output("cgal_cdt").set(cdt);
   output("triangles").set(triangles);
   output("normals").set(normals);
+}
+
+void TinSimpLASReaderNode::process() {
+  auto filepath = param<std::string>("filepath");
+  auto thin_nth = param<int>("thin_nth");
+  auto thres_error = param<float>("thres_error");
+  auto create_triangles = param<bool>("create_triangles");
+
+  std::vector<Point> points;
+  LASreadOpener lasreadopener;
+  lasreadopener.set_file_name(filepath.c_str());
+  LASreader* lasreader = lasreadopener.open();
+
+  bool found_offset = manager.data_offset.has_value();
+
+  size_t i = 0;
+  float xmin = 99999;
+  float xmax = -99999;
+  float ymin = 99999;
+  float ymax = -99999;
+  while (lasreader->read_point()) {
+    if (lasreader->point.get_classification() == 2) {
+      if (i++ % thin_nth == 0) {
+        if (!found_offset) {
+          manager.data_offset = { lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z() };
+          found_offset = true;
+        }
+        float x = lasreader->point.get_x() - (*manager.data_offset)[0];
+        float y = lasreader->point.get_y() - (*manager.data_offset)[1];
+        float z = lasreader->point.get_z() - (*manager.data_offset)[2];
+        Point p = Point(x, y, z);
+        points.push_back(p);
+        if (x < xmin) xmin = x;
+        if (x > xmax) xmax = x;
+        if (y < ymin) ymin = y;
+        if (y > ymax) ymax = y;
+      }
+      if (i % 1000000 == 0) std::cout << "Read " << i << " points...\n";
+    }
+  }
+  lasreader->close();
+  delete lasreader;
+  
+  geoflow::Box bbox = geoflow::Box();
+  bbox.set({ xmin,ymin }, { xmax,ymax });
+  
+  std::cout << "Adding points to CDT\n";
+  tinsimp::CDT cdt;
+  build_initial_tin(cdt, bbox);
+  tinsimp::greedy_insert(cdt, points, double(thres_error));
+  delete_initial_tin(cdt, bbox);
+
+  std::cout << "Completed CDT with " << cdt.number_of_faces() << " triangles...\n";
+
+  TriangleCollection triangles;
+  if (create_triangles) {
+    for (tinsimp::CDT::Finite_faces_iterator fit = cdt.finite_faces_begin();
+      fit != cdt.finite_faces_end();
+      ++fit) {
+      auto& p0 = fit->vertex(0)->point();
+      auto& p1 = fit->vertex(1)->point();
+      auto& p2 = fit->vertex(2)->point();
+      triangles.push_back({
+        to_arr3f<tinsimp::Point>(p0),
+        to_arr3f<tinsimp::Point>(p1),
+        to_arr3f<tinsimp::Point>(p2)
+        });
+    }
+    cdt.clear();
+  }
+
+  output("cgal_cdt").set(cdt);
+  output("triangles").set(triangles);
 }
 
 void SimplifyLine3DNode::process(){
@@ -645,20 +749,25 @@ void IsoLineNode::process() {
   float max = input("max").get<float>();
 
   float interval = param<float>("interval");
+  float exclude_begin = param<float>("exclude_begin");
+  float exclude_end = param<float>("exclude_end");
 
   float start = std::floor(min);
   float end = std::ceil(max);
 
-  vec1f heights;
-  for (float i = start; i < end; i+=interval) {
-    heights.push_back(i);
+  vec1f isoheights;
+  for (float i = start; i < end; i += interval) {
+    if (exclude_begin <= i && i <= exclude_end) {
+      continue;
+    }
+    isoheights.push_back(i);
   }
 
   LineStringCollection lines;
-  AttributeMap attributes;
+  vec1i heights;
   std::map< double, std::vector< CGAL::Segment_3<K> > > segmentVec;
 
-  for (auto isoDepth : heights) {
+  for (auto isoDepth : isoheights) {
     std::cout << "Slicing ISO lines at height " << isoDepth << "\n";
     // faceCache is used to ensure line segments are outputted only once. It will contain faces that have an edge exactly on the contouring depth.
     std::set<CDT::Face_handle> faceCache;
@@ -673,6 +782,14 @@ void IsoLineNode::process() {
       int v0_ = isolines::cntrEvalVertex(v0, isoDepth);
       int v1_ = isolines::cntrEvalVertex(v1, isoDepth);
       int v2_ = isolines::cntrEvalVertex(v2, isoDepth);
+      
+      //bool infinite_face = false;
+      //for (int i = 0; i < 3; i++) {
+      //  infinite_face |= cdt.is_infinite(ib->neighbor(i));
+      //}
+      //if (infinite_face) {
+      //  continue;
+      //}
 
       // following is a big if-else-if statement to identify the basic triangle configuration (wrt the contouring depth)
       //its on a horizontal plane: skip it
@@ -684,21 +801,24 @@ void IsoLineNode::process() {
         faceCache.insert(ib);
         if (faceCache.find(ib->neighbor(2)) == faceCache.end()) {
           lines.push_back(create_line(v0->point(), v1->point(), isoDepth));
-          attributes["height"].push_back(isoDepth);
+          heights.push_back(isoDepth);
+          heights.push_back(isoDepth);
         }
       }
       else if (v1_ == 0 && v2_ == 0) {
         faceCache.insert(ib);
         if (faceCache.find(ib->neighbor(0)) == faceCache.end()) {
           lines.push_back(create_line(v1->point(), v2->point(), isoDepth));
-          attributes["height"].push_back(isoDepth);
+          heights.push_back(isoDepth);
+          heights.push_back(isoDepth);
         }
       }
       else if (v2_ == 0 && v0_ == 0) {
         faceCache.insert(ib);
         if (faceCache.find(ib->neighbor(1)) == faceCache.end()) {
           lines.push_back(create_line(v2->point(), v0->point(), isoDepth));
-          attributes["height"].push_back(isoDepth);
+          heights.push_back(isoDepth);
+          heights.push_back(isoDepth);
         }
 
       //there is an intersecting line segment in between the interiors of 2 edges: calculate intersection points and extract that edge
@@ -707,41 +827,48 @@ void IsoLineNode::process() {
         Point p1 = isolines::cntrIntersectEdge(v0, v1, isoDepth);
         Point p2 = isolines::cntrIntersectEdge(v0, v2, isoDepth);
         lines.push_back(create_line(p1, p2, isoDepth));
-        attributes["height"].push_back(isoDepth);
+        heights.push_back(isoDepth);
+        heights.push_back(isoDepth);
       }
       else if ((v0_ == 1 && v1_ == -1 && v2_ == 1) || (v0_ == -1 && v1_ == 1 && v2_ == -1)) {
         Point p1 = isolines::cntrIntersectEdge(v1, v0, isoDepth);
         Point p2 = isolines::cntrIntersectEdge(v1, v2, isoDepth);
         lines.push_back(create_line(p1, p2, isoDepth));
+        heights.push_back(isoDepth);
+        heights.push_back(isoDepth);
       }
       else if ((v0_ == 1 && v1_ == 1 && v2_ == -1) || (v0_ == -1 && v1_ == -1 && v2_ == 1)) {
         Point p1 = isolines::cntrIntersectEdge(v2, v0, isoDepth);
         Point p2 = isolines::cntrIntersectEdge(v2, v1, isoDepth);
         lines.push_back(create_line(p1, p2, isoDepth));
-        attributes["height"].push_back(isoDepth);
+        heights.push_back(isoDepth);
+        heights.push_back(isoDepth);
 
         // one vertex is on the isodepth the others are above and below: return segment, consisting out of the vertex on the isodepth and the intersection on the opposing edge
       }
       else if (v0_ == 0 && v1_ != v2_) {
         Point p = isolines::cntrIntersectEdge(v1, v2, isoDepth);
         lines.push_back(create_line(v0->point(), p, isoDepth));
-        attributes["height"].push_back(isoDepth);
+        heights.push_back(isoDepth);
+        heights.push_back(isoDepth);
       }
       else if (v1_ == 0 && v0_ != v2_) {
         Point p = isolines::cntrIntersectEdge(v0, v2, isoDepth);
         lines.push_back(create_line(v1->point(), p, isoDepth));
-        attributes["height"].push_back(isoDepth);
+        heights.push_back(isoDepth);
+        heights.push_back(isoDepth);
       }
       else if (v2_ == 0 && v0_ != v1_) {
         Point p = isolines::cntrIntersectEdge(v0, v1, isoDepth);
         lines.push_back(create_line(v2->point(), p, isoDepth));
-        attributes["height"].push_back(isoDepth);
+        heights.push_back(isoDepth);
+        heights.push_back(isoDepth);
       }
     }
   }
 
   output("lines").set(lines);
-  output("attributes").set(attributes);
+  output("attributes").set(heights);
 }
 
 void IsoLineSlicerNode::process() {
@@ -843,15 +970,31 @@ void LineHeightCDTNode::process() {
   auto cdt = input("cgal_cdt").get<CDT>();
   auto lines = input("lines").get<LineStringCollection>();
 
+  auto add_bbox = param<bool>("add_bbox");
   auto densify_interval = param<float>("densify_interval");
 
   std::cout << "Starting LineHeight with " << lines.size() << " lines\n";
   
+  if (add_bbox) {
+    // Add bbox to lines
+    auto bbox = lines.box();
+    float min_x = bbox.min()[0];
+    float min_y = bbox.min()[1];
+    float max_x = bbox.max()[0];
+    float max_y = bbox.max()[1];
+    lines.push_back(vec3f({ { min_x, min_y },{ min_x, max_y } }));
+    lines.push_back(vec3f({ { min_x, max_y },{ max_x, max_y } }));
+    lines.push_back(vec3f({ { max_x, max_y },{ max_x, min_y } }));
+    lines.push_back(vec3f({ { max_x, min_y },{ min_x, min_y } }));
+  }
+
   auto denselines = densify_linestrings(lines, densify_interval);
 
   LineStringCollection lines_out;
   for (auto& line : denselines) {
     vec3f ls;
+    bool started = false;
+    bool ended = false;
     for (int i = 0; i < line.size(); i++) {
       auto p = line[i];
       Point cp = Point(p[0], p[1], p[2]);
@@ -862,8 +1005,18 @@ void LineHeightCDTNode::process() {
       // only calculate height if point is within the CDT convex or affine hull
       if (location != CDT::OUTSIDE_CONVEX_HULL &&
         location != CDT::OUTSIDE_AFFINE_HULL) {
+        // Only keep lines if all in between vertices are kept
+        // Check if the line is started and not ended yet, otherwise vertices in between are missing.
+        if (started && ended) {
+          ls.clear();
+          break;
+        }
+        started = true;
         double height = compute_height(cp, face);
         ls.push_back({ p[0], p[1], float(height) });
+      }
+      else if (started) {
+        ended = true;
       }
     }
     if (ls.size() > 0) {
