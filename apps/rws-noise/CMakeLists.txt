@@ -43,7 +43,7 @@ set_target_properties(
 
 add_executable(lod13 lod13.cpp)
 target_link_libraries( lod13 
-  geoflow-gui
+  # geoflow-gui
   stepedge_nodes
   cgal_nodes
   gdal_nodes
