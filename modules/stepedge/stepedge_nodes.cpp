@@ -2,7 +2,7 @@
 #include "region_growing_plane.h"
 // #include "gloo.h"
 #include "ptinpoly.h"
-#include "earcut.hpp"
+#include <earcut.hpp>
 
 // #include "nlohmann/json.hpp"
 // using json = nlohmann::json;
@@ -156,6 +156,7 @@ void AlphaShapeNode::process(){
   TriangleCollection alpha_triangles;
   vec1i segment_ids, plane_idx;
   for (auto& it : points_per_segment ) {
+    if (it.first == -1) continue; // skip points if they put at index -1 (eg if we care not about slanted surfaces for ring extraction)
     plane_idx.push_back(it.first);
     auto points = it.second;
     as::Triangulation_2 T;
@@ -302,10 +303,11 @@ void Arr2LinearRingsNode::process(){
       }
       linear_rings.push_back(polygon3d);
       attributes["height"].push_back(face->data().elevation_avg);
-      attributes["rms_error"].push_back(face->data().rms_error_to_avg);
-      attributes["max_error"].push_back(face->data().max_error);
-      attributes["coverage"].push_back(face->data().segid_coverage);
+      // attributes["rms_error"].push_back(face->data().rms_error_to_avg);
+      // attributes["max_error"].push_back(face->data().max_error);
+      // attributes["coverage"].push_back(face->data().segid_coverage);
       attributes["count"].push_back(face->data().total_count);
+      attributes["segid"].push_back(face->data().segid);
     }
   }
   output("linear_rings").set(linear_rings);
@@ -385,11 +387,13 @@ void ExtruderNode::process(){
     vertex n;
     for (auto edge : arr.edge_handles()) {
       // skip if faces on both sides of this edge are not finite
-      bool left_finite = edge->twin()->face()->data().in_footprint;
-      bool right_finite = edge->face()->data().in_footprint;
-      if (left_finite || right_finite) {
+      // bool left = edge->twin()->face()->data().in_footprint;
+      // bool right = edge->face()->data().in_footprint;
+      bool left = edge->twin()->face()->data().in_footprint;
+      bool right = edge->face()->data().in_footprint;
+      if (left || right) {
         int wall_label = 2;
-        if (left_finite && right_finite)
+        if (left && right)
           wall_label = 3;
 
         auto h1 = edge->face()->data().elevation_avg;
@@ -574,6 +578,245 @@ void LinearRingtoRingsNode::process(){
   output("linear_rings").set(lrc);
 }
 
+Polygon_2 arr_cell2polygon(Face_handle& fh) {
+  Polygon_2 poly;
+  auto he = fh->outer_ccb();
+  auto first = he;
+  do {
+    poly.push_back(he->target()->point());
+    he = he->next();
+  } while (he!=first);
+  return poly;
+}
+void arr_process(Arrangement_2& arr, const bool& flood_unsegmented, const bool& dissolve_edges, const bool& dissolve_stepedges, const float& step_height_threshold) {
+  if (flood_unsegmented) {
+    std::map<float, Face_handle> face_map;
+    for (auto& face : arr.face_handles()) {
+      if (face->data().segid!=0)
+        face_map[face->data().elevation_avg] = face;
+    }
+    for (auto& kv : face_map) {
+      std::stack<Face_handle> candidate_stack;
+      // std::cout << "Growing face with elevation=" << kv.first << "\n";
+      auto& cur_segid = kv.second->data().segid;
+      auto& cur_elev = kv.second->data().elevation_avg;
+      candidate_stack.push(kv.second);
+      while (!candidate_stack.empty()) {
+        auto fh = candidate_stack.top(); candidate_stack.pop();
+        auto he = fh->outer_ccb();
+        auto first = he;
+        do {
+          // std::cout << &(*curr) << "\n";
+          // ignore weird nullptrs (should not be possible...)
+          if (he==nullptr) break;
+          auto candidate = he->twin()->face();
+          if (candidate->data().segid == 0) {
+            candidate->data().segid = cur_segid;
+            candidate->data().elevation_avg = cur_elev;
+            candidate_stack.push(candidate);
+          }
+          he = he->next();
+        } while (he != first);
+      }
+    }
+  }
+  //remove edges that have the same segid on both sides
+  if (dissolve_edges) {
+    std::vector<Halfedge_handle> to_remove;
+    for (auto he : arr.edge_handles()) {
+      auto d1 = he->face()->data();
+      auto d2 = he->twin()->face()->data();
+      if ((d1.segid == d2.segid )&& (d1.in_footprint && d2.in_footprint))
+        to_remove.push_back(he);
+    }
+    for (auto he : to_remove) {
+      arr.remove_edge(he);
+    }
+  }
+  if (dissolve_stepedges) {
+    std::vector<Arrangement_2::Halfedge_handle> edges;
+    for (auto edge : arr.edge_handles()) {
+      edges.push_back(edge);
+    }
+    for (auto& edge : edges) {
+      auto f1 = edge->face();
+      auto f2 = edge->twin()->face();
+      if((f1->data().in_footprint && f2->data().in_footprint) && (f1->data().segid!=0 && f2->data().segid!=0)) {
+        if(std::abs(f1->data().elevation_avg - f2->data().elevation_avg) < step_height_threshold){
+          // should add face merge call back in face observer class...
+          // pick elevation of the segment with the highest count
+          if (f2->data().elevation_avg < f1->data().elevation_avg) {
+            f2->data().elevation_avg = f1->data().elevation_avg;
+            f2->data().segid = f1->data().segid;
+          } else {
+            f1->data().elevation_avg = f2->data().elevation_avg;
+            f1->data().segid = f2->data().segid;
+          }
+          arr.remove_edge(edge);
+        }
+      }
+    }
+  }
+}
+
+void arr_filter_biggest_face(Arrangement_2& arr, const float& rel_area_thres) {
+  // check number of faces
+  typedef std::pair<Polygon_2, double> polyar;
+  std::vector<polyar> polygons;
+  double total_area=0;
+  for (auto& fh : arr.face_handles()) {
+    if (fh->data().segid != 0 || fh->data().in_footprint == true) {
+      auto poly = arr_cell2polygon(fh);
+      double area = CGAL::to_double(CGAL::abs(poly.area()));
+      total_area += area;
+      polygons.push_back(std::make_pair(poly, area));
+    }
+  }
+  std::sort(polygons.begin(), polygons.end(), [](const polyar& a, const polyar& b) {
+    return a.second < b.second;   
+  });
+  arr.clear();
+  for (auto& poly_a : polygons) {
+    if (poly_a.second > rel_area_thres * total_area)
+      insert_non_intersecting_curves(arr, poly_a.first.edges_begin(), poly_a.first.edges_end());
+  }
+}
+std::pair<double, double> arr_measure_nosegid(Arrangement_2& arr) {
+  // check number of faces
+  double total_area=0;
+  double no_segid_area=0;
+  for (auto& fh : arr.face_handles()) {
+    if (fh->data().in_footprint) {
+      auto poly = arr_cell2polygon(fh);
+      double area = CGAL::to_double(CGAL::abs(poly.area()));
+      if (fh->data().segid == 0) {
+        no_segid_area += area;
+      }
+      total_area += area;
+    }
+  }
+  return std::make_pair(no_segid_area, no_segid_area/total_area);
+}
+// size_t get_percentile(const std::vector<linedect::Point>& points, const float& percentile) {
+//   std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
+//     return p1.z() < p2.z();
+//   });
+//   return int(percentile*float(points.size()/2));
+// }
+void arr_assign_pts_to_unsegmented(Arrangement_2& arr, std::vector<Point>& points, const float& percentile) {
+  typedef CGAL::Arr_walk_along_line_point_location<Arrangement_2> Point_location;
+
+  std::unordered_map<Face_handle, std::vector<Point>> points_per_face;
+
+  // collect for each face the points it contains
+  Point_location pl(arr);
+  for (auto& p : points){
+    auto obj = pl.locate( Point_2(p.x(), p.y()) );
+    if (auto f = boost::get<Face_const_handle>(&obj)) {
+      auto fh = arr.non_const_handle(*f);
+      if (fh->data().segid==0) {
+        points_per_face[fh].push_back(p);
+      }
+    }
+  }
+  // find elevation percentile for each face
+  for(auto& ppf : points_per_face) {
+    if (ppf.second.size()>0) {
+      std::sort(ppf.second.begin(), ppf.second.end(), [](linedect::Point& p1, linedect::Point& p2) {
+        return p1.z() < p2.z();
+      });
+      auto pid = int(percentile*float(ppf.second.size()-1));
+      // auto pid = get_percentile(ppf.second, percentile);
+      ppf.first->data().segid = -1;
+      ppf.first->data().elevation_avg = ppf.second[pid].z();
+    }
+  }
+}
+
+void BuildArrFromRingsExactNode::process() {
+  // Set up vertex data (and buffer(s)) and attribute pointers
+  auto rings = input("rings").get<std::vector<linereg::Polygon_2>>();
+  // auto plane_idx = input("plane_idx").get<vec1i>();
+  auto points_per_plane = input("pts_per_roofplane").get<std::unordered_map<int, std::vector<Point>>>();
+
+  auto fp_in = input("footprint");
+  linereg::Polygon_2 footprint;
+  if (fp_in.connected_type == TT_any)
+    footprint = fp_in.get<linereg::Polygon_2>();
+  else {
+    auto& lr = fp_in.get<LinearRing&>();
+    for (auto& p : lr) {
+      footprint.push_back(linereg::EK::Point_2(p[0], p[1]));
+    }
+  }
+
+  Arrangement_2 arr_base;
+  {
+    Face_index_observer obs (arr_base, true, 0, 0);
+    insert(arr_base, footprint.edges_begin(), footprint.edges_end());
+    // insert_non_intersecting_curves(arr_base, footprint.edges_begin(), footprint.edges_end());
+    if (!footprint.is_simple()) {
+      arr_filter_biggest_face(arr_base, param<float>("rel_area_thres"));
+    }
+  }
+  // insert step-edge lines
+  {
+    Arrangement_2 arr_overlay;
+    size_t i=0;
+    // NOTE: rings and points_per_plane must be aligned!! (matching length and order)
+    for (auto& kv : points_per_plane) {
+      if (kv.first==-1) continue;
+      auto& polygon = rings[i++];
+      if (polygon.size()>2) {
+        auto plane_id = kv.first;
+        auto& points = kv.second;
+        std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
+          return p1.z() < p2.z();
+        });
+        int elevation_id = std::floor(param<float>("z_percentile")*float(points.size()-1));
+
+        // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
+        Arrangement_2 arr;
+        Face_index_observer obs (arr, false, plane_id, points[elevation_id].z());
+        insert(arr, polygon.edges_begin(), polygon.edges_end());
+
+        if (!polygon.is_simple()) {
+          arr_filter_biggest_face(arr, param<float>("rel_area_thres"));
+        }
+
+        Overlay_traits overlay_traits;
+        arr_overlay.clear();
+        overlay(arr_base, arr, arr_overlay, overlay_traits);
+        arr_base = arr_overlay;
+      }
+    }
+  }
+  // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
+
+  if(param<bool>("extrude_unsegmented") && points_per_plane.count(-1)) {
+    arr_assign_pts_to_unsegmented(arr_base, points_per_plane[-1], param<float>("z_percentile"));
+  }
+  
+  auto nosegid_area = arr_measure_nosegid(arr_base);
+  
+  arr_process(arr_base, 
+    param<bool>("flood_to_unsegmented"), 
+    param<bool>("dissolve_edges"),
+    param<bool>("dissolve_stepedges"),
+    param<float>("step_height_threshold")
+  );
+
+  LineStringCollection segments;
+  for (auto& face: arr_base.face_handles()){
+    if (face->data().in_footprint)
+      arr2segments(face, segments);
+  }
+  output("noseg_area_a").set(float(CGAL::sqrt(nosegid_area.first)));
+  output("noseg_area_r").set(float(nosegid_area.second));
+  output("arr_segments").set(segments);
+  output("arrangement").set(arr_base);
+}
+
 void BuildArrFromRingsNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto footprint = input("footprint").get<LinearRing>();
@@ -628,72 +871,12 @@ void BuildArrFromRingsNode::process() {
     std::cout << "This polygon is no longer simple after regularisation!\n";
   }
   // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
-
-  if (param<bool>("flood_to_unsegmented")) {
-    std::map<float, Face_handle> face_map;
-    for (auto& face : arr_base.face_handles()) {
-      if (face->data().segid!=0)
-        face_map[face->data().elevation_avg] = face;
-    }
-    for (auto& kv : face_map) {
-      std::stack<Face_handle> candidate_stack;
-      // std::cout << "Growing face with elevation=" << kv.first << "\n";
-      auto& cur_segid = kv.second->data().segid;
-      auto& cur_elev = kv.second->data().elevation_avg;
-      candidate_stack.push(kv.second);
-      while (!candidate_stack.empty()) {
-        auto fh = candidate_stack.top(); candidate_stack.pop();
-        auto circ = fh->outer_ccb();
-        auto curr = circ;
-        do {
-          // std::cout << &(*curr) << "\n";
-          // ignore weird nullptrs (should not be possible...)
-          if (curr==nullptr) break;
-          auto candidate = curr->twin()->face();
-          if (candidate->data().segid == 0) {
-            candidate->data().segid = cur_segid;
-            candidate->data().elevation_avg = cur_elev;
-            candidate_stack.push(candidate);
-          }
-        } while (++curr != circ);
-      }
-    }
-  }
-  //remove edges that have the same segid on both sides
-  if (param<bool>("dissolve_edges")) {
-    std::vector<Halfedge_handle> to_remove;
-    for (auto he : arr_base.edge_handles()) {
-      auto d1 = he->face()->data();
-      auto d2 = he->twin()->face()->data();
-      if ((d1.segid == d2.segid )&& (d1.in_footprint && d2.in_footprint))
-        to_remove.push_back(he);
-    }
-    for (auto he : to_remove) {
-      arr_base.remove_edge(he);
-    }
-  }
-  if (param<bool>("dissolve_stepedges")) {
-  std::vector<Arrangement_2::Halfedge_handle> edges;
-  for (auto edge : arr_base.edge_handles()) {
-    edges.push_back(edge);
-  }
-  for (auto& edge : edges) {
-    auto f1 = edge->face();
-    auto f2 = edge->twin()->face();
-    if((f1->data().in_footprint && f2->data().in_footprint) && (f1->data().segid!=0 && f2->data().segid!=0)) {
-      if(std::abs(f1->data().elevation_avg - f2->data().elevation_avg) < param<float>("step_height_threshold")){
-        // should add face merge call back in face observer class...
-        // pick elevation of the segment with the highest count
-        if (f2->data().elevation_avg < f1->data().elevation_avg) {
-          f2->data().elevation_avg = f1->data().elevation_avg;
-        } else {
-          f1->data().elevation_avg = f2->data().elevation_avg;
-        }
-        arr_base.remove_edge(edge);
-      }
-    }
-  }
-  }
+  arr_process(arr_base, 
+    param<bool>("flood_to_unsegmented"), 
+    param<bool>("dissolve_edges"),
+    param<bool>("dissolve_stepedges"),
+    param<float>("step_height_threshold")
+  );
 
   LineStringCollection segments;
   for (auto& face: arr_base.face_handles()){
@@ -942,6 +1125,8 @@ void DetectPlanesNode::process() {
   std::unordered_map<int, std::vector<Point>> pts_per_roofplane;
   size_t horiz_roofplane_cnt=0;
   size_t slant_roofplane_cnt=0;
+  if (param<bool>("only_horizontal"))
+    pts_per_roofplane[-1] = std::vector<Point>();
   for(auto seg: PD.segment_shapes){
     auto& plane = seg.second;
     Vector n = plane.orthogonal_vector();
@@ -949,9 +1134,21 @@ void DetectPlanesNode::process() {
     auto horizontality = CGAL::abs(n*Vector(0,0,1));
     bool is_wall = horizontality < metrics_is_wall_threshold;
     bool is_horizontal = horizontality > metrics_is_horizontal_threshold;
-    if (!is_wall)
-      pts_per_roofplane[seg.first] = PD.get_points(seg.first);
 
+    // put slanted surface points at index -1 if we care only about horzontal surfaces
+    if (!is_wall) {
+      auto segpts = PD.get_points(seg.first);
+      if (!param<bool>("only_horizontal") ||
+          (param<bool>("only_horizontal") && is_horizontal)) {
+        pts_per_roofplane[seg.first] = segpts;
+      } else if (!is_horizontal) {
+        pts_per_roofplane[-1].insert(
+          pts_per_roofplane[-1].end(),
+          segpts.begin(),
+          segpts.end()
+        );
+      }
+    }
     if (is_horizontal)
       ++horiz_roofplane_cnt;
     else if (!is_wall && !is_horizontal)
@@ -1368,51 +1565,77 @@ void RegulariseRingsNode::process(){
   SegmentCollection all_edges;
 
   // build vector of all input edges
-  for(auto edge : edges) {
-    all_edges.push_back(edge);
-  }
-  size_t fpi_begin = all_edges.size();
+  // for(auto edge : edges) {
+  //   all_edges.push_back(edge);
+  // }
+  // size_t fpi_begin = all_edges.size();
+  SegmentCollection fp_edges;
   for(size_t i=0; i<footprint.size()-1; ++i) {
-    all_edges.push_back(Segment({footprint[i], footprint[i+1]}));
+    fp_edges.push_back(Segment({footprint[i], footprint[i+1]}));
   }
-  all_edges.push_back(
+  fp_edges.push_back(
     Segment({footprint[footprint.size()-1], footprint[0]})
   );
-  size_t fpi_end = all_edges.size()-1;
+  // size_t fpi_end = all_edges.size()-1;
 
   // get clusters from line regularisation 
-  auto LR = LineRegulariser(all_edges);
+  auto LR = linereg::LineRegulariser();
+  LR.add_segments(0,edges);
+  LR.add_segments(1,fp_edges);
   LR.dist_threshold = param<float>("dist_threshold");
   LR.angle_threshold = param<float>("angle_threshold");
-  LR.cluster();
+  LR.cluster(param<bool>("weighted_avg"));
 
-  // TODO: align to fp edges
-  // LR.lines
-
-  LinearRingCollection new_rings;
+  std::vector<linereg::Polygon_2> exact_polygons;
   for (auto& idx : ring_idx) {
-    LinearRing new_ring;
-    if (idx.size()>1) {
-      for (size_t i=idx[1]; i<idx[0]+idx.size(); ++i) {
-        chain(all_edges[i-1], all_edges[i], new_ring, param<float>("snap_threshold"));
-      }
-      chain(all_edges[idx[idx.size()-1]], all_edges[idx[0]], new_ring, param<float>("snap_threshold"));
+    exact_polygons.push_back(
+      linereg::chain_ring(idx, LR.get_segments(0), param<float>("snap_threshold"))
+    );
+  }
+  std::vector<size_t> fp_idx;
+  for (size_t i=0; i < LR.get_segments(1).size(); ++i) {
+    fp_idx.push_back(i);
+  }
+  auto exact_fp = linereg::chain_ring(fp_idx, LR.get_segments(1), param<float>("snap_threshold"));
+  output("exact_rings_out").set(exact_polygons);
+  output("exact_footprint_out").set(exact_fp);
+
+
+  // LinearRingCollection new_rings;
+  // for (auto& idx : ring_idx) {
+  //   LinearRing new_ring;
+  //   if (idx.size()>1) {
+  //     for (size_t i=idx[1]; i<idx[0]+idx.size(); ++i) {
+  //       chain(all_edges[i-1], all_edges[i], new_ring, param<float>("snap_threshold"));
+  //     }
+  //     chain(all_edges[idx[idx.size()-1]], all_edges[idx[0]], new_ring, param<float>("snap_threshold"));
+  //   }
+  //   new_rings.push_back(new_ring);
+  // }
+
+  // LinearRing new_fp;
+  // for (size_t i=fpi_begin+1; i<=fpi_end; ++i) {
+  //   chain(all_edges[i-1], all_edges[i], new_fp, param<float>("snap_threshold"));
+  // }
+  // chain(all_edges[fpi_end], all_edges[fpi_begin], new_fp, param<float>("snap_threshold"));
+
+  SegmentCollection new_segments;
+  vec1i priorities;
+  for(auto& kv : LR.segments) {
+    for(auto& ekseg : kv.second) {
+      new_segments.push_back(Segment());
+      new_segments.back()[0] = {float(CGAL::to_double(ekseg.source().x())), float(CGAL::to_double(ekseg.source().y())), 0};
+      new_segments.back()[1] = {float(CGAL::to_double(ekseg.target().x())), float(CGAL::to_double(ekseg.target().y())), 0};
+      priorities.push_back(kv.first);
+      priorities.push_back(kv.first);
     }
-    new_rings.push_back(new_ring);
   }
 
-  // TODO: check if we are not creating duplicate points when a linesegment becomes 0 length
-  // now solved with simplifier
-  LinearRing new_fp;
-  for (size_t i=fpi_begin+1; i<=fpi_end; ++i) {
-    chain(all_edges[i-1], all_edges[i], new_fp, param<float>("snap_threshold"));
-  }
-  chain(all_edges[fpi_end], all_edges[fpi_begin], new_fp, param<float>("snap_threshold"));
 
-  // output("merged_edges_out").set(merged_edges_out);
-  output("edges_out").set(all_edges);
-  output("rings_out").set(new_rings);
-  output("footprint_out").set(new_fp);
+  output("priorities").set(priorities);
+  output("edges_out").set(new_segments);
+  // output("rings_out").set(new_rings);
+  // output("footprint_out").set(new_fp);
 }
 
 LinearRing simplify_footprint(LinearRing& polygon, float& threshold_stop_cost) {

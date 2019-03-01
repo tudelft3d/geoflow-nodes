@@ -28,7 +28,9 @@ include_directories(${GDAL_INCLUDE_DIR})
 
 # GEOS
 find_package( GEOS )
-include_directories(${GEOS_INCLUDE_DIR})
+if (GEOS_FOUND)
+  include_directories(${GEOS_INCLUDE_DIR})
+endif()
 
 # CGAL
 find_package( CGAL QUIET COMPONENTS )
@@ -73,6 +75,11 @@ include_directories(
   thirdparty/geoflow/thirdparty/glm
 )
 
+#earcut
+include_directories(
+  thirdparty/earcut
+)
+
 # MODULES
 
 if (CGAL_FOUND)
@@ -94,6 +101,9 @@ include_directories(modules/las)
 add_subdirectory(modules/masb)
 include_directories(modules/masb)
 
+# add_subdirectory(modules/cityjson)
+include_directories(modules/cityjson)
+
 if (CGAL_FOUND AND Boost_FOUND)
   add_subdirectory(modules/stepedge)
   include_directories(modules/stepedge)
@@ -110,6 +120,8 @@ if (CGAL_FOUND AND Boost_FOUND AND GDAL_FOUND AND GEOS_FOUND)
 endif()
 
 add_subdirectory(apps/mat)
+
+add_subdirectory(apps/cityjson)
 
 # add_subdirectory(point-based)
 # add_subdirectory(raster-based)

@@ -144,6 +144,41 @@ namespace geoflow::nodes::stepedge {
     void process();
   };
 
+  class BuildArrFromRingsExactNode:public Node {
+
+    public:
+    // bool remove_unsupported=false;
+
+    using Node::Node;
+    void init() {
+      add_input("rings", TT_any);
+      add_input("pts_per_roofplane", TT_any);
+      add_input("footprint", {TT_any, TT_linear_ring});
+      add_output("noseg_area_a", TT_float);
+      add_output("noseg_area_r", TT_float);
+      add_output("arrangement", TT_any);
+      add_output("arr_segments", TT_line_string_collection);
+
+      add_param("extrude_unsegmented", (bool) true);
+      add_param("z_percentile", (float) 0.9);
+      add_param("rel_area_thres", (float) 0.1);
+      add_param("flood_to_unsegmented", (bool) true);
+      add_param("dissolve_edges", (bool) true);
+      add_param("dissolve_stepedges", (bool) true);
+      add_param("step_height_threshold", (float) 1.0);
+    }
+    void gui() {
+      ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
+      ImGui::SliderFloat("Preserve split ring area", &param<float>("rel_area_thres"), 0.01, 1);
+      ImGui::Checkbox("Extrude unsegmented", &param<bool>("extrude_unsegmented"));
+      ImGui::Checkbox("Flood to unsegmented", &param<bool>("flood_to_unsegmented"));
+      ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
+      ImGui::Checkbox("Dissolve stepedges", &param<bool>("dissolve_stepedges"));
+      ImGui::SliderFloat("step_height_threshold", &param<float>("step_height_threshold"), 0, 100);
+    }
+    void process();
+  };
+
   class BuildArrFromRingsNode:public Node {
 
     public:
@@ -247,6 +282,7 @@ namespace geoflow::nodes::stepedge {
       add_output("horiz_roofplane_cnt", TT_float);
       add_output("slant_roofplane_cnt", TT_float);
 
+      add_param("only_horizontal", (bool) true);
       add_param("metrics_normal_k", (int) 10);
       add_param("metrics_plane_min_points", (int) 50);
       add_param("metrics_plane_epsilon", (float) 0.15);
@@ -262,6 +298,7 @@ namespace geoflow::nodes::stepedge {
       ImGui::InputFloat("Plane normal thres", &param<float>("metrics_plane_normal_threshold"), 0.01, 1);
       ImGui::InputFloat("Wall angle thres", &param<float>("metrics_is_wall_threshold"), 0.01, 1);
       ImGui::InputFloat("Is horizontal", &param<float>("metrics_is_horizontal_threshold"), 0.01, 1);
+      ImGui::Checkbox("Output only horizontal planes", &param<bool>("only_horizontal"));
     }
 
     void process();
@@ -403,20 +440,25 @@ namespace geoflow::nodes::stepedge {
       // add_input("edge_segments", TT_segment_collection);
       add_input("footprint", TT_linear_ring);
       add_output("edges_out", TT_segment_collection);
-      add_output("rings_out", TT_linear_ring_collection);
-      add_output("footprint_out", TT_linear_ring);
+      add_output("priorities", TT_vec1i);
+      // add_output("rings_out", TT_linear_ring_collection);
+      // add_output("footprint_out", TT_linear_ring);
+      add_output("exact_rings_out", TT_any);
+      add_output("exact_footprint_out", TT_any);
       // add_output("footprint_labels", TT_vec1i);
       // add_output("line_clusters", TT_any); // ie a LineCluster
       // add_output("tmp_vec3f", TT_vec3f);
       add_param("dist_threshold", (float) 0.5);
-      add_param("angle_threshold", (float) 0.1);
+      add_param("angle_threshold", (float) 0.10);
       add_param("snap_threshold", (float) 1.0);
+      add_param("weighted_avg", (bool) false);
     }
 
     void gui(){
       ImGui::DragFloat("Distance threshold", &param<float>("dist_threshold"), 0.1, 0);
       ImGui::DragFloat("Angle threshold", &param<float>("angle_threshold"), 0.01, 0.01, 3.1415);
       ImGui::DragFloat("Snap threshold", &param<float>("snap_threshold"), 0.01, 0.01, 10);
+      ImGui::Checkbox("weighted_avg", &param<bool>("weighted_avg"));
     }
     void process();
   };

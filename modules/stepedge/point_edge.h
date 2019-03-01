@@ -110,7 +110,7 @@ struct FaceInfo {
   bool in_footprint=false;
   float elevation_avg=0;
   float elevation_min, elevation_max;
-  size_t segid=0;
+  int segid=0;
   float segid_coverage;
   float segid_count;
   PNL_vector points;
@@ -198,16 +198,9 @@ public:
   {
     // Assign index to the new face.
     new_face->data().in_footprint = in_footprint;
-    if(n_faces == 1) {
-      new_face->data().is_finite = true;
-      new_face->data().segid = plane_id;
-      new_face->data().elevation_avg = elevation;
-    } else if(old_face->data().is_finite) {
-      new_face->data().is_finite = true;
-      new_face->data().segid = plane_id;
-      new_face->data().elevation_avg = elevation;
-    } else
-      new_face->data().is_finite = false;
+    new_face->data().is_finite = true;
+    new_face->data().segid = plane_id;
+    new_face->data().elevation_avg = elevation;
     n_faces++;
   }
 };
