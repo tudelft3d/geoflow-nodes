@@ -26,6 +26,7 @@ int main(int ac, const char * av[])
     std::string footprints_classes_file("out_bclass.shp");
     std::string decomposed_footprints_file("out_lod13.shp");
     float step_threshold = 1.0;
+    float percentile = 0.9;
     bool gui = false;
     
     po::options_description desc("Allowed options");
@@ -36,6 +37,7 @@ int main(int ac, const char * av[])
     ("footprints", po::value<std::string>(&footprints_file), "Footprints")
     ("output", po::value<std::string>(&decomposed_footprints_file), "Decomposed footprints")
     ("step_threshold", po::value<float>(&step_threshold), "Step threshold")
+    ("percentile", po::value<float>(&percentile), "Percentile")
     ;
     po::variables_map vm;
     po::store(po::parse_command_line(ac, av, desc), vm);
@@ -60,6 +62,7 @@ int main(int ac, const char * av[])
     las_in_poly->set_param("las_filepath", las_file);
 
     lod13generator->set_param("step_height_threshold", step_threshold);
+    lod13generator->set_param("z_percentile", percentile);
     lod13generator->set_param("use_only_hplanes", true);
 
     ogr_writer->set_param("filepath", decomposed_footprints_file);
