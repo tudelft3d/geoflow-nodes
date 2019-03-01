@@ -48,7 +48,7 @@ target_link_libraries( lod13
   cgal_nodes
   gdal_nodes
   Boost::program_options
-  LASlib
+  ${LASlib}
 )
 add_executable(lod10 lod10.cpp)
 target_link_libraries( lod10 
