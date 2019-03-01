@@ -19,10 +19,10 @@ namespace gfn = geoflow::nodes;
 
 int main(int ac, const char * av[])
 {
-    //  std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_1.gpkg");
-   std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg");
-    //  std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las");
-   std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las");
+     std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_1.gpkg");
+//    std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg");
+     std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las");
+//    std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las");
     std::string footprints_classes_file("out_bclass.shp");
     std::string decomposed_footprints_file("out_lod13.shp");
     float step_threshold = 1.0;
@@ -60,6 +60,7 @@ int main(int ac, const char * av[])
     las_in_poly->set_param("las_filepath", las_file);
 
     lod13generator->set_param("step_height_threshold", step_threshold);
+    lod13generator->set_param("use_only_hplanes", true);
 
     ogr_writer->set_param("filepath", decomposed_footprints_file);
 

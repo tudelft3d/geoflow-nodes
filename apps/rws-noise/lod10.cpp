@@ -11,8 +11,10 @@ namespace gfn = geoflow::nodes;
 
 int main(int ac, const char * av[])
 {
-    std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg");
-    std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las");
+    std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_1.gpkg");
+//    std::string footprints_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_gebouwen/bag.gpkg");
+    std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las");
+//    std::string las_file("/Users/ravi/surfdrive/Data/step-edge-detector/nieuwegein_puntenwolk/extend.las");
     std::string footprints_out_file("out.shp");
     bool gui = false;
     float percentile = 0.9;
@@ -63,10 +65,10 @@ int main(int ac, const char * av[])
         ogr_loader->output("linear_rings"), 
         ogr_writer->input("geometries")
     );
-    lod10generator->output_group("attributes").connect(
+    ogr_loader->output_group("attributes").connect(
         ogr_writer->input_group("attributes")
     );
-    ogr_loader->output_group("attributes").connect(
+    lod10generator->output_group("attributes").connect(
         ogr_writer->input_group("attributes")
     );
     

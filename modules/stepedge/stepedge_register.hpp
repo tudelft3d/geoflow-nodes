@@ -224,12 +224,12 @@ namespace geoflow::nodes::stepedge {
       auto point_clouds = input("point_clouds").get<std::vector<PointCollection>>();
 
       // AttributeMap all_attributes;
-      vec1i bclass_vec;
-      output_group("attributes").add("bclass", TT_vec1i);
-      vec1f height_vec;
-      output_group("attributes").add("height", TT_vec1f);
-      vec1f rms_error_vec;
-      output_group("attributes").add("rms_error", TT_vec1f);
+      output_group("attributes").add("bclass", TT_vec1i).set(vec1i());
+      auto& bclass_vec = output_group("attributes").term("bclass").get<vec1i&>();
+      output_group("attributes").add("height", TT_vec1f).set(vec1f());
+      auto& height_vec = output_group("attributes").term("height").get<vec1f&>();
+      output_group("attributes").add("rms_error", TT_vec1f).set(vec1f());
+      auto& rms_error_vec = output_group("attributes").term("rms_error").get<vec1f&>();
 
       NodeRegister R("Nodes");
       R.register_node<DetectPlanesNode>("DetectPlanes");
@@ -279,9 +279,9 @@ namespace geoflow::nodes::stepedge {
         }
 
       }
-      output_group("attributes").term("bclass").set(bclass_vec);
-      output_group("attributes").term("height").set(height_vec);
-      output_group("attributes").term("rms_error").set(rms_error_vec);
+      // output_group("attributes").term("bclass").set(std::move(bclass_vec));
+      // output_group("attributes").term("height").set(std::move(height_vec));
+      // output_group("attributes").term("rms_error").set(std::move(rms_error_vec));
     }
   };
 
