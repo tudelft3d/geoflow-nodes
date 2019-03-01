@@ -4,7 +4,7 @@
 #include <stepedge_register.hpp>
 #include <gdal_register.hpp>
 #include <cgal_register.hpp>
-#include <geoflow/gui/flowchart.hpp>
+// #include <geoflow/gui/flowchart.hpp>
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
@@ -27,12 +27,12 @@ int main(int ac, const char * av[])
     std::string decomposed_footprints_file("out_lod13.shp");
     float step_threshold = 1.0;
     float percentile = 0.9;
-    bool gui = false;
+    // bool gui = false;
     
     po::options_description desc("Allowed options");
     desc.add_options()
     ("help", "produce help message")
-    ("gui", po::bool_switch(&gui), "launch gui") 
+    // ("gui", po::bool_switch(&gui), "launch gui") 
     ("las", po::value<std::string>(&las_file), "Point cloud ")
     ("footprints", po::value<std::string>(&footprints_file), "Footprints")
     ("output", po::value<std::string>(&decomposed_footprints_file), "Decomposed footprints")
@@ -94,8 +94,8 @@ int main(int ac, const char * av[])
       ogr_writer->input_group("attributes")
     );
   
-    if (gui)
-        geoflow::launch_flowchart(N, {stepedge, gdal, cgal});
-    else
+    // if (gui)
+    //     geoflow::launch_flowchart(N, {stepedge, gdal, cgal});
+    // else
         N.run(*ogr_loader);
 }
