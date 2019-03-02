@@ -46,6 +46,18 @@ vector<size_t> LineDetector::get_point_indices(size_t shape_id) {
   return result;
 }
 
+geoflow::Segment LineDetector::project(const size_t i1, const size_t i2) {
+  const auto& l = segment_shapes[point_segment_idx[i1]];
+  const auto& p1 = indexed_points[i1].first;
+  const auto& p2 = indexed_points[i2].first;
+  auto p1n = l.projection(p1);
+  auto p2n = l.projection(p2);
+  return geoflow::Segment({
+    geoflow::arr3f{float(p1n.x()), float(p1n.y()), float(p1n.z())},
+    geoflow::arr3f{float(p2n.x()), float(p2n.y()), float(p2n.z())}
+  });
+}
+
 size_t LineDetector::get_bounded_edges(geoflow::SegmentCollection& edges) {
   std::vector<size_t> id_mins;
   std::map<size_t, geoflow::Segment> ordered_segments;
@@ -123,16 +135,18 @@ void LineDetector::detect(){
   auto cmp = [](index_dist_pair left, index_dist_pair right) {return left.second < right.second;};
   priority_queue<index_dist_pair, vector<index_dist_pair>, decltype(cmp)> pq(cmp);
 
-  size_t i=0;
+  // size_t i=0;
   for(auto pi : indexed_points){
-    auto p = pi.first;
-    auto line = fit_line(neighbours[pi.second]);
-    auto line_dist = CGAL::squared_distance(line, p);
-    pq.push(index_dist_pair(i++, line_dist));
+    if (point_segment_idx[pi.second]==0) {
+      auto p = pi.first;
+      auto line = fit_line(neighbours[pi.second]);
+      auto line_dist = CGAL::squared_distance(line, p);
+      pq.push(index_dist_pair(pi.second, line_dist));
+    }
   }
 
   // region growing from seed points
-  while(pq.size()>0){
+  while(pq.size()>0) {
     auto idx = pq.top().first; pq.pop();
     // if (point_seed_flags[idx]){
     if (point_segment_idx[idx]==0){
@@ -146,17 +160,8 @@ inline bool LineDetector::valid_candidate(Line &line, Point &p) {
   return CGAL::squared_distance(line, p) < dist_thres;
 }
 
-void LineDetector::grow_region(size_t seed_idx){
+void LineDetector::grow_region(size_t seed_idx) {
   auto p = indexed_points[seed_idx];
-  // Neighbor_search search_init(tree, p.first, N);
-  // vector<size_t> search_idx;
-  // for (auto s : search_init){
-  //   std::cout << "p from kd-tree " << float(s.first.first.x()) << " " << float(s.first.first.y()) << " " << float(s.first.first.z()) << "\n";
-  //   std::cout << "p from indexed_points " << float(indexed_points[s.second].first.x()) << " " << float(indexed_points[s.second].first.y()) << " " << float(indexed_points[s.first.second].first.z()) << "\n";
-  //   std::cout << "id from kdtree: " << s.first.second << " ";
-  //   std::cout << "id from indexed_points: " << indexed_points[s.first.second].second << "\n";
-  //   search_idx.push_back(s.first.second);
-  // }
   auto line = fit_line(neighbours[seed_idx]);
   segment_shapes[region_counter] = line;
 

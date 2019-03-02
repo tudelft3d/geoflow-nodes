@@ -42,11 +42,12 @@ namespace linedect {
     unordered_map<size_t, Line> segment_shapes;
     int N = 5;
     double dist_thres = 0.2*0.2;
-    size_t min_segment_count = 20;
+    size_t min_segment_count = 4;
 
     LineDetector(vector<Point> &points);
     LineDetector(vector<Point> &points, vector<vector<size_t>> neighbours);
     vector<size_t> get_point_indices(size_t shape_id);
+    geoflow::Segment project(const size_t i1, const size_t i2);
     size_t get_bounded_edges(geoflow::SegmentCollection& edges);
     void detect();
 

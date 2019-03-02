@@ -218,10 +218,7 @@ namespace geoflow::nodes::stepedge {
   };
 
   class DetectLinesNode:public Node {
-    config c;
-
     public:
-    bool use_linear_neighboorhood=false;
 
     using Node::Node;
     void init() {
@@ -231,14 +228,21 @@ namespace geoflow::nodes::stepedge {
       add_output("ring_id", TT_vec1i);
       add_output("ring_order", TT_vec1i);
       add_output("is_start", TT_vec1i);
+
+      add_param("linear_knn", (bool) false);
+      add_param("dist_thres", (float) 0.3);
+      add_param("min_cnt_upper", (int) 8);
+      add_param("min_cnt_lower", (int) 4);
+      add_param("k", (int) 10);
     }
 
     void gui(){
-      ImGui::InputFloat("Dist thres", &c.linedetect_dist_threshold, 0.01, 1);
-      ImGui::InputInt("Segment cnt min", &c.linedetect_min_segment_count);
-      ImGui::InputInt("K", &c.linedetect_k);
-      ImGui::Checkbox("Use linear neighbourhood for ring input", &use_linear_neighboorhood);
+      ImGui::InputFloat("Dist thres", &param<float>("dist_thres"), 0.01, 1);
+      ImGui::DragIntRange2("Minimum segment count", &param<int>("min_cnt_lower"), &param<int>("min_cnt_upper"), 1, 0);
+      ImGui::InputInt("K", &param<int>("k"));
+      ImGui::Checkbox("Use linear neighbourhood for ring input", &param<bool>("linear_knn"));
     }
+    inline void detect_lines(linedect::LineDetector& LD);
     void process();
   };
 

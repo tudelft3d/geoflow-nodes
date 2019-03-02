@@ -898,6 +898,17 @@ void BuildArrFromRingsNode::process() {
 //   return (wasNegative) ? (N - offset) : (offset);
 // }
 
+inline void DetectLinesNode::detect_lines(linedect::LineDetector& LD) {
+  LD.dist_thres = param<float>("dist_thres") * param<float>("dist_thres");
+  LD.N = param<int>("k");
+  auto& c_upper = param<int>("min_cnt_upper");
+  auto& c_lower = param<int>("min_cnt_lower");
+  for (size_t i=c_upper; i>=c_lower; --i){
+    LD.min_segment_count = i;
+    LD.detect();
+  }
+}
+
 void DetectLinesNode::process(){
   auto input_geom = input("edge_points");
 
@@ -913,16 +924,13 @@ void DetectLinesNode::process(){
       cgal_pts.push_back(linedect::Point(p[0], p[1], p[2]));
     }
     linedect::LineDetector LD(cgal_pts);
-    LD.dist_thres = c.linedetect_dist_threshold * c.linedetect_dist_threshold;
-    LD.min_segment_count = c.linedetect_min_segment_count;
-    LD.N = c.linedetect_k;
-    LD.detect();
+    detect_lines(LD);
     LD.get_bounded_edges(edge_segments);
 
   // fit lines per ring
   } else if (input_geom.connected_type == TT_linear_ring_collection) {
     auto rings = input_geom.get<LinearRingCollection>();
-    int n = c.linedetect_k;
+    int n = param<int>("k");
     ring_idx.resize(rings.size());
     
     size_t ring_cntr=0;
@@ -934,7 +942,7 @@ void DetectLinesNode::process(){
         cgal_pts.push_back(linedect::Point(p[0], p[1], p[2]));
       }
 
-      if (use_linear_neighboorhood) {
+      if (param<bool>("linear_knn")) {
         int kb = n/2; //backward neighbors
         int kf = n-kb-1; //forward neighbours
 
@@ -950,26 +958,11 @@ void DetectLinesNode::process(){
           neighbours.push_back(idx);
         }
         linedect::LineDetector LD(cgal_pts, neighbours);
-        LD.dist_thres = c.linedetect_dist_threshold * c.linedetect_dist_threshold;
-        LD.min_segment_count = c.linedetect_min_segment_count;
-        LD.N = n;
-        LD.detect();
+        detect_lines(LD);
         LD.get_bounded_edges(edge_segments);
       } else {
         linedect::LineDetector LD(cgal_pts);
-        LD.dist_thres = c.linedetect_dist_threshold * c.linedetect_dist_threshold;
-        LD.min_segment_count = c.linedetect_min_segment_count;
-        LD.N = n;
-        LD.detect();
-        // size_t n_edges = LD.get_bounded_edges(edge_segments);
-        // for (size_t i=0; i<n_edges; ++i) {
-        //   ring_order.push_back(i);
-        //   ring_id.push_back(ring_cntr);
-        //   is_start.push_back(1);
-        //   ring_order.push_back(i);
-        //   ring_id.push_back(ring_cntr);
-        //   is_start.push_back(0);
-        // } ++ring_cntr;
+        detect_lines(LD);
 
         // chain the detected lines, to ensure correct order
         if (LD.segment_shapes.size()>1) {
@@ -979,14 +972,14 @@ void DetectLinesNode::process(){
             prev_seg=LD.point_segment_idx[prev_i], 
             cur_seg, 
             i_last_seg = -1;
-          bool no_offset=false;
+          bool perfect_aligned=false; // is the first point of the ring also the first point of a segment? If yes, we are perfectly aligned!
           for( int i=0; i<ring.size(); ++i ) {
             cur_seg = LD.point_segment_idx[i];
             if(cur_seg==prev_seg && cur_seg!=0) { // we are inside a segment
 
             } else if (cur_seg!=0 && prev_seg==0) { // from unsegmented to segmented
               new_ring_ids.push_back(i); // first of cur
-              if(i==0) no_offset=true;
+              if(i==0) perfect_aligned=true;
               // new_ring_ids.push_back(i); // end of unsegmented linesegment
             } else if (cur_seg!=0 && prev_seg!=0) { // from one segment to another
               new_ring_ids.push_back(prev_i); // last of prev
@@ -1002,13 +995,10 @@ void DetectLinesNode::process(){
           int order_cnt=0;
           
           // ring_idx.push_back();
-          for(int i = no_offset ? 0:1; i<last; i += 2) {
+          for(int i = perfect_aligned ? 0:1; i<last; i += 2) {
             // TODO: reproject points on fitted line!!
-            auto& p0 = ring[new_ring_ids[i]];
-            auto& p1 = ring[new_ring_ids[i+1]];
-            edge_segments.push_back({p0,p1});
+            edge_segments.push_back( LD.project(new_ring_ids[i], new_ring_ids[i+1]) );
             ring_idx[ring_cntr].push_back(seg_cntr++);
-            // segment_collections.back().push_back({p0,p1});
             ring_order.push_back(order_cnt);
             ring_id.push_back(ring_cntr);
             ring_order.push_back(order_cnt++);
@@ -1016,10 +1006,10 @@ void DetectLinesNode::process(){
             is_start.push_back(1);
             is_start.push_back(0);
           }
-          if(!no_offset) {
-            auto& p0 = ring[new_ring_ids[last]];
-            auto& p1 = ring[new_ring_ids[0]];
-            edge_segments.push_back({p0,p1});
+          if(!perfect_aligned) { // add the segment that runs through the first point in the original ring
+            // auto& p0 = ring[new_ring_ids[last]];
+            // auto& p1 = ring[new_ring_ids[0]];
+            edge_segments.push_back( LD.project(new_ring_ids[last], new_ring_ids[0]) );
             ring_idx[ring_cntr].push_back(seg_cntr++);
             // segment_collections.back().push_back({p0,p1});
             ring_order.push_back(order_cnt);
