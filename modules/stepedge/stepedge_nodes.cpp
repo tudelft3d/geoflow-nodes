@@ -1679,14 +1679,14 @@ void RegulariseRingsNode::process(){
   std::vector<linereg::Polygon_2> exact_polygons;
   for (auto& idx : ring_idx) {
     exact_polygons.push_back(
-      linereg::chain_ring(idx, LR.get_segments(0), param<float>("snap_threshold"))
+      linereg::chain_ring<linereg::EK>(idx, LR.get_segments(0), param<float>("snap_threshold"))
     );
   }
   std::vector<size_t> fp_idx;
   for (size_t i=0; i < LR.get_segments(1).size(); ++i) {
     fp_idx.push_back(i);
   }
-  auto exact_fp = linereg::chain_ring(fp_idx, LR.get_segments(1), param<float>("snap_threshold"));
+  auto exact_fp = linereg::chain_ring<linereg::EK>(fp_idx, LR.get_segments(1), param<float>("snap_threshold"));
   output("exact_rings_out").set(exact_polygons);
   output("exact_footprint_out").set(exact_fp);
 

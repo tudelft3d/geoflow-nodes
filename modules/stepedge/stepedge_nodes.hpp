@@ -434,7 +434,7 @@ namespace geoflow::nodes::stepedge {
       // add_output("line_clusters", TT_any); // ie a LineCluster
       // add_output("tmp_vec3f", TT_vec3f);
       add_param("dist_threshold", (float) 0.5);
-      add_param("angle_threshold", (float) 0.2);
+      add_param("angle_threshold", (float) 0.15);
     }
 
     void gui(){
