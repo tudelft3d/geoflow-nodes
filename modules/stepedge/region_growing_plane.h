@@ -41,6 +41,7 @@ namespace planedect {
     double dist_thres = 0.2*0.2;
     double normal_thres = 0.9;
     size_t min_segment_count = 20;
+    size_t n_refit = 5;
 
     PlaneDetector(vector<Point> &points, vector<Vector> &normals);
     vector<size_t> get_point_indices(size_t shape_id);

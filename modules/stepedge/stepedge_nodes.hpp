@@ -218,27 +218,41 @@ namespace geoflow::nodes::stepedge {
   };
 
   class DetectLinesNode:public Node {
-    config c;
-
     public:
-    bool use_linear_neighboorhood=false;
+    typedef std::pair<size_t,size_t> IDPair;
+    struct Cmp {
+      bool operator()(const IDPair& lhs, const IDPair& rhs) const { 
+          return lhs.first < rhs.first; 
+      }
+    };
+    typedef std::map<IDPair, size_t, Cmp> RingSegMap;
 
     using Node::Node;
     void init() {
       add_input("edge_points", {TT_point_collection, TT_linear_ring_collection});
       add_output("edge_segments", TT_segment_collection);
+      add_output("ring_edges", TT_segment_collection);
       add_output("ring_idx", TT_any);
       add_output("ring_id", TT_vec1i);
       add_output("ring_order", TT_vec1i);
       add_output("is_start", TT_vec1i);
+
+      add_param("linear_knn", (bool) false);
+      add_param("dist_thres", (float) 0.4);
+      add_param("min_cnt_upper", (int) 20);
+      add_param("min_cnt_lower", (int) 3);
+      add_param("k", (int) 10);
     }
 
     void gui(){
-      ImGui::InputFloat("Dist thres", &c.linedetect_dist_threshold, 0.01, 1);
-      ImGui::InputInt("Segment cnt min", &c.linedetect_min_segment_count);
-      ImGui::InputInt("K", &c.linedetect_k);
-      ImGui::Checkbox("Use linear neighbourhood for ring input", &use_linear_neighboorhood);
+      ImGui::InputFloat("Dist thres", &param<float>("dist_thres"), 0.01, 1);
+      ImGui::DragIntRange2("Minimum segment count", &param<int>("min_cnt_lower"), &param<int>("min_cnt_upper"), 1, 0);
+      ImGui::InputInt("K", &param<int>("k"));
+      ImGui::Checkbox("Use linear neighbourhood for ring input", &param<bool>("linear_knn"));
     }
+    inline void detect_lines_ring_m1(linedect::LineDetector& LD, SegmentCollection& segments_out);
+    inline size_t detect_lines_ring_m2(linedect::LineDetector& LD, SegmentCollection& segments_out);
+    inline void detect_lines(linedect::LineDetector& LD);
     void process();
   };
 
@@ -287,11 +301,13 @@ namespace geoflow::nodes::stepedge {
       add_param("metrics_plane_min_points", (int) 50);
       add_param("metrics_plane_epsilon", (float) 0.15);
       add_param("metrics_plane_normal_threshold", (float) 0.75);
-      add_param("metrics_is_horizontal_threshold", (float) 0.96);
+      add_param("metrics_is_horizontal_threshold", (float) 0.97);
       add_param("metrics_is_wall_threshold", (float) 0.3);
+      add_param("n_refit", (int) 5);
     }
 
     void gui(){
+      ImGui::InputInt("Refit every n points", &param<int>("n_refit"));
       ImGui::InputInt("K estimate normal ", &param<int>("metrics_normal_k"));
       ImGui::InputInt("Plane min points", &param<int>("metrics_plane_min_points"));
       ImGui::InputFloat("Plane epsilon", &param<float>("metrics_plane_epsilon"), 0.01, 1);
@@ -418,7 +434,7 @@ namespace geoflow::nodes::stepedge {
       // add_output("line_clusters", TT_any); // ie a LineCluster
       // add_output("tmp_vec3f", TT_vec3f);
       add_param("dist_threshold", (float) 0.5);
-      add_param("angle_threshold", (float) 0.1);
+      add_param("angle_threshold", (float) 0.2);
     }
 
     void gui(){
@@ -443,15 +459,17 @@ namespace geoflow::nodes::stepedge {
       add_output("priorities", TT_vec1i);
       // add_output("rings_out", TT_linear_ring_collection);
       // add_output("footprint_out", TT_linear_ring);
+      add_output("rings_out", TT_linear_ring_collection);
       add_output("exact_rings_out", TT_any);
       add_output("exact_footprint_out", TT_any);
       // add_output("footprint_labels", TT_vec1i);
       // add_output("line_clusters", TT_any); // ie a LineCluster
       // add_output("tmp_vec3f", TT_vec3f);
       add_param("dist_threshold", (float) 0.5);
-      add_param("angle_threshold", (float) 0.10);
+      add_param("angle_threshold", (float) 0.15);
       add_param("snap_threshold", (float) 1.0);
       add_param("weighted_avg", (bool) false);
+      add_param("angle_per_distcluster", (bool) false);
     }
 
     void gui(){
@@ -459,6 +477,7 @@ namespace geoflow::nodes::stepedge {
       ImGui::DragFloat("Angle threshold", &param<float>("angle_threshold"), 0.01, 0.01, 3.1415);
       ImGui::DragFloat("Snap threshold", &param<float>("snap_threshold"), 0.01, 0.01, 10);
       ImGui::Checkbox("weighted_avg", &param<bool>("weighted_avg"));
+      ImGui::Checkbox("angle_per_distcluster", &param<bool>("angle_per_distcluster"));
     }
     void process();
   };
