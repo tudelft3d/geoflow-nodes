@@ -1042,11 +1042,30 @@ inline size_t DetectLinesNode::detect_lines_ring_m2(linedect::LineDetector& LD, 
     for (auto el : to_remove) {
       sorted_segments.erase(el);
     }
+    std::vector<SCK::Segment_2> prechain_segments;
+    std::vector<size_t> idx; size_t idcnt=0;
     for (auto& [i0,i1] : sorted_segments) {
-      segments_out.push_back( LD.project(i0, i1) );
+      // segments_out.push_back( LD.project(i0, i1) );
+      prechain_segments.push_back( LD.project_cgal(i0, i1) );
+      idx.push_back(idcnt++);
     }
     // TODO: chain the ring? for better regularisation results
-    return sorted_segments.size();
+    auto chained_segments = linereg::chain_ring<SCK>(idx, prechain_segments, param<float>("snap_threshold"));
+
+    // for (auto e=prechain_segments.begin(); e!=prechain_segments.end(); ++e) {
+    for (auto e=chained_segments.edges_begin(); e!=chained_segments.edges_end(); ++e) {
+      segments_out.push_back({
+        arr3f{
+          float(CGAL::to_double(e->source().x())),
+          float(CGAL::to_double(e->source().y())),
+          0},
+        arr3f{
+          float(CGAL::to_double(e->target().x())),
+          float(CGAL::to_double(e->target().y())),
+          0},
+      });
+    }
+    return chained_segments.size();
   } else return 0;
   
 }

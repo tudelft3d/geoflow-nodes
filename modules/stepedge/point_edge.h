@@ -87,7 +87,8 @@ typedef CGAL::Orthogonal_k_neighbor_search<TreeTraits> Neighbor_search;
 typedef Neighbor_search::Tree Tree;
 
 // least squares stuff
-typedef CGAL::Simple_cartesian<double> SCK;
+// typedef CGAL::Simple_cartesian<double> SCK;
+typedef CGAL::Cartesian<double> SCK;
 typedef SCK::Point_3 Point_SCK;
 typedef SCK::Line_3 Line_SCK;
 

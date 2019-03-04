@@ -242,9 +242,11 @@ namespace geoflow::nodes::stepedge {
       add_param("min_cnt_upper", (int) 20);
       add_param("min_cnt_lower", (int) 3);
       add_param("k", (int) 10);
+      add_param("snap_threshold", (float) 1);
     }
 
     void gui(){
+      ImGui::InputFloat("Chain snap thres", &param<float>("snap_threshold"), 0.01, 1);
       ImGui::InputFloat("Dist thres", &param<float>("dist_thres"), 0.01, 1);
       ImGui::DragIntRange2("Minimum segment count", &param<int>("min_cnt_lower"), &param<int>("min_cnt_upper"), 1, 0);
       ImGui::InputInt("K", &param<int>("k"));
