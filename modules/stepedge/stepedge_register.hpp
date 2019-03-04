@@ -2,7 +2,7 @@
 
 namespace geoflow::nodes::stepedge {
 
-  void create_lod13chart(NodeManager& N, bool direct_alpharing) {
+  void create_lod13chart(NodeManager& N, bool use_linedetector, bool regularise_footprint) {
     NodeRegister R("Nodes");
     R.register_node<AlphaShapeNode>("AlphaShape");
     R.register_node<SimplifyPolygonNode>("SimplifyPolygon");
@@ -40,14 +40,17 @@ namespace geoflow::nodes::stepedge {
     connect(DetectPlanes_node, AlphaShape_node, "pts_per_roofplane", "pts_per_roofplane");
     connect(DetectPlanes_node, BuildArrFromRings_node, "pts_per_roofplane", "pts_per_roofplane");
     
-    if (direct_alpharing) {
+    if (!use_linedetector) {
       SimplifyPolygon_node->set_param("threshold_stop_cost", float(0.15));
-      connect(AlphaShape_node, SimplifyPolygon_node, "alpha_rings", "polygons");
-      connect(SimplifyPolygon_node, Ring2Segments_node, "polygons_simp", "rings");
-      connect(Ring2Segments_node, RegulariseRings_node, "edge_segments", "edge_segments");
-      connect(Ring2Segments_node, RegulariseRings_node, "ring_idx", "ring_idx");
+      connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
+      // connect(SimplifyPolygon_node, Ring2Segments_node, "polygons_simp", "rings");
+      // connect(Ring2Segments_node, RegulariseRings_node, "edge_segments", "edge_segments");
+      // connect(Ring2Segments_node, RegulariseRings_node, "ring_idx", "ring_idx");
+      connect(DetectLines_node, RegulariseRings_node, "edge_segments", "edge_segments");
+      connect(DetectLines_node, RegulariseRings_node, "ring_idx", "ring_idx");
       connect(RegulariseRings_node, BuildArrFromRings_node, "exact_rings_out", "rings");
-      connect(RegulariseRings_node, BuildArrFromRings_node, "exact_footprint_out", "footprint");
+      if(regularise_footprint)
+        connect(RegulariseRings_node, BuildArrFromRings_node, "exact_footprint_out", "footprint");
       // connect(RegulariseRings_node, SimplifyPolygon_node_postr, "rings_out", "polygons");
       // connect(RegulariseRings_node, SimplifyPolygon_node_postfp, "footprint_out", "polygons");
       // connect(SimplifyPolygon_node_postr, BuildArrFromRings_node, "polygons_simp", "rings");
@@ -82,6 +85,8 @@ namespace geoflow::nodes::stepedge {
       add_param("dissolve_edges", (bool) true);
       add_param("dissolve_stepedges", (bool) true);
       add_param("use_only_hplanes", (bool) false);
+      add_param("regularise_footprint", (bool) false);
+      add_param("use_linedetector", (bool) false);
       // add_param("zrange_threshold", (float) 0.2);
       // add_param("merge_segid", (bool) true);
       // add_param("merge_zrange", (bool) false);
@@ -99,6 +104,8 @@ namespace geoflow::nodes::stepedge {
       ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
       ImGui::Checkbox("Dissolve stepedges", &param<bool>("dissolve_stepedges"));
       ImGui::SliderFloat("step_height_threshold", &param<float>("step_height_threshold"), 0, 100);
+      ImGui::Checkbox("regularise_footprint", &param<bool>("regularise_footprint"));
+      ImGui::Checkbox("use_linedetector", &param<bool>("use_linedetector"));
     }
 
     void process(){
@@ -145,7 +152,7 @@ namespace geoflow::nodes::stepedge {
         auto& polygon = polygons[i];
         
         NodeManager N;
-        create_lod13chart(N, true);
+        create_lod13chart(N, param<bool>("use_linedetector"), param<bool>("regularise_footprint"));
 
         // config and run
         // this should copy all parameters from this LOD13Generator node to the ProcessArrangement node
@@ -155,8 +162,10 @@ namespace geoflow::nodes::stepedge {
 
         N.nodes["DetectPlanes_node"]->input("points").set(points);
         N.nodes["RegulariseRings_node"]->input("footprint").set(polygon);
-        // N.nodes["SimplifyPolygon_node_postfp"]->input("polygons").set(polygon);
-
+        if (!param<bool>("regularise_footprint")) {
+          N.nodes["BuildArrFromRings_node"]->input("footprint").set(polygon);
+          N.nodes["BuildArrFromRings_node"]->input("footprint").connected_type = TT_linear_ring;
+        }
         N.run(N.nodes["DetectPlanes_node"]);
 
         auto classf = N.nodes["DetectPlanes_node"]->output("classf").get<float>();

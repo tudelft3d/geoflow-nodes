@@ -898,6 +898,62 @@ void BuildArrFromRingsNode::process() {
 //   return (wasNegative) ? (N - offset) : (offset);
 // }
 
+inline void DetectLinesNode::detect_lines_ring_m1(linedect::LineDetector& LD, SegmentCollection& segments_out) {
+  LD.dist_thres = param<float>("dist_thres") * param<float>("dist_thres");
+  LD.N = param<int>("k");
+  auto& c_upper = param<int>("min_cnt_upper");
+  auto& c_lower = param<int>("min_cnt_lower");
+  std::vector<size_t> detected_regions;
+  size_t ringsize = LD.point_segment_idx.size();
+  RingSegMap ring_seg_map;
+  for (size_t i=c_upper; i>=c_lower; --i){
+    LD.min_segment_count = i;
+    auto new_regions = LD.detect();
+
+    // extract the new regions from the rring
+    std::vector<size_t> reset_ids;
+    for (const auto& cur_reg : new_regions) {
+      bool stitch = (cur_reg != LD.point_segment_idx.back()) && (cur_reg != LD.point_segment_idx[0]);
+
+      std::vector<std::vector<size_t>> other_regs(1);
+      size_t j=0;
+      for (auto& regid : LD.point_segment_idx) {
+        if (regid != cur_reg) {
+          other_regs.back().push_back(j);
+        } else {
+          other_regs.resize(other_regs.size()+1);
+        }
+        ++j;
+      }
+      if (stitch) {
+        auto& front = other_regs.front();
+        auto& back = other_regs.back();
+        front.insert(front.begin(), back.begin(), back.end());
+        other_regs.pop_back();
+      }
+      size_t largest = 0, largest_id;
+      j=0;
+      for (const auto& other_reg : other_regs) {
+        auto s = other_reg.size();
+        if (s >largest) {
+          largest=s;
+          largest_id=j;
+        } ++j;
+      }
+      auto idend = other_regs[largest_id].front()-1 % ringsize;
+      auto idstart = other_regs[largest_id].back()+1 % ringsize;
+      ring_seg_map[std::make_pair(idstart,idend)] = cur_reg;
+      reset_ids.push_back(idend);
+      reset_ids.push_back(idstart);
+    }
+    for (const auto& j : reset_ids) {
+      LD.point_segment_idx[j] = 0;
+    }
+  }
+  for (auto& [seg,rid] : ring_seg_map) {
+    segments_out.push_back(LD.project(seg.first, seg.second));
+  }
+}
 inline void DetectLinesNode::detect_lines(linedect::LineDetector& LD) {
   LD.dist_thres = param<float>("dist_thres") * param<float>("dist_thres");
   LD.N = param<int>("k");
@@ -908,13 +964,98 @@ inline void DetectLinesNode::detect_lines(linedect::LineDetector& LD) {
     LD.detect();
   }
 }
+inline size_t DetectLinesNode::detect_lines_ring_m2(linedect::LineDetector& LD, SegmentCollection& segments_out) {
+  LD.dist_thres = param<float>("dist_thres") * param<float>("dist_thres");
+  LD.N = param<int>("k");
+  auto& c_upper = param<int>("min_cnt_upper");
+  auto& c_lower = param<int>("min_cnt_lower");
+  for (size_t i=c_upper; i>=c_lower; --i){
+    LD.min_segment_count = i;
+    LD.detect();
+  }
+  size_t ringsize = LD.point_segment_idx.size();
+            // chain the detected lines, to ensure correct order
+  if (LD.segment_shapes.size()>1) {
+    std::vector<std::pair<size_t,size_t>> new_ring_ids;
+    bool start_seg = LD.point_segment_idx[0];
+    int prev_i=ringsize-1,
+      prev_seg=LD.point_segment_idx[prev_i], 
+      cur_seg, 
+      i_last_seg = -1;
+    bool perfect_aligned=false; // is the first point of the ring also the first point of a segment? If yes, we are perfectly aligned!
+    for( int i=0; i<ringsize; ++i ) {
+      cur_seg = LD.point_segment_idx[i];
+      if(cur_seg==prev_seg && cur_seg!=0) { // we are inside a segment
+
+      } else if (cur_seg!=0 && prev_seg==0) { // from unsegmented to segmented
+        new_ring_ids.push_back(std::make_pair(i, cur_seg)); // first of cur
+        if(i==0) perfect_aligned=true;
+        // new_ring_ids.push_back(i); // end of unsegmented linesegment
+      } else if (cur_seg!=0 && prev_seg!=0) { // from one segment to another
+        new_ring_ids.push_back(std::make_pair(prev_i, prev_seg)); // last of prev
+        new_ring_ids.push_back(std::make_pair(i, cur_seg)); // first of cur
+      } else if (cur_seg==0 && prev_seg!=0) { //from segment to unsegmented
+        new_ring_ids.push_back(std::make_pair(prev_i, prev_seg)); // last of prev
+        // new_ring_ids.push_back(prev_i); // begin of unsegmented linesegment
+      } // else: we are inside an unsegmented or segmented zone
+      prev_seg = cur_seg;
+      prev_i = i;
+    }
+    if (!perfect_aligned) { // add the segment that runs through the first point in the original ring
+      new_ring_ids.insert(new_ring_ids.begin(), new_ring_ids.back());
+      new_ring_ids.pop_back();
+    }
+    //ensure the ring is aligned wrt diff region ids around origin of the ring
+    if (new_ring_ids.front().second == new_ring_ids.back().second) {
+      size_t region = new_ring_ids.front().second;
+      do {
+        new_ring_ids.push_back(new_ring_ids.front());
+        new_ring_ids.erase(new_ring_ids.begin());
+      } while (region == new_ring_ids.front().second);
+    }
+    //merge multiple segments of the same region
+    std::unordered_map<size_t,std::pair<size_t,size_t>> map_by_region;
+    for (auto el = new_ring_ids.begin(); el<new_ring_ids.end(); ++el) {
+      if(!map_by_region.count(el->second)) {
+        map_by_region[el->second] = std::make_pair(el->first, el->first);
+      } else {
+        map_by_region[el->second].second = el->first;
+      }
+    }
+    //sort the segments acc to order in ring
+    typedef std::set<std::pair<size_t,size_t>,Cmp> SegSet;
+    SegSet sorted_segments;
+    for (auto& el : map_by_region) {
+      sorted_segments.insert(el.second);
+    }
+    // TODO: better check for overlapping segments! Following is not 100% robust...
+    auto el_prev = sorted_segments.begin();
+    // el_prev.first-=sorted_segments.size();
+    // el_prev.second-=sorted_segments.size();
+    std::vector<SegSet::iterator> to_remove;
+    for (auto el = ++sorted_segments.begin(); el != sorted_segments.end(); ++el ){
+      el_prev = el;
+      --el_prev;
+      if (el_prev->second > el->first)
+        to_remove.push_back(el);
+    }
+    for (auto el : to_remove) {
+      sorted_segments.erase(el);
+    }
+    for (auto& [i0,i1] : sorted_segments) {
+      segments_out.push_back( LD.project(i0, i1) );
+    }
+    // TODO: chain the ring? for better regularisation results
+    return sorted_segments.size();
+  } else return 0;
+  
+}
 
 void DetectLinesNode::process(){
   auto input_geom = input("edge_points");
 
   SegmentCollection edge_segments;
   vec1i ring_order, ring_id, is_start;
-  // std::vector<SegmentCollection> segment_collections;
   std::vector<std::vector<size_t>> ring_idx;
   // fit lines in all input points
   if (input_geom.connected_type == TT_point_collection) {
@@ -961,64 +1102,21 @@ void DetectLinesNode::process(){
         detect_lines(LD);
         LD.get_bounded_edges(edge_segments);
       } else {
+        
         linedect::LineDetector LD(cgal_pts);
-        detect_lines(LD);
+        // SegmentCollection ring_edges;
+        auto n_detected = detect_lines_ring_m2(LD, edge_segments);
+        // LD.get_bounded_edges(edge_segments);
 
-        // chain the detected lines, to ensure correct order
-        if (LD.segment_shapes.size()>1) {
-          vec1i new_ring_ids;
-          bool start_seg = LD.point_segment_idx[0];
-          int prev_i=ring.size()-1,
-            prev_seg=LD.point_segment_idx[prev_i], 
-            cur_seg, 
-            i_last_seg = -1;
-          bool perfect_aligned=false; // is the first point of the ring also the first point of a segment? If yes, we are perfectly aligned!
-          for( int i=0; i<ring.size(); ++i ) {
-            cur_seg = LD.point_segment_idx[i];
-            if(cur_seg==prev_seg && cur_seg!=0) { // we are inside a segment
-
-            } else if (cur_seg!=0 && prev_seg==0) { // from unsegmented to segmented
-              new_ring_ids.push_back(i); // first of cur
-              if(i==0) perfect_aligned=true;
-              // new_ring_ids.push_back(i); // end of unsegmented linesegment
-            } else if (cur_seg!=0 && prev_seg!=0) { // from one segment to another
-              new_ring_ids.push_back(prev_i); // last of prev
-              new_ring_ids.push_back(i); // first of cur
-            } else if (cur_seg==0 && prev_seg!=0) { //from segment to unsegmented
-              new_ring_ids.push_back(prev_i); // last of prev
-              // new_ring_ids.push_back(prev_i); // begin of unsegmented linesegment
-            } // else: we are inside an unsegmented or segmented zone
-            prev_seg = cur_seg;
-            prev_i = i;
-          }
-          int last = new_ring_ids.size()-1;
-          int order_cnt=0;
-          
-          // ring_idx.push_back();
-          for(int i = perfect_aligned ? 0:1; i<last; i += 2) {
-            // TODO: reproject points on fitted line!!
-            edge_segments.push_back( LD.project(new_ring_ids[i], new_ring_ids[i+1]) );
-            ring_idx[ring_cntr].push_back(seg_cntr++);
-            ring_order.push_back(order_cnt);
-            ring_id.push_back(ring_cntr);
-            ring_order.push_back(order_cnt++);
-            ring_id.push_back(ring_cntr);
-            is_start.push_back(1);
-            is_start.push_back(0);
-          }
-          if(!perfect_aligned) { // add the segment that runs through the first point in the original ring
-            // auto& p0 = ring[new_ring_ids[last]];
-            // auto& p1 = ring[new_ring_ids[0]];
-            edge_segments.push_back( LD.project(new_ring_ids[last], new_ring_ids[0]) );
-            ring_idx[ring_cntr].push_back(seg_cntr++);
-            // segment_collections.back().push_back({p0,p1});
-            ring_order.push_back(order_cnt);
-            ring_id.push_back(ring_cntr);
-            ring_order.push_back(order_cnt++);
-            ring_id.push_back(ring_cntr);
-            is_start.push_back(1);
-            is_start.push_back(0);
-          }
+        for (size_t j=0; j<n_detected; ++j) {
+          // edge_segments.push_back(ring_edges[j]);
+          ring_idx[ring_cntr].push_back(seg_cntr++);
+          ring_order.push_back(j);
+          ring_id.push_back(ring_cntr);
+          ring_order.push_back(j);
+          ring_id.push_back(ring_cntr);
+          is_start.push_back(1);
+          is_start.push_back(0);
         }
         ++ring_cntr;
         // std::cout << "number of shapes: " << LD.segment_shapes.size() <<"\n";
@@ -1028,6 +1126,7 @@ void DetectLinesNode::process(){
   }
 
   output("edge_segments").set(edge_segments);
+  // output("ring_edges").set(ring_edges);
   output("ring_idx").set(ring_idx);
   output("ring_id").set(ring_id);
   output("ring_order").set(ring_order);
@@ -1109,6 +1208,7 @@ void DetectPlanesNode::process() {
   PD.normal_thres = metrics_plane_normal_threshold;
   PD.min_segment_count = metrics_plane_min_points;
   PD.N = metrics_normal_k;
+  PD.n_refit = param<int>("n_refit");
   PD.detect();
 
   // classify horizontal/vertical planes using plane normals
@@ -1574,7 +1674,7 @@ void RegulariseRingsNode::process(){
   LR.add_segments(1,fp_edges);
   LR.dist_threshold = param<float>("dist_threshold");
   LR.angle_threshold = param<float>("angle_threshold");
-  LR.cluster(param<bool>("weighted_avg"));
+  LR.cluster(param<bool>("weighted_avg"), param<bool>("angle_per_distcluster"));
 
   std::vector<linereg::Polygon_2> exact_polygons;
   for (auto& idx : ring_idx) {
@@ -1590,24 +1690,19 @@ void RegulariseRingsNode::process(){
   output("exact_rings_out").set(exact_polygons);
   output("exact_footprint_out").set(exact_fp);
 
-
-  // LinearRingCollection new_rings;
-  // for (auto& idx : ring_idx) {
-  //   LinearRing new_ring;
-  //   if (idx.size()>1) {
-  //     for (size_t i=idx[1]; i<idx[0]+idx.size(); ++i) {
-  //       chain(all_edges[i-1], all_edges[i], new_ring, param<float>("snap_threshold"));
-  //     }
-  //     chain(all_edges[idx[idx.size()-1]], all_edges[idx[0]], new_ring, param<float>("snap_threshold"));
-  //   }
-  //   new_rings.push_back(new_ring);
-  // }
-
-  // LinearRing new_fp;
-  // for (size_t i=fpi_begin+1; i<=fpi_end; ++i) {
-  //   chain(all_edges[i-1], all_edges[i], new_fp, param<float>("snap_threshold"));
-  // }
-  // chain(all_edges[fpi_end], all_edges[fpi_begin], new_fp, param<float>("snap_threshold"));
+  LinearRingCollection lrc;
+  for (auto& poly : exact_polygons) {
+    LinearRing lr;
+    for (auto p=poly.vertices_begin(); p!=poly.vertices_end(); ++p) {
+      lr.push_back({
+        float(CGAL::to_double(p->x())),
+        float(CGAL::to_double(p->y())),
+        0
+      });
+    }
+    lrc.push_back(lr);
+  }
+  output("rings_out").set(lrc);
 
   SegmentCollection new_segments;
   vec1i priorities;

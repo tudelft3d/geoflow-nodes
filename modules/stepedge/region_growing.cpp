@@ -129,7 +129,7 @@ inline Line LineDetector::fit_line(vector<size_t>& neighbour_idx){
   return line;
 }
 
-void LineDetector::detect(){
+std::vector<size_t> LineDetector::detect(){
   // seed generation
   typedef pair<size_t,double> index_dist_pair;
   auto cmp = [](index_dist_pair left, index_dist_pair right) {return left.second < right.second;};
@@ -145,22 +145,26 @@ void LineDetector::detect(){
     }
   }
 
+  std::vector<size_t> new_regions;
+
   // region growing from seed points
   while(pq.size()>0) {
     auto idx = pq.top().first; pq.pop();
     // if (point_seed_flags[idx]){
     if (point_segment_idx[idx]==0){
-      grow_region(idx);
+      if (grow_region(idx))
+        new_regions.push_back(region_counter);
       region_counter++;
     }
   }
+  return new_regions;
 }
 
 inline bool LineDetector::valid_candidate(Line &line, Point &p) {
   return CGAL::squared_distance(line, p) < dist_thres;
 }
 
-void LineDetector::grow_region(size_t seed_idx) {
+bool LineDetector::grow_region(size_t seed_idx) {
   auto p = indexed_points[seed_idx];
   auto line = fit_line(neighbours[seed_idx]);
   segment_shapes[region_counter] = line;
@@ -197,5 +201,6 @@ void LineDetector::grow_region(size_t seed_idx) {
     segment_shapes.erase(region_counter);
     for (auto idx: idx_in_region)
       point_segment_idx[idx] = 0;
-  }
+    return false;
+  } return true;
 }

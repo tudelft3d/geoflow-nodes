@@ -102,9 +102,11 @@ void PlaneDetector::grow_region(size_t seed_idx){
         candidates.push(n_id);
         points_in_region.push_back(neighbor.first.first);
         idx_in_region.push_back(n_id);
-        Plane plane;
-        linear_least_squares_fitting_3(points_in_region.begin(),points_in_region.end(),plane,CGAL::Dimension_tag<0>());
-        segment_shapes[region_counter] = plane;
+        // if (points_in_region.size() % n_refit ||  n_refit==0){
+          Plane plane;
+          linear_least_squares_fitting_3(points_in_region.begin(),points_in_region.end(),plane,CGAL::Dimension_tag<0>());
+          segment_shapes[region_counter] = plane;
+        // }
       }
 
     }
