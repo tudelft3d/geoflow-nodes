@@ -239,18 +239,22 @@ namespace geoflow::nodes::stepedge {
 
       add_param("linear_knn", (bool) false);
       add_param("dist_thres", (float) 0.4);
-      add_param("min_cnt_upper", (int) 20);
-      add_param("min_cnt_lower", (int) 3);
+      add_param("min_cnt_upper", (int) 10);
+      add_param("min_cnt_lower", (int) 5);
       add_param("k", (int) 10);
       add_param("snap_threshold", (float) 1);
+      add_param("line_extend", (float) 0.1);
+      add_param("perform_chaining", (bool) true);
     }
 
     void gui(){
-      ImGui::InputFloat("Chain snap thres", &param<float>("snap_threshold"), 0.01, 1);
       ImGui::InputFloat("Dist thres", &param<float>("dist_thres"), 0.01, 1);
       ImGui::DragIntRange2("Minimum segment count", &param<int>("min_cnt_lower"), &param<int>("min_cnt_upper"), 1, 0);
       ImGui::InputInt("K", &param<int>("k"));
       ImGui::Checkbox("Use linear neighbourhood for ring input", &param<bool>("linear_knn"));
+      ImGui::InputFloat("Extend lines", &param<float>("line_extend"), 0.01, 1);
+      ImGui::Checkbox("Perform chaining", &param<bool>("perform_chaining"));
+      ImGui::InputFloat("Chain snap thres", &param<float>("snap_threshold"), 0.01, 1);
     }
     inline void detect_lines_ring_m1(linedect::LineDetector& LD, SegmentCollection& segments_out);
     inline size_t detect_lines_ring_m2(linedect::LineDetector& LD, SegmentCollection& segments_out);
@@ -300,8 +304,8 @@ namespace geoflow::nodes::stepedge {
 
       add_param("only_horizontal", (bool) true);
       add_param("metrics_normal_k", (int) 10);
-      add_param("metrics_plane_min_points", (int) 50);
-      add_param("metrics_plane_epsilon", (float) 0.15);
+      add_param("metrics_plane_min_points", (int) 30);
+      add_param("metrics_plane_epsilon", (float) 0.3);
       add_param("metrics_plane_normal_threshold", (float) 0.75);
       add_param("metrics_is_horizontal_threshold", (float) 0.97);
       add_param("metrics_is_wall_threshold", (float) 0.3);
