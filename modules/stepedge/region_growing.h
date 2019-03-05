@@ -8,6 +8,9 @@
 #include <CGAL/linear_least_squares_fitting_3.h>
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Search_traits_adapter.h>
+#include <CGAL/Cartesian.h>
+
+typedef CGAL::Cartesian<double> SCK;
 
 #include <geoflow/core/geoflow.hpp>
 
@@ -31,6 +34,9 @@ namespace linedect {
     typedef CGAL::Orthogonal_k_neighbor_search<TreeTraits> Neighbor_search;
     typedef Neighbor_search::Tree Tree;
 
+    typedef unordered_map<size_t, Line> SegShapes;
+    typedef SegShapes::iterator SSIterator;
+
     vector<point_index> indexed_points;
     // Tree tree;
     // vector<bool> point_seed_flags;
@@ -39,20 +45,22 @@ namespace linedect {
     
     public:
     vector<size_t> point_segment_idx; // 0=unsegmented, maybe put this on the heap...
-    unordered_map<size_t, Line> segment_shapes;
+    SegShapes segment_shapes;
     int N = 5;
     double dist_thres = 0.2*0.2;
-    size_t min_segment_count = 20;
+    size_t min_segment_count = 4;
 
     LineDetector(vector<Point> &points);
     LineDetector(vector<Point> &points, vector<vector<size_t>> neighbours);
     vector<size_t> get_point_indices(size_t shape_id);
+    geoflow::Segment project(const size_t i1, const size_t i2);
+    SCK::Segment_2 project_cgal(const size_t i1, const size_t i2, float extension);
     size_t get_bounded_edges(geoflow::SegmentCollection& edges);
-    void detect();
+    std::vector<size_t> detect();
 
     private:
     inline Line fit_line(vector<size_t>& neighbour_idx);
     inline bool valid_candidate(Line &line, Point &p);
-    void grow_region(size_t seed_idx);
+    bool grow_region(size_t seed_idx);
   };
 }

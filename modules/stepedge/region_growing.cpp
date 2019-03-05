@@ -46,6 +46,34 @@ vector<size_t> LineDetector::get_point_indices(size_t shape_id) {
   return result;
 }
 
+geoflow::Segment LineDetector::project(const size_t i1, const size_t i2) {
+  const auto& l = segment_shapes[point_segment_idx[i1]];
+  const auto& p1 = indexed_points[i1].first;
+  const auto& p2 = indexed_points[i2].first;
+  auto p1n = l.projection(p1);
+  auto p2n = l.projection(p2);
+  return geoflow::Segment({
+    geoflow::arr3f{float(p1n.x()), float(p1n.y()), float(p1n.z())},
+    geoflow::arr3f{float(p2n.x()), float(p2n.y()), float(p2n.z())}
+  });
+}
+SCK::Segment_2 LineDetector::project_cgal(const size_t i1, const size_t i2, float extension) {
+  const auto& l = segment_shapes[point_segment_idx[i1]];
+  const auto& p1 = indexed_points[i1].first;
+  const auto& p2 = indexed_points[i2].first;
+  auto p1n = l.projection(p1);
+  auto p2n = l.projection(p2);
+  // extend the linesegment a bit in both directions
+  auto v = (p2n-p1n);
+  v = v/CGAL::sqrt(v.squared_length());
+  p1n = p1n - v*extension;
+  p2n = p2n + v*extension;
+  return SCK::Segment_2(
+    SCK::Point_2(CGAL::to_double(p1n.x()), CGAL::to_double(p1n.y())),
+    SCK::Point_2(CGAL::to_double(p2n.x()), CGAL::to_double(p2n.y()))
+  );
+}
+
 size_t LineDetector::get_bounded_edges(geoflow::SegmentCollection& edges) {
   std::vector<size_t> id_mins;
   std::map<size_t, geoflow::Segment> ordered_segments;
@@ -117,46 +145,43 @@ inline Line LineDetector::fit_line(vector<size_t>& neighbour_idx){
   return line;
 }
 
-void LineDetector::detect(){
+std::vector<size_t> LineDetector::detect(){
   // seed generation
   typedef pair<size_t,double> index_dist_pair;
   auto cmp = [](index_dist_pair left, index_dist_pair right) {return left.second < right.second;};
   priority_queue<index_dist_pair, vector<index_dist_pair>, decltype(cmp)> pq(cmp);
 
-  size_t i=0;
+  // size_t i=0;
   for(auto pi : indexed_points){
-    auto p = pi.first;
-    auto line = fit_line(neighbours[pi.second]);
-    auto line_dist = CGAL::squared_distance(line, p);
-    pq.push(index_dist_pair(i++, line_dist));
+    if (point_segment_idx[pi.second]==0) {
+      auto p = pi.first;
+      auto line = fit_line(neighbours[pi.second]);
+      auto line_dist = CGAL::squared_distance(line, p);
+      pq.push(index_dist_pair(pi.second, line_dist));
+    }
   }
 
+  std::vector<size_t> new_regions;
+
   // region growing from seed points
-  while(pq.size()>0){
+  while(pq.size()>0) {
     auto idx = pq.top().first; pq.pop();
     // if (point_seed_flags[idx]){
     if (point_segment_idx[idx]==0){
-      grow_region(idx);
+      if (grow_region(idx))
+        new_regions.push_back(region_counter);
       region_counter++;
     }
   }
+  return new_regions;
 }
 
 inline bool LineDetector::valid_candidate(Line &line, Point &p) {
   return CGAL::squared_distance(line, p) < dist_thres;
 }
 
-void LineDetector::grow_region(size_t seed_idx){
+bool LineDetector::grow_region(size_t seed_idx) {
   auto p = indexed_points[seed_idx];
-  // Neighbor_search search_init(tree, p.first, N);
-  // vector<size_t> search_idx;
-  // for (auto s : search_init){
-  //   std::cout << "p from kd-tree " << float(s.first.first.x()) << " " << float(s.first.first.y()) << " " << float(s.first.first.z()) << "\n";
-  //   std::cout << "p from indexed_points " << float(indexed_points[s.second].first.x()) << " " << float(indexed_points[s.second].first.y()) << " " << float(indexed_points[s.first.second].first.z()) << "\n";
-  //   std::cout << "id from kdtree: " << s.first.second << " ";
-  //   std::cout << "id from indexed_points: " << indexed_points[s.first.second].second << "\n";
-  //   search_idx.push_back(s.first.second);
-  // }
   auto line = fit_line(neighbours[seed_idx]);
   segment_shapes[region_counter] = line;
 
@@ -192,5 +217,6 @@ void LineDetector::grow_region(size_t seed_idx){
     segment_shapes.erase(region_counter);
     for (auto idx: idx_in_region)
       point_segment_idx[idx] = 0;
-  }
+    return false;
+  } return true;
 }

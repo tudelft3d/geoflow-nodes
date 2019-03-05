@@ -1,12 +1,8 @@
-#include <iostream>
-#include <fstream>
-
 #include <geoflow/gui/flowchart.hpp>
-
 #include <geoflow/core/geoflow.hpp>
+
 #include <cityjson_nodes.hpp>
 #include <utility_nodes.hpp>
-// #include <las_register.hpp>
 
 namespace gfn = geoflow::nodes;
 
@@ -19,8 +15,8 @@ int main(int ac, const char * av[])
     NodeRegister cityjson = gfn::cityjson::create_register();
 
     // create nodes
-    auto cjreader = N.create_node(cityjson, "CityJSONReader", {200,100});
-    auto ringtri = N.create_node(utility, "RingTriangulator", {600,100});
+    NodeHandle cjreader = N.create_node(cityjson, "CityJSONReader", {200,100});
+    NodeHandle ringtri = N.create_node(utility, "RingTriangulator", {600,100});
 
     // connect terminals
     connect(

@@ -10,6 +10,7 @@ namespace linereg {
 
   typedef CGAL::Exact_predicates_exact_constructions_kernel EK;
   typedef CGAL::Polygon_2<EK> Polygon_2;
+  // typedef EK::Polygon_2 Polygon_2;
 
   class LineRegulariser {
     static constexpr double pi = 3.14159265358979323846;
@@ -63,7 +64,7 @@ namespace linereg {
     //   }
     // }
 
-    void cluster(bool weight_by_len) {
+    void cluster(bool weight_by_len, bool angle_per_distcluster) {
       // cluster by angle
       std::vector<size_t> edge_idx(lines.size());
       for (size_t i=0; i<lines.size(); ++i) {
@@ -113,7 +114,6 @@ namespace linereg {
         double sum_all=0;
         double max_len=-1;
         size_t max_len_id;
-        std::vector<double> weighted_angles;
         for(auto& i : max_idx) {
           auto& len = std::get<5>(lines[i]);
           auto& angle = std::get<0>(lines[i]);
@@ -192,28 +192,54 @@ namespace linereg {
           if (std::get<3>(lines[i]) == max_pr)
             max_idx.push_back(i);
 
-        // computed average angle weighted by segment length
-        double sum_len=0;
-        double max_len=-1;
-        size_t max_len_id;
-        Vector_2 sum_all(0,0);
-        std::vector<double> weighted_angles;
-        for(auto& i : max_idx) {
-          auto& len = std::get<5>(lines[i]);
-          auto& q = std::get<1>(lines[i]);
-          sum_all += len*Vector_2(q.x(), q.y());
-          sum_len += len;
-          if (len > max_len) {
-            max_len = len;
-            max_len_id = i;
+        // computed cluster ref point
+        {
+          double sum_len=0;
+          double max_len=-1;
+          size_t max_len_id;
+          Vector_2 sum_all(0,0);
+          for(auto& i : max_idx) {
+            auto& len = std::get<5>(lines[i]);
+            auto& q = std::get<1>(lines[i]);
+            sum_all += len*Vector_2(q.x(), q.y());
+            sum_len += len;
+            if (len > max_len) {
+              max_len = len;
+              max_len_id = i;
+            }
+          }
+          // cluster.distance = sum/cluster.idx.size();
+          if (weight_by_len) 
+            cluster.ref_point = sum_all/sum_len;
+          else {
+            auto& p = std::get<1>(lines[max_len_id]);
+            cluster.ref_point = Vector_2(p.x(), p.y());
           }
         }
-        // cluster.distance = sum/cluster.idx.size();
-        if (weight_by_len) 
-          cluster.ref_point = sum_all/sum_len;
-        else {
-          auto& p = std::get<1>(lines[max_len_id]);
-          cluster.ref_point = Vector_2(p.x(), p.y());
+        // computed cluster angle
+        if (angle_per_distcluster) {
+          double sum_len=0;
+          double sum_all=0;
+          double max_len=-1;
+          size_t max_len_id;
+          for(auto& i : max_idx) {
+            auto& len = std::get<5>(lines[i]);
+            auto& angle = std::get<0>(lines[i]);
+            sum_all += len * angle;
+            sum_len += len;
+            if (len > max_len) {
+              max_len = len;
+              max_len_id = i;
+            }
+          }
+          double angle;
+          if (weight_by_len) 
+            angle = sum_all/sum_len;
+          else 
+            angle = std::get<0>(lines[max_len_id]);
+
+          Vector_2 n(-1.0, std::tan(angle));
+          cluster.ref_vec = n/std::sqrt(n.squared_length());
         }
         cluster.ref_vec = Vector_2(cluster.ref_vec.y(), -cluster.ref_vec.x());
       }
@@ -242,13 +268,19 @@ namespace linereg {
 
   };
 
-  void chain(const EK::Segment_2& a, const EK::Segment_2& b, Polygon_2& ring, const float& snap_threshold) {
+  template<class Kernel> void 
+  chain(
+    const typename Kernel::Segment_2& a, 
+    const typename Kernel::Segment_2& b, 
+    typename CGAL::Polygon_2<Kernel>& ring, 
+    const float& snap_threshold) {
+
     auto l_a = a.supporting_line();
     auto l_b = b.supporting_line();
-    EK::Segment_2 s(a.target(), b.source());
+    typename Kernel::Segment_2 s(a.target(), b.source());
     auto result = CGAL::intersection(l_a, l_b);
     if (result) {
-      if (auto p = boost::get<EK::Point_2>(&*result)) {
+      if (auto p = boost::get<typename Kernel::Point_2>(&*result)) {
         if (CGAL::squared_distance(*p, s) < snap_threshold) {
           ring.push_back(*p);
         } else {
@@ -266,27 +298,32 @@ namespace linereg {
   }
 
   // void chain(Segment& a, Segment& b, LinearRing& ring, const float& snap_threshold) {
-  Polygon_2 chain_ring(const std::vector<size_t>& idx, const std::vector<EK::Segment_2>& segments, const float& snap_threshold) {
-    Polygon_2 ring, fixed_ring;
+  template <class Kernel> inline void check_dist(const CGAL::Polygon_2<Kernel>& pos, CGAL::Polygon_2<Kernel>& pot, const size_t a, const size_t b) {
+    auto d = CGAL::squared_distance(pos.vertex(a), pos.vertex(b));
+    if (d > 1E-6) pot.push_back(pos.vertex(a));
+  }
+  
+  template<class Kernel> CGAL::Polygon_2<Kernel> 
+  chain_ring(
+    const std::vector<size_t>& idx, 
+    const std::vector<typename Kernel::Segment_2>& segments, 
+    const float& snap_threshold) {
 
-    if (idx.size()>2) {
-      for (size_t i=idx[1]; i<idx[0]+idx.size(); ++i) {
-        chain(segments[i-1], segments[i], ring, snap_threshold);
+    typename CGAL::Polygon_2<Kernel>  ring, fixed_ring;
+
+    if (idx.size()>1) { // we need at least 2 segments
+      for (size_t i=1; i<idx.size(); ++i) {
+        chain<Kernel>(segments[idx[i-1]], segments[idx[i]], ring, snap_threshold);
       }
-      chain(segments[idx[idx.size()-1]], segments[idx[0]], ring, snap_threshold);
+      chain<Kernel>(segments[idx[idx.size()-1]], segments[idx[0]], ring, snap_threshold);
 
       // get rid of segments with zero length
       // check again the size, to ignore degenerate case of input ring that consists of 3 co-linear segments (would get chained to eg 0 vertices)
       if (ring.size()>2) {
-        auto circ = ring.vertices_circulator();
-        auto curr = circ;
-        do {
-          auto d = CGAL::squared_distance(*circ, *(circ+1));
-          if (d > 1E-6) {
-            fixed_ring.push_back(*circ);
-          }
-          ++circ;
-        } while (curr != circ);
+        for (size_t i=1; i<ring.size(); ++i) {
+          check_dist<Kernel>(ring, fixed_ring, i-1, i);
+        }
+        check_dist<Kernel>(ring, fixed_ring, ring.size()-1, 0);
       }
     }
 
