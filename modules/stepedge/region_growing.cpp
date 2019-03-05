@@ -57,6 +57,22 @@ geoflow::Segment LineDetector::project(const size_t i1, const size_t i2) {
     geoflow::arr3f{float(p2n.x()), float(p2n.y()), float(p2n.z())}
   });
 }
+SCK::Segment_2 LineDetector::project_cgal(const size_t i1, const size_t i2, float extension) {
+  const auto& l = segment_shapes[point_segment_idx[i1]];
+  const auto& p1 = indexed_points[i1].first;
+  const auto& p2 = indexed_points[i2].first;
+  auto p1n = l.projection(p1);
+  auto p2n = l.projection(p2);
+  // extend the linesegment a bit in both directions
+  auto v = (p2n-p1n);
+  v = v/CGAL::sqrt(v.squared_length());
+  p1n = p1n - v*extension;
+  p2n = p2n + v*extension;
+  return SCK::Segment_2(
+    SCK::Point_2(CGAL::to_double(p1n.x()), CGAL::to_double(p1n.y())),
+    SCK::Point_2(CGAL::to_double(p2n.x()), CGAL::to_double(p2n.y()))
+  );
+}
 
 size_t LineDetector::get_bounded_edges(geoflow::SegmentCollection& edges) {
   std::vector<size_t> id_mins;

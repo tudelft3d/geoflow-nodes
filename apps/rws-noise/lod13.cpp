@@ -4,7 +4,9 @@
 #include <stepedge_register.hpp>
 #include <gdal_register.hpp>
 #include <cgal_register.hpp>
-// #include <geoflow/gui/flowchart.hpp>
+#ifdef GF_BUILD_GUI
+    #include <geoflow/gui/flowchart.hpp>
+#endif
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
@@ -30,12 +32,14 @@ int main(int ac, const char * av[])
     bool regularise_footprint = false;
     bool use_linedetector = false;
     bool presimp_fp = false;
-    // bool gui = false;
+    bool gui = false;
     
     po::options_description desc("Allowed options");
     desc.add_options()
     ("help", "produce help message")
-    // ("gui", po::bool_switch(&gui), "launch gui") 
+    #ifdef GF_BUILD_GUI
+        ("gui", po::bool_switch(&gui), "launch gui")
+    #endif
     ("use_linedetector", po::bool_switch(&use_linedetector), "use line detector") 
     ("regularise_footprint", po::bool_switch(&regularise_footprint), "regularise footprints") 
     ("presimp_fp", po::bool_switch(&presimp_fp), "Simplify input polygons with Douglas Peucker 10 cm") 
@@ -113,8 +117,10 @@ int main(int ac, const char * av[])
       ogr_writer->input_group("attributes")
     );
   
-    // if (gui)
-    //     geoflow::launch_flowchart(N, {stepedge, gdal, cgal});
-    // else
+    #ifdef GF_BUILD_GUI
+    if (gui)
+        geoflow::launch_flowchart(N, {stepedge, gdal, cgal});
+    else
+    #endif
         N.run(*ogr_loader);
 }

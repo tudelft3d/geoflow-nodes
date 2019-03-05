@@ -6,12 +6,15 @@
 namespace geoflow::nodes::las {
 
 void LASLoaderNode::process(){
+  auto filepath = param<std::string>("filepath");
+  auto thin_nth = param<int>("thin_nth");
+
   PointCollection points;
   vec1i classification;
   vec1f intensity;
 
   LASreadOpener lasreadopener;
-  lasreadopener.set_file_name(filepath);
+  lasreadopener.set_file_name(filepath.c_str());
   LASreader* lasreader = lasreadopener.open();
   if (!lasreader)
     return;
@@ -36,7 +39,9 @@ void LASLoaderNode::process(){
         float(lasreader->point.get_y() - (*manager.data_offset)[1]), 
         float(lasreader->point.get_z() - (*manager.data_offset)[2])}
       );
-      if(i%100000000==0) std::cout << "Read " << i << " points...\n";
+    }
+    if (i % 1000000 == 0) {
+      std::cout << "Read " << i << " points...\n";
     }
   }
   lasreader->close();
@@ -47,8 +52,53 @@ void LASLoaderNode::process(){
   output("intensity").set(intensity);
 }
 
-void LASWriterNode::write_point_cloud_collection(PointCollection& point_cloud, std::string path) {
+void LASGroundLoaderNode::process() {
+  auto filepath = param<std::string>("filepath");
+  auto thin_nth = param<int>("thin_nth");
 
+  PointCollection points;
+  vec1i classification;
+  vec1f intensity;
+
+  LASreadOpener lasreadopener;
+  lasreadopener.set_file_name(filepath.c_str());
+  LASreader* lasreader = lasreadopener.open();
+  if (!lasreader)
+    return;
+
+  // geometry.bounding_box.set(
+  //   {float(lasreader->get_min_x()), float(lasreader->get_min_y()), float(lasreader->get_min_z())},
+  //   {float(lasreader->get_max_x()), float(lasreader->get_max_y()), float(lasreader->get_max_z())}
+  // );
+  bool found_offset = manager.data_offset.has_value();
+
+  size_t i = 0;
+  while (lasreader->read_point()) {
+    if (!found_offset) {
+      manager.data_offset = { lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z() };
+      found_offset = true;
+    }
+
+    if (lasreader->point.get_classification() == 2) {
+      if (i++ % thin_nth == 0) {
+        points.push_back({
+          float(lasreader->point.get_x() - (*manager.data_offset)[0]),
+          float(lasreader->point.get_y() - (*manager.data_offset)[1]),
+          float(lasreader->point.get_z() - (*manager.data_offset)[2]) }
+        );
+      }
+      if (i % 1000000 == 0) {
+        std::cout << "Read " << i << " points...\n";
+      }
+    }
+  }
+  lasreader->close();
+  delete lasreader;
+
+  output("points").set(points);
+}
+
+void LASWriterNode::write_point_cloud_collection(PointCollection& point_cloud, std::string path) {
   LASwriteOpener laswriteopener;
   laswriteopener.set_file_name(path.c_str());
 
@@ -92,20 +142,21 @@ void LASWriterNode::write_point_cloud_collection(PointCollection& point_cloud, s
 }
 
 void LASWriterNode::process(){
+  auto filepath = param<std::string>("filepath");
+
   auto input_geom = input("point_clouds");
 
   if (input_geom.connected_type == TT_point_collection) {
     auto point_cloud = input_geom.get<PointCollection>();
-    write_point_cloud_collection(point_cloud, std::string(filepath));
+    write_point_cloud_collection(point_cloud, filepath);
 
   } else if (input_geom.connected_type == TT_point_collection_list) {
     auto point_clouds = input_geom.get< std::vector<PointCollection> >();
 
     int i=0;
     for (auto point_cloud : point_clouds) {
-      std::string fp (filepath);
-      fp += "." + std::to_string(i++) + ".las";
-      write_point_cloud_collection(point_cloud, fp);
+      filepath += "." + std::to_string(i++) + ".las";
+      write_point_cloud_collection(point_cloud, filepath);
     }
   }
 }

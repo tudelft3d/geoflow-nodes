@@ -10,6 +10,7 @@ namespace linereg {
 
   typedef CGAL::Exact_predicates_exact_constructions_kernel EK;
   typedef CGAL::Polygon_2<EK> Polygon_2;
+  // typedef EK::Polygon_2 Polygon_2;
 
   class LineRegulariser {
     static constexpr double pi = 3.14159265358979323846;
@@ -267,13 +268,19 @@ namespace linereg {
 
   };
 
-  void chain(const EK::Segment_2& a, const EK::Segment_2& b, Polygon_2& ring, const float& snap_threshold) {
+  template<class Kernel> void 
+  chain(
+    const typename Kernel::Segment_2& a, 
+    const typename Kernel::Segment_2& b, 
+    typename CGAL::Polygon_2<Kernel>& ring, 
+    const float& snap_threshold) {
+
     auto l_a = a.supporting_line();
     auto l_b = b.supporting_line();
-    EK::Segment_2 s(a.target(), b.source());
+    typename Kernel::Segment_2 s(a.target(), b.source());
     auto result = CGAL::intersection(l_a, l_b);
     if (result) {
-      if (auto p = boost::get<EK::Point_2>(&*result)) {
+      if (auto p = boost::get<typename Kernel::Point_2>(&*result)) {
         if (CGAL::squared_distance(*p, s) < snap_threshold) {
           ring.push_back(*p);
         } else {
@@ -291,27 +298,32 @@ namespace linereg {
   }
 
   // void chain(Segment& a, Segment& b, LinearRing& ring, const float& snap_threshold) {
-  inline void check_dist(const Polygon_2& pos, Polygon_2& pot, const size_t a, const size_t b) {
+  template <class Kernel> inline void check_dist(const CGAL::Polygon_2<Kernel>& pos, CGAL::Polygon_2<Kernel>& pot, const size_t a, const size_t b) {
     auto d = CGAL::squared_distance(pos.vertex(a), pos.vertex(b));
     if (d > 1E-6) pot.push_back(pos.vertex(a));
   }
   
-  Polygon_2 chain_ring(const std::vector<size_t>& idx, const std::vector<EK::Segment_2>& segments, const float& snap_threshold) {
-    Polygon_2 ring, fixed_ring;
+  template<class Kernel> CGAL::Polygon_2<Kernel> 
+  chain_ring(
+    const std::vector<size_t>& idx, 
+    const std::vector<typename Kernel::Segment_2>& segments, 
+    const float& snap_threshold) {
+
+    typename CGAL::Polygon_2<Kernel>  ring, fixed_ring;
 
     if (idx.size()>1) { // we need at least 2 segments
       for (size_t i=1; i<idx.size(); ++i) {
-        chain(segments[idx[i-1]], segments[idx[i]], ring, snap_threshold);
+        chain<Kernel>(segments[idx[i-1]], segments[idx[i]], ring, snap_threshold);
       }
-      chain(segments[idx[idx.size()-1]], segments[idx[0]], ring, snap_threshold);
+      chain<Kernel>(segments[idx[idx.size()-1]], segments[idx[0]], ring, snap_threshold);
 
       // get rid of segments with zero length
       // check again the size, to ignore degenerate case of input ring that consists of 3 co-linear segments (would get chained to eg 0 vertices)
       if (ring.size()>2) {
         for (size_t i=1; i<ring.size(); ++i) {
-          check_dist(ring, fixed_ring, i-1, i);
+          check_dist<Kernel>(ring, fixed_ring, i-1, i);
         }
-        check_dist(ring, fixed_ring, ring.size()-1, 0);
+        check_dist<Kernel>(ring, fixed_ring, ring.size()-1, 0);
       }
     }
 

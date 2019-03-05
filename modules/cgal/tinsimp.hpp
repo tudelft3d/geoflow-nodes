@@ -1,3 +1,5 @@
+#pragma once
+
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Projection_traits_xy_3.h>
@@ -32,10 +34,6 @@ typedef CGAL::Triangulation_vertex_base_with_id_2<Gt>				Vb;
 struct FaceInfo2
 {
   FaceInfo2() {}
-  int nesting_level;
-  bool in_domain() {
-    return nesting_level % 2 == 1;
-  }
   std::vector<heap_handle>* points_inside = nullptr;
   CGAL::Plane_3<K>* plane = nullptr;
 };
@@ -48,6 +46,7 @@ typedef CGAL::Constrained_triangulation_plus_2<CDT>     CT;
 typedef CDT::Point													Point;
 
 void greedy_insert(CDT &T, const std::vector<std::array<float,3>> &pts, double threshold);
+void greedy_insert(CDT &T, std::vector<Point> &cpts, double threshold);
 std::pair<std::vector<size_t>, std::vector<float>> 
   greedy_insert(CDT &T, const geoflow::LineStringCollection& line_collection, double threshold);
 void greedy_insert_lines(CDT &T, const std::vector<std::array<float,3>> &pts, const std::vector<size_t> &counts, const double threshold);

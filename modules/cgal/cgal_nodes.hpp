@@ -13,6 +13,9 @@ namespace geoflow::nodes::cgal {
 
       add_param("create_triangles", (bool)false);
     }
+    void gui() {
+      ImGui::Checkbox("Create triangles", &param<bool>("create_triangles"));
+    }
     void process();
   };
 
@@ -43,7 +46,7 @@ namespace geoflow::nodes::cgal {
     }
     void gui() {
       ImGui::InputText("LAS file path", &param<std::string>("las_filepath"));
-      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 0, 100);
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 1, 100);
     }
     void process();
   };
@@ -64,7 +67,20 @@ namespace geoflow::nodes::cgal {
     }
     void gui() {
       ImGui::InputText("LAS file path", &param<std::string>("filepath"));
-      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 0, 100);
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 1, 100);
+    }
+    void process();
+  };
+
+  class CDTDistanceNode:public Node {
+  public:
+    using Node::Node;
+    void init() {
+      add_input("cgal_cdt_base", TT_any);
+      add_input("cgal_cdt_target", TT_any);
+      add_output("points", TT_point_collection);
+      add_output("distance_min", TT_float);
+      add_output("distance_max", TT_float);
     }
     void process();
   };
@@ -92,11 +108,13 @@ namespace geoflow::nodes::cgal {
       add_output("triangles", TT_triangle_collection);
       add_output("normals", TT_vec3f);
       add_output("selected_lines", TT_line_string_collection);
+      add_output("cgal_cdt", TT_any);
       // add_output("count", TT_vec1ui);
       // add_output("error", TT_vec1f);
 
       add_param("thres_error", (float)2);
       add_param("densify_interval", (float)2);
+      add_param("create_triangles", (bool)true);
     }
     void gui() {
       if (ImGui::SliderFloat("Error threshold", &param<float>("thres_error"), 0, 100)) {
@@ -104,6 +122,28 @@ namespace geoflow::nodes::cgal {
       }
       if (input("geometries").connected_type == TT_line_string_collection)
         ImGui::SliderFloat("Line densify", &param<float>("densify_interval"), 0, 100);
+      ImGui::Checkbox("Create triangles", &param<bool>("create_triangles"));
+    }
+    void process();
+  };
+
+  class TinSimpLASReaderNode:public Node {
+  public:
+    using Node::Node;
+    void init() {
+      add_output("triangles", TT_triangle_collection);
+      add_output("cgal_cdt", TT_any);
+
+      add_param("filepath", (std::string) "");
+      add_param("thin_nth", (int)5);
+      add_param("thres_error", (float)2);
+      add_param("create_triangles", (bool)true);
+    }
+    void gui() {
+      ImGui::InputText("LAS file path", &param<std::string>("filepath"));
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 1, 100);
+      ImGui::SliderFloat("Error threshold", &param<float>("thres_error"), 0, 100);
+      ImGui::Checkbox("Create triangles", &param<bool>("create_triangles"));
     }
     void process();
   };
@@ -147,7 +187,6 @@ namespace geoflow::nodes::cgal {
     using Node::Node;
     void init() {
       add_input("lines", TT_line_string_collection);
-      add_input("lines2", TT_line_string_collection);
       add_output("lines", TT_line_string_collection);
 
       add_param("threshold_stop_cost", (float) 0.1);
@@ -205,7 +244,14 @@ namespace geoflow::nodes::cgal {
       add_input("min", TT_float);
       add_input("max", TT_float);
       add_output("lines", TT_line_string_collection);
-      add_output("attributes", TT_attribute_map_f);
+      add_output("attributes", TT_vec1i);
+
+      add_param("interval", (float)1.0);
+      add_param("exclude_begin", (float)-0.5);
+      add_param("exclude_end", (float)0.5);
+    }
+    void gui() {
+      ImGui::DragFloatRange2("range", &param<float>("exclude_begin"), &param<float>("exclude_end"), 0.5f, 0.0f, 100.0f, "Min: %.1f %%", "Max: %.1f %%");
     }
     void process();
   };
@@ -233,7 +279,25 @@ namespace geoflow::nodes::cgal {
     }
     void gui() {
       ImGui::InputText("LAS file path", &param<std::string>("filepath"));
-      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 0, 100);
+      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 1, 100);
+    }
+    void process();
+  };  
+  
+  class LineHeightCDTNode:public Node {
+  public:
+    using Node::Node;
+    void init() {
+      add_input("cgal_cdt", TT_any);
+      add_input("lines", TT_line_string_collection);
+      add_output("lines", TT_line_string_collection);
+
+      add_param("add_bbox", (bool)false);
+      add_param("densify_interval", (float)2);
+    }
+    void gui() {
+      ImGui::SliderFloat("Line densify", &param<float>("densify_interval"), 0, 100);
+      ImGui::Checkbox("Add bounding box to lines", &param<bool>("add_bbox"));
     }
     void process();
   };

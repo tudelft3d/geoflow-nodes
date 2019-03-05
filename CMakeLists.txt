@@ -15,7 +15,7 @@ project( geoflow_nodes )
 
 if (MSVC)
   add_definitions(-DNOMINMAX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:precise")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:precise /Zi /DEBUG")
 endif()
 
 # Boost
@@ -74,7 +74,9 @@ include_directories(
   thirdparty/geoflow/thirdparty/imgui/examples
   thirdparty/geoflow/thirdparty/glm
 )
-
+if(${GF_BUILD_GUI})
+  add_definitions(-DGF_BUILD_GUI)
+endif()
 #earcut
 include_directories(
   thirdparty/earcut
@@ -103,6 +105,9 @@ include_directories(modules/masb)
 
 # add_subdirectory(modules/cityjson)
 include_directories(modules/cityjson)
+
+add_subdirectory(modules/general)
+include_directories(modules/general)
 
 if (CGAL_FOUND AND Boost_FOUND)
   add_subdirectory(modules/stepedge)

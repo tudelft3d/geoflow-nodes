@@ -42,15 +42,12 @@ namespace geoflow::nodes::stepedge {
     
     if (!use_linedetector) {
       SimplifyPolygon_node->set_param("threshold_stop_cost", float(0.15));
-      connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
-      // connect(SimplifyPolygon_node, Ring2Segments_node, "polygons_simp", "rings");
-      // connect(Ring2Segments_node, RegulariseRings_node, "edge_segments", "edge_segments");
-      // connect(Ring2Segments_node, RegulariseRings_node, "ring_idx", "ring_idx");
-      connect(DetectLines_node, RegulariseRings_node, "edge_segments", "edge_segments");
-      connect(DetectLines_node, RegulariseRings_node, "ring_idx", "ring_idx");
-      connect(RegulariseRings_node, BuildArrFromRings_node, "exact_rings_out", "rings");
-      if(regularise_footprint)
-        connect(RegulariseRings_node, BuildArrFromRings_node, "exact_footprint_out", "footprint");
+      connect(AlphaShape_node, SimplifyPolygon_node, "alpha_rings", "polygons");
+      connect(SimplifyPolygon_node, Ring2Segments_node, "polygons_simp", "rings");
+      connect(Ring2Segments_node, RegulariseRings_node, "edge_segments", "edge_segments");
+      connect(Ring2Segments_node, RegulariseRings_node, "ring_idx", "ring_idx");
+      // connect(DetectLines_node, RegulariseRings_node, "edge_segments", "edge_segments");
+      // connect(DetectLines_node, RegulariseRings_node, "ring_idx", "ring_idx");
       // connect(RegulariseRings_node, SimplifyPolygon_node_postr, "rings_out", "polygons");
       // connect(RegulariseRings_node, SimplifyPolygon_node_postfp, "footprint_out", "polygons");
       // connect(SimplifyPolygon_node_postr, BuildArrFromRings_node, "polygons_simp", "rings");
@@ -59,10 +56,10 @@ namespace geoflow::nodes::stepedge {
       connect(AlphaShape_node, DetectLines_node, "alpha_rings", "edge_points");
       connect(DetectLines_node, RegulariseRings_node, "edge_segments", "edge_segments");
       connect(DetectLines_node, RegulariseRings_node, "ring_idx", "ring_idx");
-      connect(RegulariseRings_node, BuildArrFromRings_node, "rings_out", "rings");
-      connect(RegulariseRings_node, SimplifyPolygon_node, "footprint_out", "polygons");
-      connect(SimplifyPolygon_node, BuildArrFromRings_node, "polygon_simp", "footprint");
     }
+    connect(RegulariseRings_node, BuildArrFromRings_node, "exact_rings_out", "rings");
+    if(regularise_footprint)
+      connect(RegulariseRings_node, BuildArrFromRings_node, "exact_footprint_out", "footprint");
     connect(BuildArrFromRings_node, Arr2LinearRings_node, "arrangement", "arrangement");
   }
 
@@ -81,7 +78,7 @@ namespace geoflow::nodes::stepedge {
       add_param("step_height_threshold", (float) 2.0);
       // add_param("direct_alpharing", (bool) true);
       add_param("z_percentile", (float) 0.9);
-      add_param("flood_to_unsegmented", (bool) true);
+      add_param("flood_to_unsegmented", (bool) false);
       add_param("dissolve_edges", (bool) true);
       add_param("dissolve_stepedges", (bool) true);
       add_param("use_only_hplanes", (bool) false);

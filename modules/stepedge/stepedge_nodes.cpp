@@ -1042,11 +1042,34 @@ inline size_t DetectLinesNode::detect_lines_ring_m2(linedect::LineDetector& LD, 
     for (auto el : to_remove) {
       sorted_segments.erase(el);
     }
-    for (auto& [i0,i1] : sorted_segments) {
-      segments_out.push_back( LD.project(i0, i1) );
+    if (param<bool>("perform_chaining")) {
+      std::vector<SCK::Segment_2> prechain_segments;
+      std::vector<size_t> idx; size_t idcnt=0;
+      for (auto& [i0,i1] : sorted_segments) {
+        // segments_out.push_back( LD.project(i0, i1) );
+        prechain_segments.push_back( LD.project_cgal(i0, i1, param<float>("line_extend")) );
+        idx.push_back(idcnt++);
+      }
+      // TODO: chain the ring? for better regularisation results
+      auto chained_segments = linereg::chain_ring<SCK>(idx, prechain_segments, param<float>("snap_threshold"));
+
+      // for (auto e=prechain_segments.begin(); e!=prechain_segments.end(); ++e) {
+      for (auto e=chained_segments.edges_begin(); e!=chained_segments.edges_end(); ++e) {
+        segments_out.push_back({
+          arr3f{
+            float(CGAL::to_double(e->source().x())),
+            float(CGAL::to_double(e->source().y())),
+            0},
+          arr3f{
+            float(CGAL::to_double(e->target().x())),
+            float(CGAL::to_double(e->target().y())),
+            0},
+        });
+      }
+      return chained_segments.size();
+    } else {
+      return sorted_segments.size();
     }
-    // TODO: chain the ring? for better regularisation results
-    return sorted_segments.size();
   } else return 0;
   
 }
@@ -1679,14 +1702,14 @@ void RegulariseRingsNode::process(){
   std::vector<linereg::Polygon_2> exact_polygons;
   for (auto& idx : ring_idx) {
     exact_polygons.push_back(
-      linereg::chain_ring(idx, LR.get_segments(0), param<float>("snap_threshold"))
+      linereg::chain_ring<linereg::EK>(idx, LR.get_segments(0), param<float>("snap_threshold"))
     );
   }
   std::vector<size_t> fp_idx;
   for (size_t i=0; i < LR.get_segments(1).size(); ++i) {
     fp_idx.push_back(i);
   }
-  auto exact_fp = linereg::chain_ring(fp_idx, LR.get_segments(1), param<float>("snap_threshold"));
+  auto exact_fp = linereg::chain_ring<linereg::EK>(fp_idx, LR.get_segments(1), param<float>("snap_threshold"));
   output("exact_rings_out").set(exact_polygons);
   output("exact_footprint_out").set(exact_fp);
 
