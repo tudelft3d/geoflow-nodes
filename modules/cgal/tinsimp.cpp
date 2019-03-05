@@ -62,13 +62,12 @@ void greedy_insert(CDT &T, std::vector<Point> &cpts, double threshold) {
 
   // compute initial point errors, build heap, store point indices in triangles
   {
-    std::unordered_set<Point, PointXYHash, PointXYEqual> set;
     for (int i = 0; i < cpts.size(); i++) {
       auto p = cpts[i];
-      // detect and skip duplicate points
-      auto not_duplicate = set.insert(p).second;
-      if (not_duplicate) {
-        auto face = T.locate(p);
+      CDT::Locate_type lt;
+      int li;
+      CDT::Face_handle face = T.locate(p, lt, li);
+      if (lt == CDT::EDGE || lt == CDT::FACE) {
         auto e = compute_error(p, face);
         auto handle = heap.push(point_error(i, e));
         face->info().points_inside->push_back(handle);
@@ -103,7 +102,7 @@ void greedy_insert(CDT &T, std::vector<Point> &cpts, double threshold) {
           if (maxelement.index != (*h).index)
             points_to_update.push_back(h);
         }
-        face->info().points_inside->clear();
+        std::vector<tinsimp::heap_handle>().swap((*face->info().points_inside));
       }
     }
 
@@ -113,11 +112,16 @@ void greedy_insert(CDT &T, std::vector<Point> &cpts, double threshold) {
     // update the errors of affected elevation points
     for (auto curelement : points_to_update) {
       auto p = cpts[(*curelement).index];
-      auto containing_face = T.locate(p, face_hint);
-      const double e = compute_error(p, containing_face);
-      const point_error new_pe = point_error((*curelement).index, e);
-      heap.update(curelement, new_pe);
-      containing_face->info().points_inside->push_back(curelement);
+      //auto containing_face = T.locate(p, face_hint);
+      CDT::Locate_type lt;
+      int li;
+      CDT::Face_handle containing_face = T.locate(p, lt, li, face_hint);
+      if (lt == CDT::EDGE || lt == CDT::FACE) {
+        const double e = compute_error(p, containing_face);
+        const point_error new_pe = point_error((*curelement).index, e);
+        heap.update(curelement, new_pe);
+        containing_face->info().points_inside->push_back(curelement);
+      }
     }
   }
 
