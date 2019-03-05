@@ -2,9 +2,14 @@ if (MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:precise /Zi /DEBUG")
 endif()
 
+set (geoflowlib geoflow-core)
+if(${GF_BUILD_GUI})
+  set (geoflowlib geoflow-gui)
+endif()
+
 add_executable(hoogtelijnen hoogtelijnen.cpp)
 target_link_libraries( hoogtelijnen
-  geoflow-gui
+  ${geoflowlib}
   Boost::program_options
   general_nodes
   gdal_nodes
@@ -16,36 +21,9 @@ set_target_properties(
   PROPERTIES CXX_STANDARD 17
 )
 
-add_executable(footprint-simp footprint-simp.cpp)
-target_link_libraries( footprint-simp 
-  flowchart-gui
-  Boost::program_options
-  ${GDAL_LIBRARY}
-  stepedge_nodes
-  gdal_nodes
-  las_nodes
-  cgal_nodes
-)
-set_target_properties(
-  footprint-simp
-  PROPERTIES CXX_STANDARD 17
-)
-
-add_executable(footprint-simp-cli footprint-simp-cli.cpp)
-target_link_libraries( footprint-simp-cli 
-  Boost::program_options
-  ${GDAL_LIBRARY}
-  gdal_nodes
-  cgal_nodes
-)
-set_target_properties(
-  footprint-simp-cli
-  PROPERTIES CXX_STANDARD 17
-)
-
 add_executable(lod13 lod13.cpp)
 target_link_libraries( lod13 
-  # geoflow-gui
+  ${geoflowlib}
   stepedge_nodes
   cgal_nodes
   gdal_nodes
@@ -54,7 +32,7 @@ target_link_libraries( lod13
 )
 add_executable(lod10 lod10.cpp)
 target_link_libraries( lod10 
-  # geoflow-gui
+  ${geoflowlib}
   stepedge_nodes
   gdal_nodes
   Boost::program_options

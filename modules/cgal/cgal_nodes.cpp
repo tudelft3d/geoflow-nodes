@@ -304,7 +304,7 @@ void CDTDistanceNode::process() {
 
   vec1f distances;
   PointCollection points;
-  for (auto& v = cdt_target.finite_vertices_begin(); v != cdt_target.finite_vertices_end(); v++) {
+  for (auto v = cdt_target.finite_vertices_begin(); v != cdt_target.finite_vertices_end(); v++) {
     CGAL::Point_3 cp = v->point();
     CDT::Locate_type location;
     int vertexid;

@@ -73,7 +73,9 @@ include_directories(
   thirdparty/geoflow/thirdparty/imgui/examples
   thirdparty/geoflow/thirdparty/glm
 )
-
+if(${GF_BUILD_GUI})
+  add_definitions(-DGF_BUILD_GUI)
+endif()
 #earcut
 include_directories(
   thirdparty/earcut

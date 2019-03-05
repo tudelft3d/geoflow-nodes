@@ -1,11 +1,15 @@
 #include <iostream>
 #include <fstream>
+#include <exception>
 
 #include <general_register.hpp>
 #include <gdal_register.hpp>
 #include <cgal_register.hpp>
 #include <las_register.hpp>
-#include <geoflow/gui/flowchart.hpp>
+
+#ifdef GF_BUILD_GUI
+    #include <geoflow/gui/flowchart.hpp>
+#endif
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
@@ -27,7 +31,9 @@ int main(int ac, const char * av[])
     po::options_description desc("Allowed options");
     desc.add_options()
     ("help", "produce help message")
-    ("gui", po::bool_switch(&gui), "launch gui")
+    #ifdef GF_BUILD_GUI
+        ("gui", po::bool_switch(&gui), "launch gui")
+    #endif
     ("las", po::value<std::string>(&las_file), "Point cloud ")
     ("lines_file_in", po::value<std::string>(&lines_file_in), "Input lines")
     ("lines_file_out", po::value<std::string>(&lines_file_out), "Output lines")
@@ -211,15 +217,20 @@ int main(int ac, const char * av[])
         // Write lines
         geoflow::connect(line_string_filter->output("line_strings"), ogr_writer->input("geometries"));
 
-        if (gui)
-            geoflow::launch_flowchart(N, {cgal, gdal});
-        else {
+        #ifdef GF_BUILD_GUI
+            if (gui)
+                geoflow::launch_flowchart(N, {cgal, gdal});
+            else {
+                //N.run(*las_loader);
+                N.run(*tin_creator_lidar);
+                N.run(*ogr_loader);
+            }
+        #else
             //N.run(*las_loader);
             N.run(*tin_creator_lidar);
             N.run(*ogr_loader);
-        }
-    }
-    catch (Exception e) {
+        #endif
+    } catch (std::exception e) {
       std::cout << e.what();
     }
 }
