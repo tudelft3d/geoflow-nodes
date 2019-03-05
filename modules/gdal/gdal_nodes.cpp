@@ -317,7 +317,6 @@ void CSVWriterNode::process() {
 }
 
 void GEOSMergeLinesNode::process() {
-  
     std::cout << "Merging lines\n";
     auto lines = input("lines").get<LineStringCollection>();
     GEOSContextHandle_t gc = GEOS_init_r();
@@ -341,7 +340,6 @@ void GEOSMergeLinesNode::process() {
       vec3f line_vec3f;
       unsigned int size;
       GEOSCoordSeq_getSize_r(gc, l, &size);
-      std::cout << size << std::endl;
       for (int j = 0; j < size;j++) {
         double x,y,z = 0;
         GEOSCoordSeq_getX_r(gc, l, j, &x);
@@ -356,7 +354,7 @@ void GEOSMergeLinesNode::process() {
     for (auto l : linearray) {
       GEOSGeom_destroy_r(gc, l);
     }
-    GEOSGeom_destroy_r(gc, lineCollection);
+    //GEOSGeom_destroy_r(gc, lineCollection);
     GEOSGeom_destroy_r(gc, mergedlines);
     GEOS_finish_r(gc);
 

@@ -15,7 +15,7 @@ project( geoflow_nodes )
 
 if (MSVC)
   add_definitions(-DNOMINMAX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:precise")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:precise /Zi /DEBUG")
 endif()
 
 # Boost
@@ -102,6 +102,9 @@ include_directories(modules/masb)
 
 # add_subdirectory(modules/cityjson)
 include_directories(modules/cityjson)
+
+add_subdirectory(modules/general)
+include_directories(modules/general)
 
 if (CGAL_FOUND AND Boost_FOUND)
   add_subdirectory(modules/stepedge)
