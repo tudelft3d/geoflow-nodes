@@ -25,6 +25,8 @@ int main(int ac, const char * av[])
     float line_densification = 2.0;
     int pointthinning = 1;
     float iso_interval = 1.0;
+    float iso_exclude_begin = -1.0;
+    float iso_exclude_end = 1.0;
     float min_line_length = 10;
     bool gui = false;
     
@@ -167,7 +169,9 @@ int main(int ac, const char * av[])
         {"create_triangles", false}
     });
     iso_lines->set_params({
-        {"interval", iso_interval}
+        {"interval", iso_interval},
+        {"exclude_begin", iso_exclude_begin},
+        {"exclude_end", iso_exclude_end}
     });
     line_height_adder_iso->set_params({
         {"densify_interval", line_densification}
@@ -230,7 +234,7 @@ int main(int ac, const char * av[])
             N.run(*tin_creator_lidar);
             N.run(*ogr_loader);
         #endif
-    } catch (std::exception& e) {
-      std::cout << e.what();
+    } catch (const std::exception& e) {
+      std::cout << e.what() << std::endl;
     }
 }

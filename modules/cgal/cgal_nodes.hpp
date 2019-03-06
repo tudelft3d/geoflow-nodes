@@ -251,7 +251,8 @@ namespace geoflow::nodes::cgal {
       add_param("exclude_end", (float)0.5);
     }
     void gui() {
-      ImGui::DragFloatRange2("range", &param<float>("exclude_begin"), &param<float>("exclude_end"), 0.5f, 0.0f, 100.0f, "Min: %.1f %%", "Max: %.1f %%");
+      ImGui::DragFloatRange2("Excluding range", &param<float>("exclude_begin"), &param<float>("exclude_end"), 0.5f, 0.0f, 100.0f, "Min: %.1f", "Max: %.1f");
+      ImGui::SliderFloat("Interval", &param<float>("interval"), 1, 100);
     }
     void process();
   };
