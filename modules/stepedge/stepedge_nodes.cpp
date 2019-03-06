@@ -541,17 +541,17 @@ void arr2segments(Face_handle& face, LineStringCollection& segments) {
     he = he->next();
     if (he==first) break;
   }
-  segments.push_back({
-    {
-      float(CGAL::to_double(he->source()->point().x())),
-      float(CGAL::to_double(he->source()->point().y())),
-      0
-    },{
-      float(CGAL::to_double(he->target()->point().x())),
-      float(CGAL::to_double(he->target()->point().y())),
-      0
-    }
-  });
+  // segments.push_back({
+  //   {
+  //     float(CGAL::to_double(he->source()->point().x())),
+  //     float(CGAL::to_double(he->source()->point().y())),
+  //     0
+  //   },{
+  //     float(CGAL::to_double(he->target()->point().x())),
+  //     float(CGAL::to_double(he->target()->point().y())),
+  //     0
+  //   }
+  // });
 }
 
 void BuildArrangementNode::process(){
@@ -592,7 +592,7 @@ void arr_process(Arrangement_2& arr, const bool& flood_unsegmented, const bool& 
   if (flood_unsegmented) {
     std::map<float, Face_handle> face_map;
     for (auto& face : arr.face_handles()) {
-      if (face->data().segid!=0)
+      if (face->data().segid!=0 && face->data().in_footprint)
         face_map[face->data().elevation_avg] = face;
     }
     for (auto& kv : face_map) {
@@ -608,7 +608,10 @@ void arr_process(Arrangement_2& arr, const bool& flood_unsegmented, const bool& 
         do {
           // std::cout << &(*curr) << "\n";
           // ignore weird nullptrs (should not be possible...)
-          if (he==nullptr) break;
+          if (he==nullptr) {
+            // std::cout << "nullptr detected!\n";
+            break;
+          }
           auto candidate = he->twin()->face();
           if (candidate->data().segid == 0) {
             candidate->data().segid = cur_segid;
@@ -733,6 +736,32 @@ void arr_assign_pts_to_unsegmented(Arrangement_2& arr, std::vector<Point>& point
   }
 }
 
+void arr_insert_polygon(Arrangement_2& arr, const linereg::Polygon_2& polygon) {
+  auto tr = Traits_2();
+  auto compare = tr.compare_xy_2_object();
+
+  auto e = polygon.edges_begin();
+  bool source_was_left = (compare(e->source(),e->target()) == CGAL::SMALLER);
+  auto he = arr.insert_in_face_interior(*e, arr.unbounded_face());
+  auto v_prev = source_was_left ? he->target() : he->source();
+  auto first_he = he;
+  auto last_e = --polygon.edges_end();
+
+  ++e;
+  for (auto eit = e; eit != last_e; ++eit) {
+    // Traits_2::Compare_xy_2()(eit->source(),eit->target());
+    auto source_is_left = compare(eit->source(),eit->target()) == CGAL::SMALLER;
+    if (source_is_left)
+      he = arr.insert_from_left_vertex(*eit, v_prev);
+    else
+      he = arr.insert_from_right_vertex(*eit, v_prev);
+    v_prev = he->target();
+  }
+  auto v1 = first_he->next()==first_he->twin() ? first_he->target() : first_he->source();
+  auto v2 = he->next()==he->twin() ? he->target() : he->source();
+  arr.insert_at_vertices(*last_e, v1, v2);
+}
+
 void BuildArrFromRingsExactNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto rings = input("rings").get<std::vector<linereg::Polygon_2>>();
@@ -754,6 +783,7 @@ void BuildArrFromRingsExactNode::process() {
   {
     Face_index_observer obs (arr_base, true, 0, 0);
     insert(arr_base, footprint.edges_begin(), footprint.edges_end());
+    // arr_insert_polygon(arr_base, footprint);
     // insert_non_intersecting_curves(arr_base, footprint.edges_begin(), footprint.edges_end());
     if (!footprint.is_simple()) {
       arr_filter_biggest_face(arr_base, param<float>("rel_area_thres"));
@@ -779,6 +809,7 @@ void BuildArrFromRingsExactNode::process() {
         Arrangement_2 arr;
         Face_index_observer obs (arr, false, plane_id, points[elevation_id].z());
         insert(arr, polygon.edges_begin(), polygon.edges_end());
+        // arr_insert_polygon(arr, polygon);
 
         if (!polygon.is_simple()) {
           arr_filter_biggest_face(arr, param<float>("rel_area_thres"));
@@ -805,6 +836,10 @@ void BuildArrFromRingsExactNode::process() {
     param<bool>("dissolve_stepedges"),
     param<float>("step_height_threshold")
   );
+  
+  arr_is_valid = arr_base.is_valid();
+  vcount = arr_base.number_of_vertices();
+  ecount = arr_base.number_of_edges();
 
   LineStringCollection segments;
   for (auto& face: arr_base.face_handles()){
@@ -1077,7 +1112,7 @@ inline size_t DetectLinesNode::detect_lines_ring_m2(linedect::LineDetector& LD, 
 void DetectLinesNode::process(){
   auto input_geom = input("edge_points");
 
-  SegmentCollection edge_segments;
+  SegmentCollection edge_segments, lines3d;
   vec1i ring_order, ring_id, is_start;
   std::vector<std::vector<size_t>> ring_idx;
   // fit lines in all input points
@@ -1129,7 +1164,7 @@ void DetectLinesNode::process(){
         linedect::LineDetector LD(cgal_pts);
         // SegmentCollection ring_edges;
         auto n_detected = detect_lines_ring_m2(LD, edge_segments);
-        // LD.get_bounded_edges(edge_segments);
+        LD.get_bounded_edges(lines3d);
 
         for (size_t j=0; j<n_detected; ++j) {
           // edge_segments.push_back(ring_edges[j]);
@@ -1149,6 +1184,7 @@ void DetectLinesNode::process(){
   }
 
   output("edge_segments").set(edge_segments);
+  output("lines3d").set(lines3d);
   // output("ring_edges").set(ring_edges);
   output("ring_idx").set(ring_idx);
   output("ring_id").set(ring_id);
@@ -1279,14 +1315,15 @@ void DetectPlanesNode::process() {
 
   bool b_is_horizontal = float(horiz_pt_cnt)/float(total_pt_cnt) > param<float>("horiz_min_count");
   int building_type=-2; // as built: -2=undefined; -1=no pts; 0=LOD1, 1=LOD1.3, 2=LOD2
-  if (horiz_roofplane_cnt==1 && slant_roofplane_cnt==0){
-    building_type=0;
-  }else if (b_is_horizontal){
-    building_type=1;
-  }else if (!b_is_horizontal){
-    building_type=2;
-  }else if (PD.segment_shapes.size()==0)
+  if (PD.segment_shapes.size()==0) {
     building_type=-1;
+  } else if (horiz_roofplane_cnt==1 && slant_roofplane_cnt==0){
+    building_type=0;
+  } else if (b_is_horizontal){
+    building_type=1;
+  } else if (slant_roofplane_cnt > 0) {
+    building_type=2;
+  }
 
   output("class").set(building_type);
   output("classf").set(float(building_type));
@@ -1707,12 +1744,14 @@ void RegulariseRingsNode::process(){
     exact_polygons.push_back(
       linereg::chain_ring<linereg::EK>(idx, LR.get_segments(0), param<float>("snap_threshold"))
     );
+    // std::cout << "ch ring size : "<< exact_polygons.back().size() << ", " << exact_polygons.back().is_simple() << "\n";
   }
   std::vector<size_t> fp_idx;
   for (size_t i=0; i < LR.get_segments(1).size(); ++i) {
     fp_idx.push_back(i);
   }
   auto exact_fp = linereg::chain_ring<linereg::EK>(fp_idx, LR.get_segments(1), param<float>("snap_threshold"));
+  // std::cout << "ch fp size : "<< exact_fp.size() << ", " << exact_fp.is_simple() << "\n";
   output("exact_rings_out").set(exact_polygons);
   output("exact_footprint_out").set(exact_fp);
 

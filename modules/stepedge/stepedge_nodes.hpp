@@ -147,7 +147,8 @@ namespace geoflow::nodes::stepedge {
   class BuildArrFromRingsExactNode:public Node {
 
     public:
-    // bool remove_unsupported=false;
+    bool arr_is_valid=false;
+    int vcount, ecount;
 
     using Node::Node;
     void init() {
@@ -175,6 +176,8 @@ namespace geoflow::nodes::stepedge {
       ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
       ImGui::Checkbox("Dissolve stepedges", &param<bool>("dissolve_stepedges"));
       ImGui::SliderFloat("step_height_threshold", &param<float>("step_height_threshold"), 0, 100);
+      ImGui::Text("Arrangement valid? %s", arr_is_valid? "yes" : "no");
+      ImGui::Text("vcount: %d, ecount: %d", vcount, ecount);
     }
     void process();
   };
@@ -183,6 +186,7 @@ namespace geoflow::nodes::stepedge {
 
     public:
     // bool remove_unsupported=false;
+    bool arr_is_valid=false;
 
     using Node::Node;
     void init() {
@@ -204,6 +208,7 @@ namespace geoflow::nodes::stepedge {
       ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
       ImGui::Checkbox("Dissolve stepedges", &param<bool>("dissolve_stepedges"));
       ImGui::SliderFloat("step_height_threshold", &param<float>("step_height_threshold"), 0, 100);
+      ImGui::Text("Arrangement is valid? %d", arr_is_valid);
     }
     void process();
   };
@@ -231,6 +236,7 @@ namespace geoflow::nodes::stepedge {
     void init() {
       add_input("edge_points", {TT_point_collection, TT_linear_ring_collection});
       add_output("edge_segments", TT_segment_collection);
+      add_output("lines3d", TT_segment_collection);
       add_output("ring_edges", TT_segment_collection);
       add_output("ring_idx", TT_any);
       add_output("ring_id", TT_vec1i);
@@ -243,7 +249,7 @@ namespace geoflow::nodes::stepedge {
       add_param("min_cnt_lower", (int) 5);
       add_param("k", (int) 10);
       add_param("snap_threshold", (float) 1);
-      add_param("line_extend", (float) 0.1);
+      add_param("line_extend", (float) 0.2);
       add_param("perform_chaining", (bool) true);
     }
 
@@ -303,7 +309,7 @@ namespace geoflow::nodes::stepedge {
       add_output("slant_roofplane_cnt", TT_float);
 
       add_param("only_horizontal", (bool) true);
-      add_param("horiz_min_count", (float) 0.99);
+      add_param("horiz_min_count", (float) 0.95);
       add_param("metrics_normal_k", (int) 10);
       add_param("metrics_plane_min_points", (int) 20);
       add_param("metrics_plane_epsilon", (float) 0.3);

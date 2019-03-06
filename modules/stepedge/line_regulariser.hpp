@@ -317,7 +317,7 @@ namespace linereg {
       }
       chain<Kernel>(segments[idx[idx.size()-1]], segments[idx[0]], ring, snap_threshold);
 
-      // get rid of segments with zero length
+      // get rid of segments with zero length (ie duplicate points)
       // check again the size, to ignore degenerate case of input ring that consists of 3 co-linear segments (would get chained to eg 0 vertices)
       if (ring.size()>2) {
         for (size_t i=1; i<ring.size(); ++i) {
@@ -325,6 +325,8 @@ namespace linereg {
         }
         check_dist<Kernel>(ring, fixed_ring, ring.size()-1, 0);
       }
+
+      // NOTE: at this point there can still be vertices between co-linear segments (ie 3 consecutive points on the same line)
     }
 
     return fixed_ring;
