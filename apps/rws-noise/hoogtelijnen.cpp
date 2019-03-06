@@ -25,6 +25,8 @@ int main(int ac, const char * av[])
     float line_densification = 2.0;
     int pointthinning = 1;
     float iso_interval = 1.0;
+    float iso_exclude_begin = -1.0;
+    float iso_exclude_end = 1.0;
     float min_line_length = 10;
     bool gui = false;
     
@@ -38,7 +40,13 @@ int main(int ac, const char * av[])
     ("lines_file_in", po::value<std::string>(&lines_file_in), "Input lines")
     ("lines_file_out", po::value<std::string>(&lines_file_out), "Output lines")
     ("selection_threshold", po::value<float>(&selection_threshold), "Selection threshold")
-    ("simplification_threshold", po::value<float>(&simplification_threshold), "Simplification threshold")
+    ("simplification_threshold", po::value<float>(&simplification_threshold), "Simplification threshold (area of triangle)")
+    ("line_densification", po::value<float>(&line_densification), "Line densification distance")
+    ("iso_interval", po::value<float>(&iso_interval), "Iso line interval")
+    ("iso_exclude_begin", po::value<float>(&iso_exclude_begin), "Iso line exclude begin")
+    ("iso_exclude_end", po::value<float>(&iso_exclude_end), "Iso line exclude end")
+    ("min_line_length", po::value<float>(&min_line_length), "Minimum line length")
+    ("pointthinning", po::value<int>(&pointthinning), "Point thinning")
     ;
     po::variables_map vm;
     po::store(po::parse_command_line(ac, av, desc), vm);
@@ -167,7 +175,9 @@ int main(int ac, const char * av[])
         {"create_triangles", false}
     });
     iso_lines->set_params({
-        {"interval", iso_interval}
+        {"interval", iso_interval},
+        {"exclude_begin", iso_exclude_begin},
+        {"exclude_end", iso_exclude_end}
     });
     line_height_adder_iso->set_params({
         {"densify_interval", line_densification}
@@ -230,7 +240,7 @@ int main(int ac, const char * av[])
             N.run(*tin_creator_lidar);
             N.run(*ogr_loader);
         #endif
-    } catch (std::exception e) {
-      std::cout << e.what();
+    } catch (const std::exception& e) {
+      std::cout << e.what() << std::endl;
     }
 }
