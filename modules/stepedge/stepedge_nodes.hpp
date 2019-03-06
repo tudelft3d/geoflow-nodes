@@ -303,8 +303,9 @@ namespace geoflow::nodes::stepedge {
       add_output("slant_roofplane_cnt", TT_float);
 
       add_param("only_horizontal", (bool) true);
+      add_param("horiz_min_count", (float) 0.99);
       add_param("metrics_normal_k", (int) 10);
-      add_param("metrics_plane_min_points", (int) 30);
+      add_param("metrics_plane_min_points", (int) 20);
       add_param("metrics_plane_epsilon", (float) 0.3);
       add_param("metrics_plane_normal_threshold", (float) 0.75);
       add_param("metrics_is_horizontal_threshold", (float) 0.97);
@@ -321,6 +322,8 @@ namespace geoflow::nodes::stepedge {
       ImGui::InputFloat("Wall angle thres", &param<float>("metrics_is_wall_threshold"), 0.01, 1);
       ImGui::InputFloat("Is horizontal", &param<float>("metrics_is_horizontal_threshold"), 0.01, 1);
       ImGui::Checkbox("Output only horizontal planes", &param<bool>("only_horizontal"));
+      if(param<bool>("only_horizontal"))
+        ImGui::InputFloat("Min horiz point count", &param<float>("horiz_min_count"), 0.01, 1);
     }
 
     void process();

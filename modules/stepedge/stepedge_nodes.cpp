@@ -1238,8 +1238,8 @@ void DetectPlanesNode::process() {
   std::unordered_map<int, std::vector<Point>> pts_per_roofplane;
   size_t horiz_roofplane_cnt=0;
   size_t slant_roofplane_cnt=0;
-  if (param<bool>("only_horizontal"))
-    pts_per_roofplane[-1] = std::vector<Point>();
+  if (param<bool>("only_horizontal")) pts_per_roofplane[-1] = std::vector<Point>();
+  size_t horiz_pt_cnt=0, total_pt_cnt=0;
   for(auto seg: PD.segment_shapes){
     auto& plane = seg.second;
     Vector n = plane.orthogonal_vector();
@@ -1251,9 +1251,11 @@ void DetectPlanesNode::process() {
     // put slanted surface points at index -1 if we care only about horzontal surfaces
     if (!is_wall) {
       auto segpts = PD.get_points(seg.first);
+      total_pt_cnt += segpts.size();
       if (!param<bool>("only_horizontal") ||
           (param<bool>("only_horizontal") && is_horizontal)) {
         pts_per_roofplane[seg.first] = segpts;
+        horiz_pt_cnt += segpts.size();
       } else if (!is_horizontal) {
         pts_per_roofplane[-1].insert(
           pts_per_roofplane[-1].end(),
@@ -1275,14 +1277,15 @@ void DetectPlanesNode::process() {
     }
   }
 
+  bool b_is_horizontal = float(horiz_pt_cnt)/float(total_pt_cnt) > param<float>("horiz_min_count");
   int building_type=-2; // as built: -2=undefined; -1=no pts; 0=LOD1, 1=LOD1.3, 2=LOD2
-  if (horiz_roofplane_cnt==1 && slant_roofplane_cnt==0)
+  if (horiz_roofplane_cnt==1 && slant_roofplane_cnt==0){
     building_type=0;
-  else if (horiz_roofplane_cnt!=0 && slant_roofplane_cnt==0)
+  }else if (b_is_horizontal){
     building_type=1;
-  else if (slant_roofplane_cnt!=0)
+  }else if (!b_is_horizontal){
     building_type=2;
-  else if (PD.segment_shapes.size()==0)
+  }else if (PD.segment_shapes.size()==0)
     building_type=-1;
 
   output("class").set(building_type);

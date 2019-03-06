@@ -118,9 +118,9 @@ int main(int ac, const char * av[])
     );
   
     #ifdef GF_BUILD_GUI
-    if (gui)
-        geoflow::launch_flowchart(N, {stepedge, gdal, cgal});
-    else
+        if (gui)
+            geoflow::launch_flowchart(N, {stepedge, gdal, cgal});
+        else
     #endif
         N.run(*ogr_loader);
 }
