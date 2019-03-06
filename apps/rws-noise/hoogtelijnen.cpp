@@ -240,7 +240,7 @@ int main(int ac, const char * av[])
             N.run(*tin_creator_lidar);
             N.run(*ogr_loader);
         #endif
-    } catch (const std::exception& e) {
+    } catch (const std::exception e) {
       std::cout << e.what() << std::endl;
     }
 }
