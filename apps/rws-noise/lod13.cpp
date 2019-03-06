@@ -103,16 +103,8 @@ int main(int ac, const char * av[])
     // ogr_loader->output_group("attributes").connect(
     //   lod13generatorA->input_group("attributes")
     // );
-
     ogr_loader->output_group("attributes").connect(
         ogr_writer_lod10->input_group("attributes")
-    );
-    lod10generator->output_group("attributes").connect(
-        ogr_writer_lod10->input_group("attributes")
-    );
-    geoflow::connect(
-        ogr_loader->output("linear_rings"),
-        ogr_writer_lod10->input("geometries")
     );
 
     if (presimp_fp) {
@@ -168,6 +160,17 @@ int main(int ac, const char * av[])
     // lod13generatorA->output_group("attributes").connect(
     //   ogr_writerA->input_group("attributes")
     // );
+    geoflow::connect(
+        ogr_loader->output("linear_rings"),
+        ogr_writer_lod10->input("geometries")
+    );
+    geoflow::connect(
+        las_in_poly->output("point_clouds"),
+        lod10generator->input("point_clouds")
+    );
+    lod10generator->output_group("attributes").connect(
+        ogr_writer_lod10->input_group("attributes")
+    );
   
     #ifdef GF_BUILD_GUI
         if (gui)

@@ -144,7 +144,7 @@ namespace geoflow::nodes::stepedge {
       AttributeMap all_attributes;
       
       for(int i=0; i<point_clouds.size(); ++i) {
-       std::cout << "b fid: " << i << "\n";
+       std::cout << "13" << (param<bool>("use_only_hplanes") ? "H" : "A") << " fid: " << i << "\n";
         auto& points = point_clouds[i];
         auto& polygon = polygons[i];
         
@@ -241,7 +241,7 @@ namespace geoflow::nodes::stepedge {
       R.register_node<DetectPlanesNode>("DetectPlanes");
       
       for(int i=0; i<point_clouds.size(); i++) {
-        std::cout << "b fid: " << i << "\n";
+        std::cout << "10 fid: " << i << "\n";
         auto& point_cloud = point_clouds[i];
         
         NodeManager N;
