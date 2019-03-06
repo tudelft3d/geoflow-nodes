@@ -6,6 +6,7 @@
 #include "visvalingam_cost.hpp"
 
 #include <lasreader.hpp>
+#include <lasfilter.hpp>
 #include <fstream>
 #include <algorithm>
 
@@ -486,8 +487,13 @@ void TinSimpLASReaderNode::process() {
   LASreadOpener lasreadopener;
   lasreadopener.set_file_name(filepath.c_str());
   LASreader* lasreader = lasreadopener.open();
+  LASfilter* filter = new LASfilter();
+  char arg[] = "-keep_class 2";
+  filter->parse(arg);
+  lasreader->set_filter(filter);
 
-  bool found_offset = manager.data_offset.has_value();
+  manager.data_offset = { lasreader->get_min_x(), lasreader->get_min_y(), lasreader->get_min_z() };
+  auto offset = manager.data_offset.value();
 
   size_t i = 0;
   float xmin = 99999;
@@ -495,24 +501,18 @@ void TinSimpLASReaderNode::process() {
   float ymin = 99999;
   float ymax = -99999;
   while (lasreader->read_point()) {
-    if (lasreader->point.get_classification() == 2) {
-      if (i++ % thin_nth == 0) {
-        if (!found_offset) {
-          manager.data_offset = { lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z() };
-          found_offset = true;
-        }
-        float x = lasreader->point.get_x() - (*manager.data_offset)[0];
-        float y = lasreader->point.get_y() - (*manager.data_offset)[1];
-        float z = lasreader->point.get_z() - (*manager.data_offset)[2];
-        Point p = Point(x, y, z);
-        points.push_back(p);
-        if (x < xmin) xmin = x;
-        if (x > xmax) xmax = x;
-        if (y < ymin) ymin = y;
-        if (y > ymax) ymax = y;
-      }
-      if (i % 1000000 == 0) std::cout << "Read " << i << " points...\n";
+    if (i++ % thin_nth == 0) {
+      float x = lasreader->point.get_x() - offset[0];
+      float y = lasreader->point.get_y() - offset[1];
+      float z = lasreader->point.get_z() - offset[2];
+      Point p = Point(x, y, z);
+      points.push_back(p);
+      if (x < xmin) xmin = x;
+      if (x > xmax) xmax = x;
+      if (y < ymin) ymin = y;
+      if (y > ymax) ymax = y;
     }
+    if (i % 1000000 == 0) std::cout << "Read " << i << " points...\n";
   }
   lasreader->close();
   delete lasreader;
