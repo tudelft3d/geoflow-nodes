@@ -40,7 +40,13 @@ int main(int ac, const char * av[])
     ("lines_file_in", po::value<std::string>(&lines_file_in), "Input lines")
     ("lines_file_out", po::value<std::string>(&lines_file_out), "Output lines")
     ("selection_threshold", po::value<float>(&selection_threshold), "Selection threshold")
-    ("simplification_threshold", po::value<float>(&simplification_threshold), "Simplification threshold")
+    ("simplification_threshold", po::value<float>(&simplification_threshold), "Simplification threshold (area of triangle)")
+    ("line_densification", po::value<float>(&line_densification), "Line densification distance")
+    ("iso_interval", po::value<float>(&iso_interval), "Iso line interval")
+    ("iso_exclude_begin", po::value<float>(&iso_exclude_begin), "Iso line exclude begin")
+    ("iso_exclude_end", po::value<float>(&iso_exclude_end), "Iso line exclude end")
+    ("min_line_length", po::value<float>(&min_line_length), "Minimum line length")
+    ("pointthinning", po::value<int>(&pointthinning), "Point thinning")
     ;
     po::variables_map vm;
     po::store(po::parse_command_line(ac, av, desc), vm);
