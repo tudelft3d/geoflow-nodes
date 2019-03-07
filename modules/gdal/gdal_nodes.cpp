@@ -96,20 +96,11 @@ namespace geoflow::nodes::gdal {
               manager.data_offset = {poPoint.getX(), poPoint.getY(), 0};
               found_offset = true;
             }
-            std::array<float,3> p;
-            if (poGeometry->getGeometryType() == wkbLineString) {
-              p = {
-                float(poPoint.getX()-(*manager.data_offset)[0]), 
-                float(poPoint.getY()-(*manager.data_offset)[1]), 
-                0
-              };
-            } else {
-              p = {
-                float(poPoint.getX()-(*manager.data_offset)[0]), 
-                float(poPoint.getY()-(*manager.data_offset)[1]), 
-                float(poPoint.getZ()-(*manager.data_offset)[2])
-              };
-            }
+            std::array<float,3> p = {
+              float(poPoint.getX()-(*manager.data_offset)[0]), 
+              float(poPoint.getY()-(*manager.data_offset)[1]), 
+              float(poPoint.getZ()-(*manager.data_offset)[2])
+            };
             line_string.push_back(p);
           }
           line_strings.push_back(line_string);

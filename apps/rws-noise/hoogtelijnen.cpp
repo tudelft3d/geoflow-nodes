@@ -18,7 +18,8 @@ namespace gfn = geoflow::nodes;
 int main(int ac, const char * av[])
 {
     std::string lines_file_in;
-    std::string lines_file_out;
+    std::string lines_file_out_all;
+    std::string lines_file_out_bgtonly;
     std::string las_file;
     float selection_threshold = 0.5;
     float simplification_threshold = 10;
@@ -38,7 +39,8 @@ int main(int ac, const char * av[])
     #endif
     ("las", po::value<std::string>(&las_file), "Point cloud ")
     ("lines_file_in", po::value<std::string>(&lines_file_in), "Input lines")
-    ("lines_file_out", po::value<std::string>(&lines_file_out), "Output lines")
+    ("lines_file_out", po::value<std::string>(&lines_file_out_all), "All output lines")
+    ("lines_file_out_bgtonly", po::value<std::string>(&lines_file_out_bgtonly), "Output lines bgt only")
     ("selection_threshold", po::value<float>(&selection_threshold), "Selection threshold")
     ("simplification_threshold", po::value<float>(&simplification_threshold), "Simplification threshold (area of triangle)")
     ("line_densification", po::value<float>(&line_densification), "Line densification distance")
@@ -145,10 +147,12 @@ int main(int ac, const char * av[])
     auto simplify_lines_cdt = N.create_node(cgal, "SimplifyLines", { 1250, 215 });
     auto line_string_filter = N.create_node(general, "LineStringFilter", { 1250, 285 });
     auto ogr_writer = N.create_node(gdal, "OGRWriterNoAttributes", { 1250, 350 });
+    auto ogr_writer_bgtonly = N.create_node(gdal, "OGRWriterNoAttributes", { 1250, 550 });
 
     // Setup nodes
     ogr_loader->set_param("filepath", lines_file_in);
-    ogr_writer->set_param("filepath", lines_file_out);
+    ogr_writer->set_param("filepath", lines_file_out_all);
+    ogr_writer_bgtonly->set_param("filepath", lines_file_out_bgtonly);
 
     //las_loader->set_params({
     //    {"filepath", las_file},
@@ -226,6 +230,9 @@ int main(int ac, const char * av[])
         geoflow::connect(simplify_lines_cdt->output("lines"), line_string_filter->input("line_strings"));
         // Write lines
         geoflow::connect(line_string_filter->output("line_strings"), ogr_writer->input("geometries"));
+
+
+        geoflow::connect(line_height_adder_input->output("lines"), ogr_writer_bgtonly->input("geometries"));
 
         #ifdef GF_BUILD_GUI
             if (gui)
