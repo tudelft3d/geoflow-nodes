@@ -85,7 +85,9 @@ namespace geoflow::nodes::gdal {
       if( poGeometry != nullptr ) // FIXME: we should check if te layer geometrytype matches with this feature's geometry type. Messy because they can be a bit different eg. wkbLineStringZM and wkbLineString25D
       {
 
-        if (poGeometry->getGeometryType() == wkbLineString25D || poGeometry->getGeometryType() == wkbLineStringZM) {
+        if (
+          poGeometry->getGeometryType() == wkbLineString25D || poGeometry->getGeometryType() == wkbLineStringZM ||
+          poGeometry->getGeometryType() == wkbLineString) {
           OGRLineString *poLineString = poGeometry->toLineString();
           
           vec3f line_string;
@@ -94,7 +96,20 @@ namespace geoflow::nodes::gdal {
               manager.data_offset = {poPoint.getX(), poPoint.getY(), 0};
               found_offset = true;
             }
-            std::array<float,3> p = {float(poPoint.getX()-(*manager.data_offset)[0]), float(poPoint.getY()-(*manager.data_offset)[1]), float(poPoint.getZ()-(*manager.data_offset)[2])};
+            std::array<float,3> p;
+            if (poGeometry->getGeometryType() == wkbLineString) {
+              p = {
+                float(poPoint.getX()-(*manager.data_offset)[0]), 
+                float(poPoint.getY()-(*manager.data_offset)[1]), 
+                0
+              };
+            } else {
+              p = {
+                float(poPoint.getX()-(*manager.data_offset)[0]), 
+                float(poPoint.getY()-(*manager.data_offset)[1]), 
+                float(poPoint.getZ()-(*manager.data_offset)[2])
+              };
+            }
             line_string.push_back(p);
           }
           line_strings.push_back(line_string);
@@ -133,10 +148,12 @@ namespace geoflow::nodes::gdal {
       }
 
     }
-    if (geometry_type == wkbLineString25D || geometry_type == wkbLineStringZM) {
+    // if (geometry_type == wkbLineString25D || geometry_type == wkbLineStringZM) {
+    if (line_strings.size() > 0) {
       output("line_strings").set(line_strings);
       std::cout << "pushed " << line_strings.size() << " line_string features...\n";
-    } else if (geometry_type == wkbPolygon || geometry_type == wkbPolygon25D || geometry_type == wkbPolygonZM || geometry_type == wkbPolygonM) {
+    // } else if (geometry_type == wkbPolygon || geometry_type == wkbPolygon25D || geometry_type == wkbPolygonZM || geometry_type == wkbPolygonM) {
+    } else if (linear_rings.size() > 0) {
       output("linear_rings").set(linear_rings);
       std::cout << "pushed " << linear_rings.size() << " linear_ring features...\n";
     }

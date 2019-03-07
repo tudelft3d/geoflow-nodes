@@ -1064,18 +1064,20 @@ inline size_t DetectLinesNode::detect_lines_ring_m2(linedect::LineDetector& LD, 
       sorted_segments.insert(el.second);
     }
     // TODO: better check for overlapping segments! Following is not 100% robust...
-    auto el_prev = sorted_segments.begin();
-    // el_prev.first-=sorted_segments.size();
-    // el_prev.second-=sorted_segments.size();
-    std::vector<SegSet::iterator> to_remove;
-    for (auto el = ++sorted_segments.begin(); el != sorted_segments.end(); ++el ){
-      el_prev = el;
-      --el_prev;
-      if (el_prev->second > el->first)
-        to_remove.push_back(el);
-    }
-    for (auto el : to_remove) {
-      sorted_segments.erase(el);
+    if (param<bool>("remove_overlap")) {
+      auto el_prev = sorted_segments.begin();
+      // el_prev.first-=sorted_segments.size();
+      // el_prev.second-=sorted_segments.size();
+      std::vector<SegSet::iterator> to_remove;
+      for (auto el = ++sorted_segments.begin(); el != sorted_segments.end(); ++el ){
+        el_prev = el;
+        --el_prev;
+        if (el_prev->second > el->first)
+          to_remove.push_back(el);
+      }
+      for (auto el : to_remove) {
+        sorted_segments.erase(el);
+      }
     }
     if (param<bool>("perform_chaining")) {
       std::vector<SCK::Segment_2> prechain_segments;
@@ -1103,6 +1105,11 @@ inline size_t DetectLinesNode::detect_lines_ring_m2(linedect::LineDetector& LD, 
       }
       return chained_segments.size();
     } else {
+      for (const auto& e : sorted_segments) {
+        segments_out.push_back(
+          LD.project(e.first,e.second)
+        );
+      }
       return sorted_segments.size();
     }
   } else return 0;

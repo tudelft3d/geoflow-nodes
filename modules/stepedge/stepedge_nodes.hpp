@@ -251,6 +251,7 @@ namespace geoflow::nodes::stepedge {
       add_param("snap_threshold", (float) 1);
       add_param("line_extend", (float) 0.2);
       add_param("perform_chaining", (bool) true);
+      add_param("remove_overlap", (bool) true);
     }
 
     void gui(){
@@ -261,6 +262,7 @@ namespace geoflow::nodes::stepedge {
       ImGui::InputFloat("Extend lines", &param<float>("line_extend"), 0.01, 1);
       ImGui::Checkbox("Perform chaining", &param<bool>("perform_chaining"));
       ImGui::InputFloat("Chain snap thres", &param<float>("snap_threshold"), 0.01, 1);
+      ImGui::Checkbox("Remove overlap", &param<bool>("remove_overlap"));
     }
     inline void detect_lines_ring_m1(linedect::LineDetector& LD, SegmentCollection& segments_out);
     inline size_t detect_lines_ring_m2(linedect::LineDetector& LD, SegmentCollection& segments_out);
