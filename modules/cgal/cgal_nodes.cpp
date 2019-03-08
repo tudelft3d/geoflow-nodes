@@ -513,8 +513,9 @@ void TinSimpLASReaderNode::process() {
       if (y < ymin) ymin = y;
       if (y > ymax) ymax = y;
     }
-    if (i % 1000000 == 0) std::cout << "Read " << i << " points...\n";
+    if (i % 10000000 == 0) std::cout << "Read " << i << " points...\n";
   }
+  std::cout << "Done reading. Read " << i << " points...\n";
   lasreader->close();
   delete lasreader;
   points.shrink_to_fit();
