@@ -179,7 +179,7 @@ namespace linereg {
         }
       }
 
-      // find average direction and center point for each cluster
+      // find direction and center point for each cluster
       for(auto& cluster : dist_clusters) {
         // find max priority
         size_t max_pr=0;

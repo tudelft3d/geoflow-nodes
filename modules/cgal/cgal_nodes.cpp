@@ -491,6 +491,7 @@ void TinSimpLASReaderNode::process() {
   char arg[] = "-keep_class 2";
   filter->parse(arg);
   lasreader->set_filter(filter);
+  points.reserve(lasreader->npoints);
 
   manager.data_offset = { lasreader->get_min_x(), lasreader->get_min_y(), lasreader->get_min_z() };
   auto offset = manager.data_offset.value();
@@ -516,6 +517,7 @@ void TinSimpLASReaderNode::process() {
   }
   lasreader->close();
   delete lasreader;
+  points.shrink_to_fit();
   
   geoflow::Box bbox = geoflow::Box();
   bbox.set({ xmin,ymin }, { xmax,ymax });
