@@ -288,6 +288,51 @@ void PolygonExtruderNode::process(){
   output("heights").set(heights);
 }
 
+void PolygonGrowerNode::process(){
+  auto polygons = input("rings_exact").get<std::vector<linereg::Polygon_2>>();
+  auto extension = param<float>("extension");
+
+  std::vector<linereg::Polygon_2> new_polygons;
+  LinearRingCollection new_rings;
+  
+  for (auto& poly : polygons) {
+    auto e = poly.edges_circulator();
+    auto begin = e;
+    linereg::Polygon_2 new_poly;
+    LinearRing new_ring;
+    // for (auto e =poly.edges_begin())
+    do {
+      auto p = e->target();
+      auto ne = ++e;
+      linereg::EK::Vector_2 v;
+      auto a = e->source()-p;
+      a = a/a.squared_length();
+      auto b = ne->target()-p;
+      b = b/b.squared_length();
+
+      if (CGAL::collinear(p,e->source(),ne->target())) {
+        v = linereg::EK::Vector_2(a.y(), -a.x());
+      } else {
+        v = a+b;
+        v = v/v.squared_length();
+      }
+      auto np = p + v*extension;
+      new_poly.push_back(np);
+      new_ring.push_back({
+        float(CGAL::to_double(np.x())), 
+        float(CGAL::to_double(np.y())), 
+        0
+      });
+
+    } while (e!=begin);
+    new_polygons.push_back(new_poly);
+    new_rings.push_back(new_ring);
+  }
+
+  output("rings_exact").set(new_polygons);
+  output("rings").set(new_rings);
+}
+
 void Arr2LinearRingsNode::process(){
   auto arr = input("arrangement").get<Arrangement_2>();
 

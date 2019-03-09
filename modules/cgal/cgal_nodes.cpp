@@ -526,10 +526,12 @@ void TinSimpLASReaderNode::process() {
   std::cout << "Adding points to CDT\n";
   tinsimp::CDT cdt;
   build_initial_tin(cdt, bbox);
+  std::cout << "Built initial TIN...\n";
   tinsimp::greedy_insert(cdt, points, double(thres_error));
+  std::cout << "Completed TINSimp with " << cdt.number_of_faces() << " triangles...\n";
   delete_initial_tin(cdt, bbox);
+  std::cout << "Removed initial TIN...\n";
 
-  std::cout << "Completed CDT with " << cdt.number_of_faces() << " triangles...\n";
 
   TriangleCollection triangles;
   if (create_triangles) {

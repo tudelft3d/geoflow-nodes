@@ -98,6 +98,24 @@ namespace geoflow::nodes::stepedge {
     void process();
   };
 
+    class PolygonGrowerNode:public Node {
+
+    public:
+    using Node::Node;
+    void init() {
+      add_input("rings_exact", TT_any);
+      add_output("rings_exact", TT_any);
+      add_output("rings", TT_linear_ring_collection);
+
+      add_param("extension", (float) 0.1);
+    }
+
+    void gui() {
+      ImGui::DragFloat("Extension length", &param<float>("extension"));
+    }
+    void process();
+  };
+
   class ProcessArrangementNode:public Node {
     public:
     using Node::Node;

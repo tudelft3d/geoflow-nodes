@@ -62,18 +62,23 @@ void greedy_insert(CDT &T, std::vector<Point> &cpts, double threshold) {
 
   // compute initial point errors, build heap, store point indices in triangles
   {
+    std::unordered_set<Point, PointXYHash, PointXYEqual> set;
     for (int i = 0; i < cpts.size(); i++) {
       auto p = cpts[i];
       CDT::Locate_type lt;
       int li;
-      CDT::Face_handle face = T.locate(p, lt, li);
-      if (lt == CDT::EDGE || lt == CDT::FACE) {
-        auto e = compute_error(p, face);
-        auto handle = heap.push(point_error(i, e));
-        face->info().points_inside->push_back(handle);
+      auto not_duplicate = set.insert(p).second;
+      if(not_duplicate){
+        CDT::Face_handle face = T.locate(p, lt, li);
+        if (lt == CDT::EDGE || lt == CDT::FACE) {
+          auto e = compute_error(p, face);
+          auto handle = heap.push(point_error(i, e));
+          face->info().points_inside->push_back(handle);
+        }
       }
     }
   }
+  std::cout << "prepared tinsimp...\n";
 
   // insert points, update errors of affected triangles until threshold error is reached
   while (!heap.empty() && heap.top().error > threshold) {
