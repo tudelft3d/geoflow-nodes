@@ -103,8 +103,7 @@ namespace geoflow::nodes::stepedge {
     public:
     using Node::Node;
     void init() {
-      add_input("rings_exact", TT_any);
-      add_output("rings_exact", TT_any);
+      add_input("rings", TT_linear_ring_collection);
       add_output("rings", TT_linear_ring_collection);
 
       add_param("extension", (float) 0.1);
@@ -177,6 +176,9 @@ namespace geoflow::nodes::stepedge {
       add_output("noseg_area_r", TT_float);
       add_output("arrangement", TT_any);
       add_output("arr_segments", TT_line_string_collection);
+      add_output("snap_to_e", TT_segment_collection);
+      add_output("snap_to_v", TT_point_collection);
+      add_output("snap_v", TT_point_collection);
 
       add_param("extrude_unsegmented", (bool) true);
       add_param("z_percentile", (float) 0.9);
@@ -185,10 +187,14 @@ namespace geoflow::nodes::stepedge {
       add_param("dissolve_edges", (bool) true);
       add_param("dissolve_stepedges", (bool) true);
       add_param("step_height_threshold", (float) 1.0);
+      add_param("snap_clean", (bool) true);
+      add_param("snap_dist", (float) 0.05);
     }
     void gui() {
       ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
       ImGui::SliderFloat("Preserve split ring area", &param<float>("rel_area_thres"), 0.01, 1);
+      ImGui::Checkbox("Snap", &param<bool>("snap_clean"));
+      ImGui::SliderFloat("Snap distance", &param<float>("snap_dist"), 0.01, 1);
       ImGui::Checkbox("Extrude unsegmented", &param<bool>("extrude_unsegmented"));
       ImGui::Checkbox("Flood to unsegmented", &param<bool>("flood_to_unsegmented"));
       ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
@@ -197,6 +203,7 @@ namespace geoflow::nodes::stepedge {
       ImGui::Text("Arrangement valid? %s", arr_is_valid? "yes" : "no");
       ImGui::Text("vcount: %d, ecount: %d", vcount, ecount);
     }
+    void arr_process(Arrangement_2& arr);
     void process();
   };
 
@@ -228,7 +235,7 @@ namespace geoflow::nodes::stepedge {
       ImGui::SliderFloat("step_height_threshold", &param<float>("step_height_threshold"), 0, 100);
       ImGui::Text("Arrangement is valid? %d", arr_is_valid);
     }
-    void process();
+    void process(){};
   };
   class LinearRingtoRingsNode:public Node {
     public:

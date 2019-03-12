@@ -258,6 +258,24 @@ class Face_merge_observer : public CGAL::Arr_observer<Arrangement_2>
   }
 };
 
+typedef std::variant<Arrangement_2::Vertex_handle, Arrangement_2::Halfedge_handle> Candidate;
+typedef std::unordered_map<Arrangement_2::Vertex_handle, std::vector<Candidate>> CandidateMap;
+class Vertex_remove_observer : public CGAL::Arr_observer<Arrangement_2>
+{ 
+  CandidateMap& candidates;
+  public:
+  Vertex_remove_observer (Arrangement_2& arr, CandidateMap& candidates) :
+    CGAL::Arr_observer<Arrangement_2> (arr), candidates(candidates) {};
+
+  virtual void before_remove_vertex (Vertex_handle v)
+  {
+    auto handle  = candidates.find(v);
+    if (handle != candidates.end()) {
+      candidates.erase(handle);
+    }
+  }
+};
+
 // this is for the cgal regularize_plane function
 class Index_map
 {
