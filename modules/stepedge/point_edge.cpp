@@ -284,12 +284,12 @@ void build_arrangement(geoflow::LinearRing &footprint, geoflow::LineStringCollec
   // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
   insert_non_intersecting_curves(arr, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
 
-  for (auto edge : arr.edge_handles()) {
-    edge->data().is_touched = true;
-    edge->data().is_footprint = true;
-    edge->twin()->data().is_touched = true;
-    edge->twin()->data().is_footprint = true;
-  }
+  // for (auto edge : arr.edge_handles()) {
+  //   edge->data().is_touched = true;
+  //   edge->data().is_footprint = true;
+  //   edge->twin()->data().is_touched = true;
+  //   edge->twin()->data().is_footprint = true;
+  // }
   // std::cout << arr.number_of_faces() <<std::endl;
   // for (auto face: arr.face_handles()){
   //   if(face->is_unbounded())
@@ -308,42 +308,42 @@ void build_arrangement(geoflow::LinearRing &footprint, geoflow::LineStringCollec
     const Kernel::Point_2 b(s[1][0],s[1][1]);
     insert(arr, Line_2(Point_2(s[0][0],s[0][1]), Point_2(s[1][0],s[1][1])));
     
-    if (remove_unsupported) for (auto edge : arr.edge_handles()) {
-      if (!edge->data().is_touched) {
-        auto v = (b-a)/2;
-        edge->data().c = a+v;
-        edge->data().halfdist_sq = v.squared_length();
-        edge->data().is_touched = true;
-        edge->twin()->data().c = a+v;
-        edge->twin()->data().halfdist_sq = v.squared_length();
-        edge->twin()->data().is_touched = true;
-      }
-    }
+    // if (remove_unsupported) for (auto edge : arr.edge_handles()) {
+    //   if (!edge->data().is_touched) {
+    //     auto v = (b-a)/2;
+    //     edge->data().c = a+v;
+    //     edge->data().halfdist_sq = v.squared_length();
+    //     edge->data().is_touched = true;
+    //     edge->twin()->data().c = a+v;
+    //     edge->twin()->data().halfdist_sq = v.squared_length();
+    //     edge->twin()->data().is_touched = true;
+    //   }
+    // }
   }
 
   // remove edges that do not overlap with their detected edge
-  if (remove_unsupported) {
-    std::vector<Arrangement_2::Halfedge_handle> edges;
-    for (auto edge : arr.edge_handles()) {
-      if (!edge->data().is_footprint && !(edge->source()->is_at_open_boundary() || edge->target()->is_at_open_boundary())) {
-        auto s = Kernel::Point_2(CGAL::to_double(edge->source()->point().x()), CGAL::to_double(edge->source()->point().y()));
-        auto t = Kernel::Point_2(CGAL::to_double(edge->target()->point().x()), CGAL::to_double(edge->target()->point().y()));
-        auto c = edge->data().c;
-        auto d = edge->data().halfdist_sq;
+  // if (remove_unsupported) {
+  //   std::vector<Arrangement_2::Halfedge_handle> edges;
+  //   for (auto edge : arr.edge_handles()) {
+  //     if (!edge->data().is_footprint && !(edge->source()->is_at_open_boundary() || edge->target()->is_at_open_boundary())) {
+  //       auto s = Kernel::Point_2(CGAL::to_double(edge->source()->point().x()), CGAL::to_double(edge->source()->point().y()));
+  //       auto t = Kernel::Point_2(CGAL::to_double(edge->target()->point().x()), CGAL::to_double(edge->target()->point().y()));
+  //       auto c = edge->data().c;
+  //       auto d = edge->data().halfdist_sq;
         
-        auto left = s-c;
-        auto right = t-c;
-        bool partial_overlap = (left.squared_length() < d) || (right.squared_length() < d);
-        bool c_inbetween_st = left*right < 0; //should also check d, but not needed in combination with partial_overlap
-        if (!(partial_overlap || c_inbetween_st)) {
-          edges.push_back(edge);
-        }
-      }
-    }
-    for (auto edge : edges) {
-      arr.remove_edge(edge); 
-    }
-  }
+  //       auto left = s-c;
+  //       auto right = t-c;
+  //       bool partial_overlap = (left.squared_length() < d) || (right.squared_length() < d);
+  //       bool c_inbetween_st = left*right < 0; //should also check d, but not needed in combination with partial_overlap
+  //       if (!(partial_overlap || c_inbetween_st)) {
+  //         edges.push_back(edge);
+  //       }
+  //     }
+  //   }
+  //   for (auto edge : edges) {
+  //     arr.remove_edge(edge); 
+  //   }
+  // }
 }
 
 // void build_arrangement(geoflow::LinearRing &footprint, geoflow::LinearRingCollection & rings, Arrangement_2 &arr, geoflow::vec1i& plane_idx, bool remove_unsupported){

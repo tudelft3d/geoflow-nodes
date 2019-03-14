@@ -337,7 +337,11 @@ void Arr2LinearRingsNode::process(){
   LinearRingCollection linear_rings;
   AttributeMap attributes;
   for (auto face: arr.face_handles()){
-    if(face->data().in_footprint) {
+    if(
+      !(param<bool>("only_in_footprint") && !face->data().in_footprint)
+      &&
+      !(face->is_fictitious() || face->is_unbounded())
+      ) {
       vec2f polygon;
       arrangementface_to_polygon(face, polygon);
       vec3f polygon3d;
@@ -632,150 +636,157 @@ Polygon_2 arr_cell2polygon(Face_handle& fh) {
   return poly;
 }
 
-void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
+std::tuple<size_t, size_t, size_t> arr_checkzone(Arrangement_2& arr, Segment_2 segment, Arrangement_2::Face_handle& face) {
+  std::vector<CGAL::Object> zone_elems;
+  
+  Arrangement_2::Halfedge_handle edge;
+  Arrangement_2::Vertex_handle vertex;
+  CGAL::zone(arr, segment, std::back_inserter(zone_elems));
+  // std::cout << "Zone has " << zone_elems.size() << " elems\n";
+  size_t v_cnt=0, f_cnt=0, e_cnt=0;
+  for ( auto& object : zone_elems ) {
+    if ( assign(face, object) ) {
+      // std::cout << "Zone face, segid= " << face->data().segid << "\n";
+      ++f_cnt;
+    } else if ( assign(edge, object) ) {
+      // std::cout << "Zone edge\n";
+      ++e_cnt;
+    } else if ( assign(vertex, object) ) {
+      // std::cout << "Zone vertex\n";
+      ++v_cnt;
+    }
+  }
+  return std::make_tuple(v_cnt, e_cnt, f_cnt);
+}
+
+void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
   typedef Arrangement_2::Traits_2 AT;
+  typedef std::variant<Arrangement_2::Vertex_handle, Arrangement_2::Halfedge_handle> Candidate;
+  typedef std::unordered_map<Arrangement_2::Vertex_handle, std::vector<Candidate>> CandidateMap;
+  float snap_dist = param<float>("snap_dist")*param<float>("snap_dist");
+
+  PointCollection snap_to_v, snap_v;
+  SegmentCollection snap_to_e;
+
+  CandidateMap candidates;
+  std::vector<Arrangement_2::Vertex_handle> non_fp_vertices;
+  // collect non fp vertices
+  for (auto& v :  arr.vertex_handles()){
+    auto vhe = v->incident_halfedges();
+    auto vdone = vhe;
+    // check if v is not on the fp boundary
+    bool v_is_on_fp = false;
+    do {
+      v_is_on_fp |= (!vhe->face()->data().in_footprint) || (!vhe->twin()->face()->data().in_footprint);
+    } while (++vhe!=vdone);
+    if (!v_is_on_fp)
+      non_fp_vertices.push_back(v);
+  }
+  // find candidate vertices/edges to snap to for each vertex
+  auto obs = Snap_observer(arr);
+
+  for (auto& v : non_fp_vertices) {
+    auto vhe = v->incident_halfedges();
+    auto vdone = vhe;
+    do { //for all incident faces f of v
+      auto f = vhe->face();
+      if(f->data().in_footprint) {
+        auto fhe = f->outer_ccb();
+        auto fdone = fhe;
+        do { //for all edges in outer_ccb of f
+          // only care if one side of the edge is outside the fp, ie the edge is part of the fp
+          if( (!fhe->face()->data().in_footprint) || (!fhe->twin()->face()->data().in_footprint) ) {
+            // compute distance and compare to threshold
+            auto s = AT::Segment_2(fhe->source()->point(), fhe->target()->point());
+            if (snap_dist > CGAL::squared_distance(v->point(), s)) {
+              candidates[v].push_back(fhe);
+              snap_to_e.push_back({
+                arr3f{float(CGAL::to_double(s.source().x())), float(CGAL::to_double(s.source().y())), 0},
+                arr3f{float(CGAL::to_double(s.target().x())), float(CGAL::to_double(s.target().y())), 0}
+              });
+              snap_v.push_back({float(CGAL::to_double(v->point().x())), float(CGAL::to_double(v->point().y())), 0});
+            }
+            if (snap_dist > CGAL::squared_distance(v->point(), fhe->source()->point())) {
+              candidates[v].push_back(fhe->source());
+              snap_to_v.push_back({float(CGAL::to_double(s.source().x())), float(CGAL::to_double(s.source().y())), 0});
+              snap_v.push_back({float(CGAL::to_double(v->point().x())), float(CGAL::to_double(v->point().y())), 0});
+            }
+          }
+        } while (++fhe!=fdone);
+      }
+    } while (++vhe!=vdone);    
+
+    // perform snapping for this vertex
+    if (candidates.count(v)) {
+      auto& cvec = candidates[v];
+      // std::cout << cvec.size() << "\n";
+      // merge v with an edge
+      if (cvec.size() == 1) {
+        if(auto he_ptr = std::get_if<Arrangement_2::Halfedge_handle>(&cvec[0])) {
+
+          auto& source = (*he_ptr)->source()->point();
+          auto& target = (*he_ptr)->target()->point();
+          auto line = AT::Line_2(source, target);
+          auto split_point = line.projection(v->point());
+          
+          // check zone to target edge
+          auto blocking_segment = AT::Segment_2(split_point, v->point());
+          Arrangement_2::Face_handle face;
+          auto [v_cnt, e_cnt, f_cnt] = arr_checkzone(arr, blocking_segment, face);
+          bool empty_zone = (v_cnt==1 && e_cnt==1) && f_cnt==1;
+
+          if (empty_zone) {
+            // split
+            AT::Segment_2 s1(source, split_point);
+            AT::Segment_2 s2(split_point, target);
+            auto e_split = arr.split_edge((*he_ptr), s1, s2);
+            auto v_split = e_split->target();
+
+            // create new edge to split_vertex
+            auto he_fix = arr.insert_at_vertices(blocking_segment, v_split, v);
+          }
+        }
+      } else if (cvec.size() > 1) {
+        // pick the 1st vertex
+        bool found_vertex=false;
+        Arrangement_2::Vertex_handle v_target;
+        for (auto& obj : cvec) {
+          if(auto v_ptr = std::get_if<Arrangement_2::Vertex_handle>(&obj)) {
+            v_target = *v_ptr;
+            found_vertex = true;
+            break;
+          }
+        }
+        if (found_vertex) {
+          auto blocking_segment = AT::Segment_2(v_target->point(), v->point());
+          Arrangement_2::Face_handle face;
+          auto [v_cnt, e_cnt, f_cnt] = arr_checkzone(arr, blocking_segment, face);
+          bool empty_zone = (v_cnt==2 && e_cnt==0) && f_cnt==1;
+          if (empty_zone) {
+            // create new edge to target vertex
+            if (face->data().segid==0)
+              auto he_fix = arr.insert_at_vertices(blocking_segment, v_target, v);
+          }
+        }
+      }
+    }
+  }
+
+
+  // for (auto& [v, cvec] : candidates) {
+    
+  // }
+  output("snap_v").set(snap_v);
+  output("snap_to_v").set(snap_to_v);
+  output("snap_to_e").set(snap_to_e);
+}
+
+void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
 
   bool& flood_unsegmented = param<bool>("flood_to_unsegmented");
   bool& dissolve_edges = param<bool>("dissolve_edges");
   bool& dissolve_stepedges = param<bool>("dissolve_stepedges");
   float& step_height_threshold = param<float>("step_height_threshold");
-  bool& snap_clean = param<bool>("snap_clean");
-  float snap_dist = param<float>("snap_dist")*param<float>("snap_dist");
-
-  PointCollection snap_to_v, snap_v;
-  SegmentCollection snap_to_e;
-  if (snap_clean) {
-    CandidateMap candidates;
-    // find candidate vertices/edges to snap to for each vertex
-    for (auto& v :  arr.vertex_handles()){
-      auto vhe = v->incident_halfedges();
-      auto vdone = vhe;
-      // check if v is not on the fp boundary
-      bool v_is_on_fp = false;
-      do {
-        v_is_on_fp |= (!vhe->face()->data().in_footprint) || (!vhe->twin()->face()->data().in_footprint);
-      } while (++vhe!=vdone);
-      if (v_is_on_fp) continue;
-
-      vhe = v->incident_halfedges();
-      vdone = vhe;
-      do { //for all incident faces f of v
-        auto f = vhe->face();
-        if(f->data().in_footprint) {
-          auto fhe = f->outer_ccb();
-          auto fdone = fhe;
-          do { //for all edges in outer_ccb of f
-            // only care if one side of the edge is outside the fp, ie the edge is part of the fp
-            if( (!fhe->face()->data().in_footprint) || (!fhe->twin()->face()->data().in_footprint) ) {
-              // compute distance and compare to threshold
-              auto s = AT::Segment_2(fhe->source()->point(), fhe->target()->point());
-              if (snap_dist > CGAL::squared_distance(v->point(), s)) {
-                candidates[v].push_back(fhe);
-                snap_to_e.push_back({
-                  arr3f{float(CGAL::to_double(s.source().x())), float(CGAL::to_double(s.source().y())), 0},
-                  arr3f{float(CGAL::to_double(s.target().x())), float(CGAL::to_double(s.target().y())), 0}
-                });
-                snap_v.push_back({float(CGAL::to_double(v->point().x())), float(CGAL::to_double(v->point().y())), 0});
-              }
-              if (snap_dist > CGAL::squared_distance(v->point(), fhe->source()->point())) {
-                candidates[v].push_back(fhe->source());
-                snap_to_v.push_back({float(CGAL::to_double(s.source().x())), float(CGAL::to_double(s.source().y())), 0});
-                snap_v.push_back({float(CGAL::to_double(v->point().x())), float(CGAL::to_double(v->point().y())), 0});
-              }
-            }
-          } while (++fhe!=fdone);
-        }
-      } while (++vhe!=vdone);    
-    }
-    // we should iterate 
-    auto obs = Vertex_remove_observer(arr, candidates);
-
-    // while (candidates.size() > 0) {
-    //   auto handle = candidates.begin();
-    //   auto& [v,cvec] = *handle;
-
-
-    //   if (candidates.count(v)) // check if it wasn't removed by the observer
-    //     candidates.erase(handle);
-    // }
-
-    for (auto& [v, cvec] : candidates) {
-      std::cout << cvec.size() << "\n";
-      // merge v with an edge
-      if (cvec.size() == 1) {
-        if(auto he_ptr = std::get_if<Arrangement_2::Halfedge_handle>(&cvec[0])) {
-          // find face between v and v_split
-          Arrangement_2::Face_handle common_face;
-          if ((*he_ptr)->face()->data().in_footprint)
-            common_face = (*he_ptr)->face();
-          else
-            common_face = (*he_ptr)->twin()->face();
-
-          // split
-          auto& source = (*he_ptr)->source()->point();
-          auto& target = (*he_ptr)->target()->point();
-          auto line = AT::Line_2(source, target);
-          auto split_point = line.projection(v->point());
-          AT::Segment_2 s1(source, split_point);
-          AT::Segment_2 s2(split_point, target);
-          auto e_split = arr.split_edge((*he_ptr), s1, s2);
-          auto v_split = e_split->target();
-
-          bool found_common_face = false;
-          auto ihe = v->incident_halfedges();
-          auto idone = ihe;
-          do {
-            if ( (found_common_face = (ihe->face() == common_face)) ) {
-              break;
-            }
-          } while (++ihe!=idone);
-          
-          if (found_common_face) {
-            // create new edge to split_vertex
-            auto he_fix = arr.insert_at_vertices(AT::Segment_2(v_split->point(), v->point()), v_split, v);
-            // check faces on both sides and mark the one with the smallest area as the sliver face
-            auto f1 = he_fix->face();
-            auto f2 = he_fix->twin()->face();
-            auto a1 = CGAL::abs(arr_cell2polygon(f1).area());
-            auto a2 = CGAL::abs(arr_cell2polygon(f2).area());
-            Arrangement_2::Face_handle sliver_face;
-            // make sure to preserve data of common_face
-            if (a1 > a2) {
-              f1->set_data(common_face->data());
-              sliver_face = f2;
-            } else {
-              f2->set_data(common_face->data());
-              sliver_face = f1;
-            }
-            // find the edge that is incident to v and sliver_face and *not* to common_face
-            // we know the target of he_fix is v
-            Arrangement_2::Face_handle other_face;
-            if (he_fix->face()==sliver_face) {
-              other_face = he_fix->next()->twin()->face();
-            } else {
-              other_face = he_fix->prev()->twin()->face();
-            }
-            sliver_face->set_data(other_face->data());
-
-            // dissolve the sliver face
-            auto she = sliver_face->outer_ccb();
-            auto sdone = she;
-            std::vector<Arrangement_2::Halfedge_handle> to_remove;
-            do {
-              if(she->face()->data().segid == she->twin()->face()->data().segid)
-                to_remove.push_back(she);
-            } while (++she!=sdone);
-            for (auto e : to_remove) {
-              arr.remove_edge(e); // corresponding vertices will be remove from candidates map with the observer
-            }
-          }
-        }
-      }
-    }
-    output("snap_v").set(snap_v);
-    output("snap_to_v").set(snap_to_v);
-    output("snap_to_e").set(snap_to_e);
-  }
 
   if (flood_unsegmented) {
     std::map<float, Face_handle> face_map;
@@ -800,11 +811,14 @@ void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
             // std::cout << "nullptr detected!\n";
             break;
           }
-          auto candidate = he->twin()->face();
-          if (candidate->data().segid == 0) {
-            candidate->data().segid = cur_segid;
-            candidate->data().elevation_avg = cur_elev;
-            candidate_stack.push(candidate);
+          // skip blocking edges (see snapping)
+          if (!he->data().blocks) {
+            auto candidate = he->twin()->face();
+            if (candidate->data().segid == 0) {
+              candidate->data().segid = cur_segid;
+              candidate->data().elevation_avg = cur_elev;
+              candidate_stack.push(candidate);
+            }
           }
           he = he->next();
         } while (he != first);
@@ -892,12 +906,7 @@ std::pair<double, double> arr_measure_nosegid(Arrangement_2& arr) {
   }
   return std::make_pair(no_segid_area, no_segid_area/total_area);
 }
-// size_t get_percentile(const std::vector<linedect::Point>& points, const float& percentile) {
-//   std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
-//     return p1.z() < p2.z();
-//   });
-//   return int(percentile*float(points.size()/2));
-// }
+
 void arr_assign_pts_to_unsegmented(Arrangement_2& arr, std::vector<Point>& points, const float& percentile) {
   typedef CGAL::Arr_walk_along_line_point_location<Arrangement_2> Point_location;
 
@@ -1014,12 +1023,12 @@ void BuildArrFromRingsExactNode::process() {
       }
     }
   }
-  // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
+  if(param<bool>("snap_clean"))
+    arr_snapclean(arr_base);
 
   if(param<bool>("extrude_unsegmented") && points_per_plane.count(-1)) {
     arr_assign_pts_to_unsegmented(arr_base, points_per_plane[-1], param<float>("z_percentile"));
   }
-  
   auto nosegid_area = arr_measure_nosegid(arr_base);
   
   arr_process(arr_base);

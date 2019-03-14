@@ -120,10 +120,7 @@ struct FaceInfo {
   float total_count;
 };
 struct EdgeInfo {
-  bool is_touched=false;
-  bool is_footprint=false;
-  Kernel::Point_2 c;
-  double halfdist_sq;
+  bool blocks = false;
 };
 typedef CGAL::Arr_extended_dcel<Traits_2, bool, EdgeInfo, FaceInfo>   Dcel;
 typedef CGAL::Arrangement_2<Traits_2, Dcel>           Arrangement_2;
@@ -258,21 +255,18 @@ class Face_merge_observer : public CGAL::Arr_observer<Arrangement_2>
   }
 };
 
-typedef std::variant<Arrangement_2::Vertex_handle, Arrangement_2::Halfedge_handle> Candidate;
-typedef std::unordered_map<Arrangement_2::Vertex_handle, std::vector<Candidate>> CandidateMap;
-class Vertex_remove_observer : public CGAL::Arr_observer<Arrangement_2>
+class Snap_observer : public CGAL::Arr_observer<Arrangement_2>
 { 
-  CandidateMap& candidates;
   public:
-  Vertex_remove_observer (Arrangement_2& arr, CandidateMap& candidates) :
-    CGAL::Arr_observer<Arrangement_2> (arr), candidates(candidates) {};
+  Snap_observer (Arrangement_2& arr) :
+    CGAL::Arr_observer<Arrangement_2> (arr) {};
 
-  virtual void before_remove_vertex (Vertex_handle v)
-  {
-    auto handle  = candidates.find(v);
-    if (handle != candidates.end()) {
-      candidates.erase(handle);
-    }
+  virtual void 	after_create_edge (Halfedge_handle e) {
+    e->data().blocks = true;
+  }
+  virtual void after_split_face (Face_handle old_face, Face_handle new_face, bool ) {
+    if (old_face->data().segid==0)
+      new_face->set_data(old_face->data());
   }
 };
 

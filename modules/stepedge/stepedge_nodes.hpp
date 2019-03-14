@@ -66,8 +66,11 @@ namespace geoflow::nodes::stepedge {
       add_input("arrangement", TT_any);
       add_output("linear_rings", TT_linear_ring_collection);
       add_output("attributes", TT_attribute_map_f);
+      add_param("only_in_footprint", (bool) true);
     }
-
+    void gui() {
+      ImGui::Checkbox("Only in footprint", &param<bool>("only_in_footprint"));
+    }
     void process();
   };
 
@@ -188,7 +191,7 @@ namespace geoflow::nodes::stepedge {
       add_param("dissolve_stepedges", (bool) true);
       add_param("step_height_threshold", (float) 1.0);
       add_param("snap_clean", (bool) true);
-      add_param("snap_dist", (float) 0.05);
+      add_param("snap_dist", (float) 0.2);
     }
     void gui() {
       ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
@@ -203,6 +206,7 @@ namespace geoflow::nodes::stepedge {
       ImGui::Text("Arrangement valid? %s", arr_is_valid? "yes" : "no");
       ImGui::Text("vcount: %d, ecount: %d", vcount, ecount);
     }
+    void arr_snapclean(Arrangement_2& arr);
     void arr_process(Arrangement_2& arr);
     void process();
   };
@@ -274,7 +278,7 @@ namespace geoflow::nodes::stepedge {
       add_param("min_cnt_lower", (int) 5);
       add_param("k", (int) 10);
       add_param("snap_threshold", (float) 1);
-      add_param("line_extend", (float) 0.2);
+      add_param("line_extend", (float) 0.05);
       add_param("perform_chaining", (bool) true);
       add_param("remove_overlap", (bool) true);
     }
