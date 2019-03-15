@@ -33,7 +33,7 @@ int main(int ac, const char * av[])
     float percentile = 0.9;
     bool regularise_footprint = false;
     bool no_linedetector = false;
-    bool presimp_fp = false;
+    bool presimp_fp = true;
     bool gui = false;
     
     po::options_description desc("Allowed options");
@@ -44,7 +44,7 @@ int main(int ac, const char * av[])
     #endif
     ("no_linedetector", po::bool_switch(&no_linedetector), "don't use line detector") 
     ("regularise_footprint", po::bool_switch(&regularise_footprint), "regularise footprints") 
-    ("presimp_fp", po::bool_switch(&presimp_fp), "Simplify input polygons with Douglas Peucker 10 cm") 
+    // ("presimp_fp", po::bool_switch(&presimp_fp), "Simplify input polygons with Douglas Peucker 10 cm") 
     ("las", po::value<std::string>(&las_file), "Point cloud ")
     ("footprints", po::value<std::string>(&footprints_file), "Footprints")
     // ("outputA", po::value<std::string>(&decomposed_footprints_A_file), "Decomposed footprints LoD1.3A")

@@ -182,6 +182,9 @@ namespace geoflow::nodes::stepedge {
       add_output("snap_to_e", TT_segment_collection);
       add_output("snap_to_v", TT_point_collection);
       add_output("snap_v", TT_point_collection);
+      add_output("snap_fp_to_e", TT_segment_collection);
+      add_output("snap_fp_to_v", TT_point_collection);
+      add_output("snap_fp_v", TT_point_collection);
 
       add_param("extrude_unsegmented", (bool) true);
       add_param("z_percentile", (float) 0.9);
@@ -191,12 +194,16 @@ namespace geoflow::nodes::stepedge {
       add_param("dissolve_stepedges", (bool) true);
       add_param("step_height_threshold", (float) 1.0);
       add_param("snap_clean", (bool) true);
+      add_param("snap_clean_fp", (bool) false);
+      add_param("snap_detect_only", (bool) false);
       add_param("snap_dist", (float) 0.2);
     }
     void gui() {
       ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
       ImGui::SliderFloat("Preserve split ring area", &param<float>("rel_area_thres"), 0.01, 1);
       ImGui::Checkbox("Snap", &param<bool>("snap_clean"));
+      ImGui::Checkbox("Snap fp", &param<bool>("snap_clean_fp"));
+      ImGui::Checkbox("Snap detect only", &param<bool>("snap_detect_only"));
       ImGui::SliderFloat("Snap distance", &param<float>("snap_dist"), 0.01, 1);
       ImGui::Checkbox("Extrude unsegmented", &param<bool>("extrude_unsegmented"));
       ImGui::Checkbox("Flood to unsegmented", &param<bool>("flood_to_unsegmented"));
@@ -207,6 +214,7 @@ namespace geoflow::nodes::stepedge {
       ImGui::Text("vcount: %d, ecount: %d", vcount, ecount);
     }
     void arr_snapclean(Arrangement_2& arr);
+    void arr_snapclean_from_fp(Arrangement_2& arr);
     void arr_process(Arrangement_2& arr);
     void process();
   };
@@ -516,6 +524,8 @@ namespace geoflow::nodes::stepedge {
       add_param("snap_threshold", (float) 1.0);
       add_param("weighted_avg", (bool) false);
       add_param("angle_per_distcluster", (bool) false);
+      add_param("regularise_fp", (bool) false);
+      add_param("fp_offset", (float) 0.01);
     }
 
     void gui(){
@@ -524,6 +534,8 @@ namespace geoflow::nodes::stepedge {
       ImGui::DragFloat("Snap threshold", &param<float>("snap_threshold"), 0.01, 0.01, 10);
       ImGui::Checkbox("weighted_avg", &param<bool>("weighted_avg"));
       ImGui::Checkbox("angle_per_distcluster", &param<bool>("angle_per_distcluster"));
+      ImGui::Checkbox("regularise_fp", &param<bool>("regularise_fp"));
+      ImGui::DragFloat("fp_offset", &param<float>("fp_offset"), 0.01, 0.01, 10);
     }
     void process();
   };
@@ -550,7 +562,7 @@ namespace geoflow::nodes::stepedge {
       add_output("polygons_simp", TT_linear_ring_collection);
       add_output("polygon_simp", TT_linear_ring);
 
-      add_param("threshold_stop_cost", (float) 0.01);
+      add_param("threshold_stop_cost", (float) 0.005);
     }
     void gui() {
       if(ImGui::DragFloat("stop cost", &param<float>("threshold_stop_cost"),0.01, 0,1000)) {

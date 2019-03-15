@@ -35,6 +35,30 @@ namespace linereg {
 
     LineRegulariser() {};
 
+    void add_segments(size_t priority, const Polygon_2& polygon, double offset) {
+      size_t i=0;
+      segments[priority] = vec_ek_seg();
+      auto orientation = polygon.orientation();
+      for(auto edge = polygon.edges_begin(); edge != polygon.edges_end(); ++edge) {
+        auto source = edge->source();
+        auto target = edge->target();
+        auto perp = (target-source).perpendicular(orientation);
+        auto len = CGAL::sqrt(CGAL::to_double(perp.squared_length()));
+        // std::cout << "len: " << len << "\n"; 
+        perp = offset * (perp/len);
+        target -= perp;
+        source -= perp;
+        auto v = target-source;
+        auto p_ = source + v/2;
+        auto p = Point_2(CGAL::to_double(p_.x()),CGAL::to_double(p_.y()));
+        auto l = CGAL::to_double(v.squared_length());
+        auto angle = std::atan2(CGAL::to_double(v.x()), CGAL::to_double(v.y()));
+        if (angle < 0) angle += pi;
+        lines.push_back(std::make_tuple(angle,p,0,priority,i++,l));
+        segments[priority].push_back(EK::Segment_2(target,source));
+      }
+    }
+
     void add_segments(size_t priority, geoflow::SegmentCollection& segs) {
       size_t i=0;
       segments[priority] = vec_ek_seg();

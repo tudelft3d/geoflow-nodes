@@ -659,7 +659,7 @@ std::tuple<size_t, size_t, size_t> arr_checkzone(Arrangement_2& arr, Segment_2 s
   return std::make_tuple(v_cnt, e_cnt, f_cnt);
 }
 
-void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
+void BuildArrFromRingsExactNode::arr_snapclean_from_fp(Arrangement_2& arr) {
   typedef Arrangement_2::Traits_2 AT;
   typedef std::variant<Arrangement_2::Vertex_handle, Arrangement_2::Halfedge_handle> Candidate;
   typedef std::unordered_map<Arrangement_2::Vertex_handle, std::vector<Candidate>> CandidateMap;
@@ -669,7 +669,7 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
   SegmentCollection snap_to_e;
 
   CandidateMap candidates;
-  std::vector<Arrangement_2::Vertex_handle> non_fp_vertices;
+  std::vector<Arrangement_2::Vertex_handle> vertices_to_snap;
   // collect non fp vertices
   for (auto& v :  arr.vertex_handles()){
     auto vhe = v->incident_halfedges();
@@ -679,13 +679,13 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
     do {
       v_is_on_fp |= (!vhe->face()->data().in_footprint) || (!vhe->twin()->face()->data().in_footprint);
     } while (++vhe!=vdone);
-    if (!v_is_on_fp)
-      non_fp_vertices.push_back(v);
+    if (v_is_on_fp)
+      vertices_to_snap.push_back(v);
   }
   // find candidate vertices/edges to snap to for each vertex
   auto obs = Snap_observer(arr);
 
-  for (auto& v : non_fp_vertices) {
+  for (auto& v : vertices_to_snap) {
     auto vhe = v->incident_halfedges();
     auto vdone = vhe;
     do { //for all incident faces f of v
@@ -695,7 +695,13 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
         auto fdone = fhe;
         do { //for all edges in outer_ccb of f
           // only care if one side of the edge is outside the fp, ie the edge is part of the fp
-          if( (!fhe->face()->data().in_footprint) || (!fhe->twin()->face()->data().in_footprint) ) {
+          if (fhe->source() == v || fhe->target() == v) continue;
+
+          bool check_this_edge;
+          // both sides of the edge must be in the fp
+          check_this_edge = (fhe->face()->data().in_footprint) && (fhe->twin()->face()->data().in_footprint);
+
+          if( check_this_edge ) {
             // compute distance and compare to threshold
             auto s = AT::Segment_2(fhe->source()->point(), fhe->target()->point());
             if (snap_dist > CGAL::squared_distance(v->point(), s)) {
@@ -717,7 +723,7 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
     } while (++vhe!=vdone);    
 
     // perform snapping for this vertex
-    if (candidates.count(v)) {
+    if (candidates.count(v) && !param<bool>("snap_detect_only")) {
       auto& cvec = candidates[v];
       // std::cout << cvec.size() << "\n";
       // merge v with an edge
@@ -735,7 +741,130 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
           auto [v_cnt, e_cnt, f_cnt] = arr_checkzone(arr, blocking_segment, face);
           bool empty_zone = (v_cnt==1 && e_cnt==1) && f_cnt==1;
 
+          if (empty_zone && face->data().in_footprint) {
+            // split
+            if (CGAL::do_intersect(AT::Segment_2(source, target), split_point)) {
+              AT::Segment_2 s1(source, split_point);
+              AT::Segment_2 s2(split_point, target);
+              auto e_split = arr.split_edge((*he_ptr), s1, s2);
+              auto v_split = e_split->target();
+
+              // create new edge to split_vertex
+              auto he_fix = arr.insert_at_vertices(blocking_segment, v_split, v);
+            }
+          }
+        }
+      } else if (cvec.size() > 1) {
+        // pick the 1st vertex
+        bool found_vertex=false;
+        Arrangement_2::Vertex_handle v_target;
+        for (auto& obj : cvec) {
+          if(auto v_ptr = std::get_if<Arrangement_2::Vertex_handle>(&obj)) {
+            v_target = *v_ptr;
+            found_vertex = true;
+            break;
+          }
+        }
+        if (found_vertex) {
+          auto blocking_segment = AT::Segment_2(v_target->point(), v->point());
+          Arrangement_2::Face_handle face;
+          auto [v_cnt, e_cnt, f_cnt] = arr_checkzone(arr, blocking_segment, face);
+          bool empty_zone = (v_cnt==2 && e_cnt==0) && f_cnt==1;
           if (empty_zone) {
+            // create new edge to target vertex
+            if (face->data().segid==0)
+              auto he_fix = arr.insert_at_vertices(blocking_segment, v_target, v);
+          }
+        }
+      }
+    }
+  }
+
+  output("snap_fp_v").set(snap_v);
+  output("snap_fp_to_v").set(snap_to_v);
+  output("snap_fp_to_e").set(snap_to_e);
+}
+void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
+  typedef Arrangement_2::Traits_2 AT;
+  typedef std::variant<Arrangement_2::Vertex_handle, Arrangement_2::Halfedge_handle> Candidate;
+  typedef std::unordered_map<Arrangement_2::Vertex_handle, std::vector<Candidate>> CandidateMap;
+  float snap_dist = param<float>("snap_dist")*param<float>("snap_dist");
+
+  PointCollection snap_to_v, snap_v;
+  SegmentCollection snap_to_e;
+
+  CandidateMap candidates;
+  std::vector<Arrangement_2::Vertex_handle> vertices_to_snap;
+  // collect non fp vertices
+  for (auto& v :  arr.vertex_handles()){
+    auto vhe = v->incident_halfedges();
+    auto vdone = vhe;
+    // check if v is not on the fp boundary
+    bool on_fp = false;
+    do {
+      on_fp |= (!vhe->face()->data().in_footprint) || (!vhe->twin()->face()->data().in_footprint);
+    } while (++vhe!=vdone);
+    if (!on_fp)
+      vertices_to_snap.push_back(v);
+  }
+  // find candidate vertices/edges to snap to for each vertex
+  auto obs = Snap_observer(arr);
+
+  for (auto& v : vertices_to_snap) {
+    auto vhe = v->incident_halfedges();
+    auto vdone = vhe;
+    do { //for all incident faces f of v
+      auto f = vhe->face();
+      if(f->data().in_footprint) {
+        auto fhe = f->outer_ccb();
+        auto fdone = fhe;
+        do { //for all edges in outer_ccb of f
+          // only care if one side of the edge is outside the fp, ie the edge is part of the fp
+          bool check_this_edge;
+          // one side of the edge must be outside the fp
+          check_this_edge = (!fhe->face()->data().in_footprint) || (!fhe->twin()->face()->data().in_footprint);
+
+          if( check_this_edge ) {
+            // compute distance and compare to threshold
+            auto s = AT::Segment_2(fhe->source()->point(), fhe->target()->point());
+            if (snap_dist > CGAL::squared_distance(v->point(), s)) {
+              candidates[v].push_back(fhe);
+              snap_to_e.push_back({
+                arr3f{float(CGAL::to_double(s.source().x())), float(CGAL::to_double(s.source().y())), 0},
+                arr3f{float(CGAL::to_double(s.target().x())), float(CGAL::to_double(s.target().y())), 0}
+              });
+              snap_v.push_back({float(CGAL::to_double(v->point().x())), float(CGAL::to_double(v->point().y())), 0});
+            }
+            if (snap_dist > CGAL::squared_distance(v->point(), fhe->source()->point())) {
+              candidates[v].push_back(fhe->source());
+              snap_to_v.push_back({float(CGAL::to_double(s.source().x())), float(CGAL::to_double(s.source().y())), 0});
+              snap_v.push_back({float(CGAL::to_double(v->point().x())), float(CGAL::to_double(v->point().y())), 0});
+            }
+          }
+        } while (++fhe!=fdone);
+      }
+    } while (++vhe!=vdone);    
+
+    // perform snapping for this vertex
+    if (candidates.count(v) && !param<bool>("snap_detect_only")) {
+      auto& cvec = candidates[v];
+      // std::cout << cvec.size() << "\n";
+      // merge v with an edge
+      if (cvec.size() == 1) {
+        if(auto he_ptr = std::get_if<Arrangement_2::Halfedge_handle>(&cvec[0])) {
+
+          auto& source = (*he_ptr)->source()->point();
+          auto& target = (*he_ptr)->target()->point();
+          auto line = AT::Line_2(source, target);
+          auto split_point = line.projection(v->point());
+          
+          // check zone to target edge
+          auto blocking_segment = AT::Segment_2(split_point, v->point());
+          Arrangement_2::Face_handle face;
+          auto [v_cnt, e_cnt, f_cnt] = arr_checkzone(arr, blocking_segment, face);
+          bool empty_zone = (v_cnt==1 && e_cnt==1) && f_cnt==1;
+
+          if (empty_zone && face->data().in_footprint) {
             // split
             AT::Segment_2 s1(source, split_point);
             AT::Segment_2 s2(split_point, target);
@@ -772,10 +901,6 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
     }
   }
 
-
-  // for (auto& [v, cvec] : candidates) {
-    
-  // }
   output("snap_v").set(snap_v);
   output("snap_to_v").set(snap_to_v);
   output("snap_to_e").set(snap_to_e);
@@ -803,7 +928,7 @@ void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
       while (!candidate_stack.empty()) {
         auto fh = candidate_stack.top(); candidate_stack.pop();
         auto he = fh->outer_ccb();
-        auto first = he;
+        auto done = he;
         do {
           // std::cout << &(*curr) << "\n";
           // ignore weird nullptrs (should not be possible...)
@@ -814,14 +939,14 @@ void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
           // skip blocking edges (see snapping)
           if (!he->data().blocks) {
             auto candidate = he->twin()->face();
-            if (candidate->data().segid == 0) {
+            if (candidate->data().segid == 0 && candidate->data().in_footprint) {
               candidate->data().segid = cur_segid;
               candidate->data().elevation_avg = cur_elev;
               candidate_stack.push(candidate);
             }
           }
           he = he->next();
-        } while (he != first);
+        } while (he != done);
       }
     }
   }
@@ -833,8 +958,6 @@ void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
     for (auto& edge : edges) {
       auto f1 = edge->face();
       auto f2 = edge->twin()->face();
-      
-      if(f1==f2) continue;
 
       if((f1->data().in_footprint && f2->data().in_footprint) && (f1->data().segid!=0 && f2->data().segid!=0)) {
         if(std::abs(f1->data().elevation_avg - f2->data().elevation_avg) < step_height_threshold){
@@ -858,13 +981,29 @@ void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
     for (auto he : arr.edge_handles()) {
       auto d1 = he->face()->data();
       auto d2 = he->twin()->face()->data();
-      if ((d1.segid == d2.segid )&& (d1.in_footprint && d2.in_footprint))
+      if ((d1.segid == d2.segid ) && (d1.in_footprint && d2.in_footprint) && d1.segid > 0)
         to_remove.push_back(he);
     }
     for (auto he : to_remove) {
       arr.remove_edge(he);
     }
   }
+
+  // if (remove_low_holes) {
+  //   std::vector<Arrangement_2::Halfedge_handle> to_remove;
+  //   for (auto& face : arr.face_handles()) {
+  //     if (face->data().segid!=0 && face->data().in_footprint) {
+  //       for (auto iccb=face->holes_begin(); iccb != face->holes_end(); ++iccb) {
+  //         auto inner_face = (*iccb)->twin()->face();
+  //         if (inner_face->data().elevation_avg < face->data().elevation_avg)
+  //           to_remove.push_back(inner_face);
+  //       }
+  //     }
+  //   }
+  //   for (auto& f : to_remove) {
+  //     arr.rem
+  //   }
+  // }
 
 }
 
@@ -1023,8 +1162,8 @@ void BuildArrFromRingsExactNode::process() {
       }
     }
   }
-  if(param<bool>("snap_clean"))
-    arr_snapclean(arr_base);
+  if(param<bool>("snap_clean")) arr_snapclean(arr_base);
+  if(param<bool>("snap_clean_fp")) arr_snapclean_from_fp(arr_base);
 
   if(param<bool>("extrude_unsegmented") && points_per_plane.count(-1)) {
     arr_assign_pts_to_unsegmented(arr_base, points_per_plane[-1], param<float>("z_percentile"));
@@ -1913,26 +2052,30 @@ void RegulariseRingsNode::process(){
   // auto ring_id = input("ring_id").get<vec1i>();
   // auto ring_order = input("ring_order").get<vec1i>();
 
-  SegmentCollection all_edges;
+  // SegmentCollection all_edges;
 
   // build vector of all input edges
   // for(auto edge : edges) {
   //   all_edges.push_back(edge);
   // }
   // size_t fpi_begin = all_edges.size();
-  SegmentCollection fp_edges;
-  for(size_t i=0; i<footprint.size()-1; ++i) {
-    fp_edges.push_back(Segment({footprint[i], footprint[i+1]}));
+  // SegmentCollection fp_edges;
+  // for(size_t i=0; i<footprint.size()-1; ++i) {
+  //   fp_edges.push_back(Segment({footprint[i], footprint[i+1]}));
+  // }
+  // fp_edges.push_back(
+  //   Segment({footprint[footprint.size()-1], footprint[0]})
+  // );
+  linereg::Polygon_2 ek_footprint;
+  for (auto& p : footprint) {
+    ek_footprint.push_back(linereg::EK::Point_2(p[0], p[1]));
   }
-  fp_edges.push_back(
-    Segment({footprint[footprint.size()-1], footprint[0]})
-  );
   // size_t fpi_end = all_edges.size()-1;
 
   // get clusters from line regularisation 
   auto LR = linereg::LineRegulariser();
   LR.add_segments(0,edges);
-  LR.add_segments(1,fp_edges);
+  LR.add_segments(1,ek_footprint, (double) param<float>("fp_offset"));
   LR.dist_threshold = param<float>("dist_threshold");
   LR.angle_threshold = param<float>("angle_threshold");
   LR.cluster(param<bool>("weighted_avg"), param<bool>("angle_per_distcluster"));
@@ -1944,14 +2087,19 @@ void RegulariseRingsNode::process(){
     );
     // std::cout << "ch ring size : "<< exact_polygons.back().size() << ", " << exact_polygons.back().is_simple() << "\n";
   }
-  std::vector<size_t> fp_idx;
-  for (size_t i=0; i < LR.get_segments(1).size(); ++i) {
-    fp_idx.push_back(i);
-  }
-  auto exact_fp = linereg::chain_ring<linereg::EK>(fp_idx, LR.get_segments(1), param<float>("snap_threshold"));
   // std::cout << "ch fp size : "<< exact_fp.size() << ", " << exact_fp.is_simple() << "\n";
   output("exact_rings_out").set(exact_polygons);
-  output("exact_footprint_out").set(exact_fp);
+
+  if (param<bool>("regularise_fp")) {
+    std::vector<size_t> fp_idx;
+    for (size_t i=0; i < LR.get_segments(1).size(); ++i) {
+      fp_idx.push_back(i);
+    }
+    auto ek_reg_fp = linereg::chain_ring<linereg::EK>(fp_idx, LR.get_segments(1), param<float>("snap_threshold"));
+    output("exact_footprint_out").set(ek_reg_fp);
+  } else {
+    output("exact_footprint_out").set(ek_footprint);
+  }
 
   LinearRingCollection lrc;
   for (auto& poly : exact_polygons) {

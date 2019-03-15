@@ -2,7 +2,7 @@
 
 namespace geoflow::nodes::stepedge {
 
-  void create_lod13chart(NodeManager& N, bool use_linedetector, bool regularise_footprint) {
+  void create_lod13chart(NodeManager& N, bool use_linedetector) {
     NodeRegister R("Nodes");
     R.register_node<AlphaShapeNode>("AlphaShape");
     R.register_node<SimplifyPolygonNode>("SimplifyPolygon");
@@ -58,8 +58,8 @@ namespace geoflow::nodes::stepedge {
       connect(DetectLines_node, RegulariseRings_node, "ring_idx", "ring_idx");
     }
     connect(RegulariseRings_node, BuildArrFromRings_node, "exact_rings_out", "rings");
-    if(regularise_footprint)
-      connect(RegulariseRings_node, BuildArrFromRings_node, "exact_footprint_out", "footprint");
+    // if(regularise_footprint)
+    connect(RegulariseRings_node, BuildArrFromRings_node, "exact_footprint_out", "footprint");
     connect(BuildArrFromRings_node, Arr2LinearRings_node, "arrangement", "arrangement");
   }
 
@@ -149,20 +149,21 @@ namespace geoflow::nodes::stepedge {
         auto& polygon = polygons[i];
         
         NodeManager N;
-        create_lod13chart(N, param<bool>("use_linedetector"), param<bool>("regularise_footprint"));
+        create_lod13chart(N, param<bool>("use_linedetector"));
 
         // config and run
         // this should copy all parameters from this LOD13Generator node to the ProcessArrangement node
         N.nodes["BuildArrFromRings_node"]->set_params( dump_params(), true );
         N.nodes["BuildArrFromRings_node"]->set_param("extrude_unsegmented", param<bool>("use_only_hplanes"));
+        N.nodes["RegulariseRings_node"]->set_param("regularise_fp", param<bool>("regularise_footprint"));
         N.nodes["DetectPlanes_node"]->set_param("only_horizontal", param<bool>("use_only_hplanes"));
 
         N.nodes["DetectPlanes_node"]->input("points").set(points);
         N.nodes["RegulariseRings_node"]->input("footprint").set(polygon);
-        if (!param<bool>("regularise_footprint")) {
-          N.nodes["BuildArrFromRings_node"]->input("footprint").set(polygon);
-          N.nodes["BuildArrFromRings_node"]->input("footprint").connected_type = TT_linear_ring;
-        }
+        // if (!param<bool>("regularise_footprint")) {
+          // N.nodes["BuildArrFromRings_node"]->input("footprint").set(polygon);
+          // N.nodes["BuildArrFromRings_node"]->input("footprint").connected_type = TT_linear_ring;
+        // }
         N.run(N.nodes["DetectPlanes_node"]);
 
         auto classf = N.nodes["DetectPlanes_node"]->output("classf").get<float>();
