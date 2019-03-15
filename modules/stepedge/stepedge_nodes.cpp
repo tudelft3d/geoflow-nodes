@@ -625,7 +625,7 @@ void LinearRingtoRingsNode::process(){
   output("linear_rings").set(lrc);
 }
 
-Polygon_2 arr_cell2polygon(Face_handle& fh) {
+Polygon_2 arr_cell2polygon(const Face_handle& fh) {
   Polygon_2 poly;
   auto he = fh->outer_ccb();
   auto first = he;
@@ -864,7 +864,7 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
           auto [v_cnt, e_cnt, f_cnt] = arr_checkzone(arr, blocking_segment, face);
           bool empty_zone = (v_cnt==1 && e_cnt==1) && f_cnt==1;
 
-          if (empty_zone && face->data().in_footprint) {
+          if (empty_zone && face->data().in_footprint && face->data().segid==0) {
             // split
             AT::Segment_2 s1(source, split_point);
             AT::Segment_2 s2(split_point, target);
@@ -981,7 +981,7 @@ void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
     for (auto he : arr.edge_handles()) {
       auto d1 = he->face()->data();
       auto d2 = he->twin()->face()->data();
-      if ((d1.segid == d2.segid ) && (d1.in_footprint && d2.in_footprint) && d1.segid > 0)
+      if ((d1.segid == d2.segid ) && (d1.in_footprint && d2.in_footprint) && d1.segid != 0)
         to_remove.push_back(he);
     }
     for (auto he : to_remove) {
@@ -1004,7 +1004,6 @@ void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
   //     arr.rem
   //   }
   // }
-
 }
 
 void arr_filter_biggest_face(Arrangement_2& arr, const float& rel_area_thres) {
@@ -1046,7 +1045,7 @@ std::pair<double, double> arr_measure_nosegid(Arrangement_2& arr) {
   return std::make_pair(no_segid_area, no_segid_area/total_area);
 }
 
-void arr_assign_pts_to_unsegmented(Arrangement_2& arr, std::vector<Point>& points, const float& percentile) {
+void BuildArrFromRingsExactNode::arr_assign_pts_to_unsegmented(Arrangement_2& arr, std::vector<Point>& points) {
   typedef CGAL::Arr_walk_along_line_point_location<Arrangement_2> Point_location;
 
   std::unordered_map<Face_handle, std::vector<Point>> points_per_face;
@@ -1057,18 +1056,19 @@ void arr_assign_pts_to_unsegmented(Arrangement_2& arr, std::vector<Point>& point
     auto obj = pl.locate( Point_2(p.x(), p.y()) );
     if (auto f = boost::get<Face_const_handle>(&obj)) {
       auto fh = arr.non_const_handle(*f);
-      if (fh->data().segid==0) {
+      if (fh->data().segid==0 && fh->data().in_footprint) {
         points_per_face[fh].push_back(p);
       }
     }
   }
   // find elevation percentile for each face
   for(auto& ppf : points_per_face) {
-    if (ppf.second.size()>0) {
+    double area = CGAL::to_double(CGAL::abs(arr_cell2polygon(ppf.first).area()));
+    if (ppf.second.size()/area > param<float>("extrude_mindensity")) {
       std::sort(ppf.second.begin(), ppf.second.end(), [](linedect::Point& p1, linedect::Point& p2) {
         return p1.z() < p2.z();
       });
-      auto pid = int(percentile*float(ppf.second.size()-1));
+      auto pid = int(param<float>("z_percentile")*float(ppf.second.size()-1));
       // auto pid = get_percentile(ppf.second, percentile);
       ppf.first->data().segid = -1;
       ppf.first->data().elevation_avg = ppf.second[pid].z();
@@ -1166,7 +1166,7 @@ void BuildArrFromRingsExactNode::process() {
   if(param<bool>("snap_clean_fp")) arr_snapclean_from_fp(arr_base);
 
   if(param<bool>("extrude_unsegmented") && points_per_plane.count(-1)) {
-    arr_assign_pts_to_unsegmented(arr_base, points_per_plane[-1], param<float>("z_percentile"));
+    arr_assign_pts_to_unsegmented(arr_base, points_per_plane[-1]);
   }
   auto nosegid_area = arr_measure_nosegid(arr_base);
   
@@ -1666,6 +1666,7 @@ void DetectPlanesNode::process() {
   output("classf").set(float(building_type));
   output("horiz_roofplane_cnt").set(float(horiz_roofplane_cnt));
   output("slant_roofplane_cnt").set(float(slant_roofplane_cnt));
+  output("roof_pt_cnt").set((int)total_pt_cnt);
 
   vec1i plane_id, is_wall, is_horizontal;
   for(auto& p : pnl_points) {

@@ -187,6 +187,7 @@ namespace geoflow::nodes::stepedge {
       add_output("snap_fp_v", TT_point_collection);
 
       add_param("extrude_unsegmented", (bool) true);
+      add_param("extrude_mindensity", (float) 5);
       add_param("z_percentile", (float) 0.9);
       add_param("rel_area_thres", (float) 0.1);
       add_param("flood_to_unsegmented", (bool) true);
@@ -196,7 +197,7 @@ namespace geoflow::nodes::stepedge {
       add_param("snap_clean", (bool) true);
       add_param("snap_clean_fp", (bool) false);
       add_param("snap_detect_only", (bool) false);
-      add_param("snap_dist", (float) 0.2);
+      add_param("snap_dist", (float) 1.0);
     }
     void gui() {
       ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
@@ -204,8 +205,9 @@ namespace geoflow::nodes::stepedge {
       ImGui::Checkbox("Snap", &param<bool>("snap_clean"));
       ImGui::Checkbox("Snap fp", &param<bool>("snap_clean_fp"));
       ImGui::Checkbox("Snap detect only", &param<bool>("snap_detect_only"));
-      ImGui::SliderFloat("Snap distance", &param<float>("snap_dist"), 0.01, 1);
+      ImGui::SliderFloat("Snap distance", &param<float>("snap_dist"), 0.01, 5);
       ImGui::Checkbox("Extrude unsegmented", &param<bool>("extrude_unsegmented"));
+      ImGui::SliderFloat("Extrude min density", &param<float>("extrude_mindensity"), 1, 20);
       ImGui::Checkbox("Flood to unsegmented", &param<bool>("flood_to_unsegmented"));
       ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
       ImGui::Checkbox("Dissolve stepedges", &param<bool>("dissolve_stepedges"));
@@ -216,6 +218,7 @@ namespace geoflow::nodes::stepedge {
     void arr_snapclean(Arrangement_2& arr);
     void arr_snapclean_from_fp(Arrangement_2& arr);
     void arr_process(Arrangement_2& arr);
+    void arr_assign_pts_to_unsegmented(Arrangement_2& arr, std::vector<Point>& points);
     void process();
   };
 
@@ -342,6 +345,7 @@ namespace geoflow::nodes::stepedge {
       
       add_output("pts_per_roofplane", TT_any);
 
+      add_output("roof_pt_cnt", TT_int);
       add_output("class", TT_int);
       add_output("classf", TT_float);
       add_output("horiz_roofplane_cnt", TT_float);
@@ -351,7 +355,7 @@ namespace geoflow::nodes::stepedge {
       add_param("horiz_min_count", (float) 0.95);
       add_param("metrics_normal_k", (int) 10);
       add_param("metrics_plane_min_points", (int) 20);
-      add_param("metrics_plane_epsilon", (float) 0.3);
+      add_param("metrics_plane_epsilon", (float) 0.2);
       add_param("metrics_plane_normal_threshold", (float) 0.75);
       add_param("metrics_is_horizontal_threshold", (float) 0.97);
       add_param("metrics_is_wall_threshold", (float) 0.3);
@@ -523,7 +527,7 @@ namespace geoflow::nodes::stepedge {
       add_param("angle_threshold", (float) 0.15);
       add_param("snap_threshold", (float) 1.0);
       add_param("weighted_avg", (bool) false);
-      add_param("angle_per_distcluster", (bool) false);
+      add_param("angle_per_distcluster", (bool) true);
       add_param("regularise_fp", (bool) false);
       add_param("fp_offset", (float) 0.01);
     }

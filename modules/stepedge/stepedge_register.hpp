@@ -129,6 +129,8 @@ namespace geoflow::nodes::stepedge {
           oT.set(vec1b());
       }
       
+      auto roof_pt_cnt_vec = vec1i();
+      output_group("attributes").add("roof_pt_cnt_vec", TT_vec1i);
       auto noid_a_vec = vec1f();
       output_group("attributes").add("noid_a", TT_vec1f);
       auto noid_r_vec = vec1f();
@@ -166,6 +168,7 @@ namespace geoflow::nodes::stepedge {
         // }
         N.run(N.nodes["DetectPlanes_node"]);
 
+        auto roof_pt_cnt = N.nodes["DetectPlanes_node"]->output("roof_pt_cnt").get<int>();
         auto classf = N.nodes["DetectPlanes_node"]->output("classf").get<float>();
         auto horiz = N.nodes["DetectPlanes_node"]->output("horiz_roofplane_cnt").get<float>();
         auto slant = N.nodes["DetectPlanes_node"]->output("slant_roofplane_cnt").get<float>();
@@ -183,6 +186,7 @@ namespace geoflow::nodes::stepedge {
           noid_a_vec.push_back(noseg_area_a);
           noid_r_vec.push_back(noseg_area_r);
           bclass_vec.push_back(classf);
+          roof_pt_cnt_vec.push_back(roof_pt_cnt);
           for(auto& [name, iT] : input_group("attributes").terminals) {
             auto& oT = output_group("attributes").term(name);
             if(oT.type == TT_vec1f) {
@@ -203,6 +207,7 @@ namespace geoflow::nodes::stepedge {
           }
         }
       }
+      output_group("attributes").term("roof_pt_cnt_vec").set(std::move(roof_pt_cnt_vec));
       output_group("attributes").term("noid_a").set(std::move(noid_a_vec));
       output_group("attributes").term("noid_r").set(std::move(noid_r_vec));
       output_group("attributes").term("height").set(std::move(height_vec));
@@ -237,6 +242,8 @@ namespace geoflow::nodes::stepedge {
       auto& height_vec = output_group("attributes").term("height").get<vec1f&>();
       output_group("attributes").add("rms_error", TT_vec1f).set(vec1f());
       auto& rms_error_vec = output_group("attributes").term("rms_error").get<vec1f&>();
+      output_group("attributes").add("roof_pt_cnt", TT_vec1i).set(vec1i());
+      auto& roof_pt_cnt_vec = output_group("attributes").term("roof_pt_cnt").get<vec1i&>();
 
       NodeRegister R("Nodes");
       R.register_node<DetectPlanesNode>("DetectPlanes");
@@ -254,7 +261,9 @@ namespace geoflow::nodes::stepedge {
         auto classf = detect_planes_node->output("classf").get<float>();
         auto horiz = detect_planes_node->output("horiz_roofplane_cnt").get<float>();
         auto slant = detect_planes_node->output("slant_roofplane_cnt").get<float>();
+        auto roof_pt_cnt = detect_planes_node->output("roof_pt_cnt").get<int>();
         bclass_vec.push_back(classf);
+        roof_pt_cnt_vec.push_back(roof_pt_cnt);
         // all_attributes["horiz"].push_back(horiz);
         // all_attributes["slant"].push_back(slant);
         // note: the following will crash if the flowchart specified above is stopped halfway for some reason (eg missing output/connection)
