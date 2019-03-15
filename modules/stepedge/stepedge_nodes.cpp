@@ -787,7 +787,7 @@ void BuildArrFromRingsExactNode::arr_snapclean_from_fp(Arrangement_2& arr) {
 void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
   typedef Arrangement_2::Traits_2 AT;
   typedef std::variant<Arrangement_2::Vertex_handle, Arrangement_2::Halfedge_handle> Candidate;
-  typedef std::unordered_map<Arrangement_2::Vertex_handle, std::vector<Candidate>> CandidateMap;
+  typedef std::unordered_map<Arrangement_2::Vertex_handle, std::map<double,Candidate>> CandidateMap;
   float snap_dist = param<float>("snap_dist")*param<float>("snap_dist");
 
   PointCollection snap_to_v, snap_v;
@@ -827,16 +827,18 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
           if( check_this_edge ) {
             // compute distance and compare to threshold
             auto s = AT::Segment_2(fhe->source()->point(), fhe->target()->point());
-            if (snap_dist > CGAL::squared_distance(v->point(), s)) {
-              candidates[v].push_back(fhe);
+            double d = CGAL::to_double(CGAL::squared_distance(v->point(), s));
+            if (snap_dist > d) {
+              candidates[v][d] = fhe;
               snap_to_e.push_back({
                 arr3f{float(CGAL::to_double(s.source().x())), float(CGAL::to_double(s.source().y())), 0},
                 arr3f{float(CGAL::to_double(s.target().x())), float(CGAL::to_double(s.target().y())), 0}
               });
               snap_v.push_back({float(CGAL::to_double(v->point().x())), float(CGAL::to_double(v->point().y())), 0});
             }
-            if (snap_dist > CGAL::squared_distance(v->point(), fhe->source()->point())) {
-              candidates[v].push_back(fhe->source());
+            d = CGAL::to_double(CGAL::squared_distance(v->point(), fhe->source()->point()));
+            if (snap_dist > d) {
+              candidates[v][d] = fhe->source();
               snap_to_v.push_back({float(CGAL::to_double(s.source().x())), float(CGAL::to_double(s.source().y())), 0});
               snap_v.push_back({float(CGAL::to_double(v->point().x())), float(CGAL::to_double(v->point().y())), 0});
             }
@@ -851,7 +853,7 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
       // std::cout << cvec.size() << "\n";
       // merge v with an edge
       if (cvec.size() == 1) {
-        if(auto he_ptr = std::get_if<Arrangement_2::Halfedge_handle>(&cvec[0])) {
+        if(auto he_ptr = std::get_if<Arrangement_2::Halfedge_handle>(&(cvec.begin()->second))) {
 
           auto& source = (*he_ptr)->source()->point();
           auto& target = (*he_ptr)->target()->point();
@@ -868,18 +870,20 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
             // split
             AT::Segment_2 s1(source, split_point);
             AT::Segment_2 s2(split_point, target);
-            auto e_split = arr.split_edge((*he_ptr), s1, s2);
-            auto v_split = e_split->target();
+            if(CGAL::do_intersect(AT::Segment_2(source, target), split_point)) {
+              auto e_split = arr.split_edge((*he_ptr), s1, s2);
+              auto v_split = e_split->target();
 
-            // create new edge to split_vertex
-            auto he_fix = arr.insert_at_vertices(blocking_segment, v_split, v);
+              // create new edge to split_vertex
+              auto he_fix = arr.insert_at_vertices(blocking_segment, v_split, v);
+            }
           }
         }
       } else if (cvec.size() > 1) {
         // pick the 1st vertex
         bool found_vertex=false;
         Arrangement_2::Vertex_handle v_target;
-        for (auto& obj : cvec) {
+        for (auto& [d, obj] : cvec) {
           if(auto v_ptr = std::get_if<Arrangement_2::Vertex_handle>(&obj)) {
             v_target = *v_ptr;
             found_vertex = true;
