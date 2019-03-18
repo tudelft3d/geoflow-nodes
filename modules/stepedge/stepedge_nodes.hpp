@@ -527,7 +527,7 @@ namespace geoflow::nodes::stepedge {
       add_param("angle_threshold", (float) 0.15);
       add_param("snap_threshold", (float) 1.0);
       add_param("weighted_avg", (bool) false);
-      add_param("angle_per_distcluster", (bool) true);
+      add_param("angle_per_distcluster", (bool) false);
       add_param("regularise_fp", (bool) false);
       add_param("fp_offset", (float) 0.01);
     }
