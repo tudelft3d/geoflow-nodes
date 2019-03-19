@@ -880,7 +880,7 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
           }
         }
       } else if (cvec.size() > 1) {
-        // pick the 1st vertex
+        // pick the 1st (closest) vertex
         bool found_vertex=false;
         Arrangement_2::Vertex_handle v_target;
         for (auto& [d, obj] : cvec) {
