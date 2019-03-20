@@ -43,9 +43,9 @@ void ComputeMedialAxisNode::process(){
     ma_coords.push_back({c[0], c[1], c[2]});
   }
 
-  vec1f ma_radii;
+  vec1f ma_radii(madata.m*2);
   for(size_t i=0; i<madata.m*2; ++i) {
-    ma_radii.push_back( Vrui::Geometry::dist(coords[i], ma_coords_[i]) );
+    ma_radii.push_back( Vrui::Geometry::dist(coords[i%madata.m], ma_coords_[i]) );
   }
 
 
