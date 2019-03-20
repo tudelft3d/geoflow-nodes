@@ -43,10 +43,17 @@ void ComputeMedialAxisNode::process(){
     ma_coords.push_back({c[0], c[1], c[2]});
   }
 
+  vec1f ma_radii;
+  for(size_t i=0; i<madata.m*2; ++i) {
+    ma_radii.push_back( Vrui::Geometry::dist(coords[i], ma_coords_[i]) );
+  }
+
+
   vec1i ma_is_interior(madata.m*2, 0);
   std::fill_n(ma_is_interior.begin(), madata.m, 1);
 
   output("ma_coords").set(ma_coords);
+  output("ma_radii").set(ma_radii);
   output("ma_qidx").set(ma_qidx);
   output("ma_is_interior").set(ma_is_interior);
 }

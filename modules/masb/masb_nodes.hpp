@@ -15,6 +15,7 @@ namespace geoflow::nodes::mat {
       add_input("points", TT_point_collection);
       add_input("normals", TT_vec3f);
       add_output("ma_coords", TT_point_collection);
+      add_output("ma_radii", TT_vec1f);
       add_output("ma_qidx", TT_vec1i);
       add_output("ma_is_interior", TT_vec1i);
     }
