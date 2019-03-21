@@ -11,6 +11,7 @@
 #include <las_register.hpp>
 #include <stepedge_register.hpp>
 #include <masb_register.hpp>
+#include <utility_nodes.hpp>
 
 namespace gfn = geoflow::nodes;
 
@@ -28,6 +29,7 @@ int main(int ac, const char * av[])
     NodeRegister gdal = gfn::gdal::create_register();
     NodeRegister las = gfn::las::create_register();
     NodeRegister mat = gfn::mat::create_register();
+    NodeRegister utility = gfn::utility::create_register();
 
     // create some nodes and connections
     NodeManager N;
@@ -72,6 +74,17 @@ int main(int ac, const char * av[])
     OGRLoader->set_param(
         "filepath", fp_path);
 
+    // auto h_ogrload = N.create_node(gdal, "OGRLoader", {-275,300});
+    // auto h_polex = N.create_node(stepedge, "PolygonExtruder", {-50,300});
+    // auto h_rtri = N.create_node(utility, "RingTriangulator", {150,300});
+
+    // h_ogrload->set_param("filepath", (std::string)"/Users/ravi/git/geoflow-nodes/build/out_lod13H.gpkg");
+
+    // N.run(h_ogrload);
+
+    // h_ogrload->output_group("attributes").term("height").connect(h_polex->input("heights"));
+    // h_ogrload->output("linear_rings").connect(h_polex->input("polygons"));
+
     // launch the GUI
-    launch_flowchart(N, {stepedge, cgal, gdal, las, mat});
+    launch_flowchart(N, {stepedge, cgal, gdal, las, mat, utility});
 }

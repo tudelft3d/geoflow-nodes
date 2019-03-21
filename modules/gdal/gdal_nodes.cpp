@@ -111,7 +111,10 @@ namespace geoflow::nodes::gdal {
           OGRPolygon *poPolygon = poGeometry->toPolygon();
     
           vec3f ring;
-          for(auto& poPoint : poPolygon->getExteriorRing()) {
+          // for(auto& poPoint : poPolygon->getExteriorRing()) {
+          OGRPoint poPoint;
+          for(size_t i=0; i<poPolygon->getExteriorRing()->getNumPoints()-1; ++i) {
+            poPolygon->getExteriorRing()->getPoint(i, &poPoint);
             if (!found_offset) {
               manager.data_offset = {poPoint.getX(), poPoint.getY(), 0};
               found_offset = true;
@@ -119,17 +122,17 @@ namespace geoflow::nodes::gdal {
             std::array<float,3> p = {float(poPoint.getX()-(*manager.data_offset)[0]), float(poPoint.getY()-(*manager.data_offset)[1]), float(poPoint.getZ()-(*manager.data_offset)[2])};
             ring.push_back(p);
           }
-          // ring.erase(ring.end()-1);
-          bg::model::polygon<point_type_3d> boost_poly;
-          for (auto& p : ring) {
-            bg::append(boost_poly.outer(), point_type_3d(p[0], p[1], p[2]));
-          }
-          bg::unique(boost_poly);
-          vec3f ring_dedup;
-          for (auto& p : boost_poly.outer()) {
-            ring_dedup.push_back({float(bg::get<0>(p)), float(bg::get<1>(p)), float(bg::get<2>(p))}); //FIXME losing potential z...
-          }
-          linear_rings.push_back(ring_dedup);
+          // ring.erase(--ring.end());
+          // bg::model::polygon<point_type_3d> boost_poly;
+          // for (auto& p : ring) {
+          //   bg::append(boost_poly.outer(), point_type_3d(p[0], p[1], p[2]));
+          // }
+          // bg::unique(boost_poly);
+          // vec3f ring_dedup;
+          // for (auto& p : boost_poly.outer()) {
+          //   ring_dedup.push_back({float(bg::get<0>(p)), float(bg::get<1>(p)), float(bg::get<2>(p))}); //FIXME losing potential z...
+          // }
+          linear_rings.push_back(ring);
           
           push_attributes(*poFeature);
 

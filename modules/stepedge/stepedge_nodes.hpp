@@ -44,15 +44,27 @@ namespace geoflow::nodes::stepedge {
     void process();
   };
 
+  class PointCloudMeanZNode:public Node {
+
+    public:
+    using Node::Node;
+    void init() {
+      add_input("point_clouds", TT_point_collection_list);
+      add_output("height", TT_vec1f);
+    }
+
+    void process();
+  };
+
   class PolygonExtruderNode:public Node {
 
     public:
     using Node::Node;
     void init() {
       add_input("polygons", TT_linear_ring_collection);
-      add_input("point_clouds", TT_point_collection_list);
-      add_output("polygons_extruded", TT_linear_ring_collection);
-      add_output("height", TT_vec1f);
+      add_input("heights", TT_vec1f);
+      add_output("rings_3d", TT_linear_ring_collection);
+      add_output("ring_types", TT_vec1i);
     }
 
     void process();

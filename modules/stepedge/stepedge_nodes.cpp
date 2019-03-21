@@ -270,11 +270,8 @@ void Ring2SegmentsNode::process() {
   output("ring_idx").set(ring_idx);
 }
 
-void PolygonExtruderNode::process(){
-  auto polygons = input("polygons").get<LinearRingCollection>();
+void PointCloudMeanZNode::process(){
   auto point_clouds = input("point_clouds").get<std::vector<PointCollection>>();
-
-  if(polygons.size()!=point_clouds.size()) return;
 
   vec1f heights;
   for (auto& point_cloud : point_clouds) {
@@ -284,8 +281,43 @@ void PolygonExtruderNode::process(){
     }
     heights.push_back(sum_elevation/point_cloud.size());
   }
-  output("polygons_extruded").set(polygons);
   output("heights").set(heights);
+}
+
+void PolygonExtruderNode::process() {
+  auto rings = input("polygons").get<LinearRingCollection>();
+  auto heights = input("heights").get<vec1f>();
+
+  LinearRingCollection rings_3d;
+  vec1i surf_type;
+  for (size_t i=0; i<rings.size(); ++i) {
+    auto h = heights[i];
+    //floor
+    rings_3d.push_back(rings[i]);
+    surf_type.push_back(0);
+    //roof
+    LinearRing r = rings[i];
+    for (auto& p : r) p[2] = h;
+    rings_3d.push_back(r);
+    surf_type.push_back(2);
+    //walls
+    size_t j_prev = r.size()-1;
+    for (size_t j=0; j<r.size(); ++j) {
+      LinearRing wall;
+      wall.push_back(rings[i][j]);
+      wall.push_back(rings[i][j_prev]);
+      auto ha = r[j_prev];
+      auto hb = r[j];
+      wall.push_back(ha);
+      wall.push_back(hb);
+      surf_type.push_back(1);
+      rings_3d.push_back(wall);
+      j_prev=j;
+    }
+  }
+
+  output("rings_3d").set(rings_3d);
+  output("ring_types").set(surf_type);
 }
 
 inline arr3f grow(const arr3f& p_, const arr3f& q_, const arr3f& r_, const float& extension) {
