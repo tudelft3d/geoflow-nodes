@@ -12,12 +12,12 @@ namespace geoflow::nodes::mat {
     double zero=0,pi=3.14;
     using Node::Node;
     void init() {
-      add_input("points", TT_point_collection);
-      add_input("normals", TT_vec3f);
-      add_output("ma_coords", TT_point_collection);
-      add_output("ma_radii", TT_vec1f);
-      add_output("ma_qidx", TT_vec1i);
-      add_output("ma_is_interior", TT_vec1i);
+      add_input("points", typeid(PointCollection));
+      add_input("normals", typeid(vec3f));
+      add_output("ma_coords", typeid(PointCollection));
+      add_output("ma_radii", typeid(vec1f));
+      add_output("ma_qidx", typeid(vec1i));
+      add_output("ma_is_interior", typeid(vec1i));
     }
     void gui(){
       ImGui::SliderFloat("initial_radius", &params.initial_radius, 0, 1000);
@@ -34,8 +34,8 @@ namespace geoflow::nodes::mat {
     float interval = 2;
     using Node::Node;
     void init() {
-      add_input("points", TT_point_collection);
-      add_output("normals", TT_vec3f);
+      add_input("points", typeid(PointCollection));
+      add_output("normals", typeid(vec3f));
     }
     void gui(){
       ImGui::SliderInt("K", &params.k, 1, 100);

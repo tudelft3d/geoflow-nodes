@@ -1,15 +1,19 @@
 #pragma once
 
 #include <geoflow/core/geoflow.hpp>
+#include "tinsimp.hpp"
 
 namespace geoflow::nodes::cgal {
+
+  typedef tinsimp::CDT  CDT;
+
   class CDTNode:public Node {
   public:
     using Node::Node;
     void init() {
-      add_input("geometries", { TT_point_collection, TT_line_string_collection });
-      add_output("cgal_cdt", TT_any);
-      add_output("triangles", TT_triangle_collection);
+      add_input("geometries", { typeid(PointCollection), typeid(LineStringCollection) });
+      add_output("cgal_cdt", typeid(CDT));
+      add_output("triangles", typeid(TriangleCollection));
 
       add_param("create_triangles", (bool)false);
     }
@@ -23,8 +27,8 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("points", TT_point_collection);
-      add_output("cgal_dt", TT_any);
+      add_input("points", typeid(PointCollection));
+      add_output("cgal_dt", typeid(CDT));
     }
     void process();
   };
@@ -33,12 +37,12 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("triangles1_vec3f", TT_vec3f);
-      add_input("triangles2_vec3f", TT_vec3f);
-      add_output("points", TT_vec3f);
-      add_output("distances1", TT_vec1f);
-      add_output("distances2", TT_vec1f);
-      add_output("diff", TT_vec1f);
+      add_input("triangles1_vec3f", typeid(vec3f));
+      add_input("triangles2_vec3f", typeid(vec3f));
+      add_output("points", typeid(vec3f));
+      add_output("distances1", typeid(vec1f));
+      add_output("distances2", typeid(vec1f));
+      add_output("diff", typeid(vec1f));
 
       add_param("las_filpath", (std::string) "");
       add_param("log_filpath", (std::string) "");
@@ -55,11 +59,11 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("triangles", TT_triangle_collection);
-      add_output("points", TT_point_collection);
-      add_output("distances", TT_vec1f);
-      add_output("distance_min", TT_float);
-      add_output("distance_max", TT_float);
+      add_input("triangles", typeid(TriangleCollection));
+      add_output("points", typeid(PointCollection));
+      add_output("distances", typeid(vec1f));
+      add_output("distance_min", typeid(float));
+      add_output("distance_max", typeid(float));
 
       add_param("filepath", (std::string) "");
       add_param("thin_nth", (int)5);
@@ -76,11 +80,11 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("cgal_cdt_base", TT_any);
-      add_input("cgal_cdt_target", TT_any);
-      add_output("points", TT_point_collection);
-      add_output("distance_min", TT_float);
-      add_output("distance_max", TT_float);
+      add_input("cgal_cdt_base", typeid(CDT));
+      add_input("cgal_cdt_target", typeid(CDT));
+      add_output("points", typeid(PointCollection));
+      add_output("distance_min", typeid(float));
+      add_output("distance_max", typeid(float));
     }
     void process();
   };
@@ -89,8 +93,8 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("geometries", { TT_line_string_collection });
-      add_output("dense_linestrings", TT_line_string_collection);
+      add_input("geometries", { typeid(LineStringCollection) });
+      add_output("dense_linestrings", typeid(LineStringCollection));
 
       add_param("interval", (int)2);
     }
@@ -104,13 +108,13 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("geometries", { TT_point_collection, TT_line_string_collection });
-      add_output("triangles", TT_triangle_collection);
-      add_output("normals", TT_vec3f);
-      add_output("selected_lines", TT_line_string_collection);
-      add_output("cgal_cdt", TT_any);
-      // add_output("count", TT_vec1ui);
-      // add_output("error", TT_vec1f);
+      add_input("geometries", { typeid(PointCollection), typeid(LineStringCollection) });
+      add_output("triangles", typeid(TriangleCollection));
+      add_output("normals", typeid(vec3f));
+      add_output("selected_lines", typeid(LineStringCollection));
+      add_output("cgal_cdt", typeid(CDT));
+      // add_output("count", typeid(vec1ui));
+      // add_output("error", typeid(vec1f));
 
       add_param("thres_error", (float)2);
       add_param("densify_interval", (float)2);
@@ -120,7 +124,7 @@ namespace geoflow::nodes::cgal {
       if (ImGui::SliderFloat("Error threshold", &param<float>("thres_error"), 0, 100)) {
         manager.run(*this);
       }
-      if (input("geometries").connected_type == TT_line_string_collection)
+      if (input("geometries").connected_type == typeid(LineStringCollection))
         ImGui::SliderFloat("Line densify", &param<float>("densify_interval"), 0, 100);
       ImGui::Checkbox("Create triangles", &param<bool>("create_triangles"));
     }
@@ -131,8 +135,8 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_output("triangles", TT_triangle_collection);
-      add_output("cgal_cdt", TT_any);
+      add_output("triangles", typeid(TriangleCollection));
+      add_output("cgal_cdt", typeid(CDT));
 
       add_param("filepath", (std::string) "");
       add_param("thin_nth", (int)5);
@@ -152,8 +156,8 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("lines", TT_line_string_collection);
-      add_output("lines", TT_line_string_collection);
+      add_input("lines", typeid(LineStringCollection));
+      add_output("lines", typeid(LineStringCollection));
 
       add_param("area_threshold", (float) 0.1);
     }
@@ -169,8 +173,8 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("lines", TT_line_string_collection);
-      add_output("lines", TT_line_string_collection);
+      add_input("lines", typeid(LineStringCollection));
+      add_output("lines", typeid(LineStringCollection));
 
       add_param("threshold_stop_cost", (float) 0.1);
     }
@@ -186,8 +190,8 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("lines", TT_line_string_collection);
-      add_output("lines", TT_line_string_collection);
+      add_input("lines", typeid(LineStringCollection));
+      add_output("lines", typeid(LineStringCollection));
 
       add_param("threshold_stop_cost", (float) 0.1);
     }
@@ -203,8 +207,8 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("polygons", TT_linear_ring_collection);
-      add_output("polygons_simp", TT_linear_ring_collection);
+      add_input("polygons", typeid(LinearRingCollection));
+      add_output("polygons_simp", typeid(LinearRingCollection));
 
       add_param("threshold_stop_cost", (float) 0.1);
     }
@@ -222,8 +226,8 @@ namespace geoflow::nodes::cgal {
 
     using Node::Node;
     void init() {
-      add_input("points", TT_point_collection); //TT_point_collection_list
-      add_input("labels", TT_vec1i);
+      add_input("points", typeid(PointCollection)); //TT_point_collection_list
+      add_input("labels", typeid(vec1i));
 
       add_param("filepath", (std::string) "out.ply");
       add_param("write_binary", (bool)false);
@@ -240,11 +244,11 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("cgal_cdt", TT_any);
-      add_input("min", TT_float);
-      add_input("max", TT_float);
-      add_output("lines", TT_line_string_collection);
-      add_output("attributes", TT_vec1i);
+      add_input("cgal_cdt", typeid(CDT));
+      add_input("min", typeid(float));
+      add_input("max", typeid(float));
+      add_output("lines", typeid(LineStringCollection));
+      add_output("attributes", typeid(vec1i));
 
       add_param("interval", (float)1.0);
       add_param("exclude_begin", (float)-0.5);
@@ -261,9 +265,9 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("cgal_cdt", TT_any);
-      add_output("lines", TT_line_string_collection);
-      add_output("attributes", TT_attribute_map_f);
+      add_input("cgal_cdt", typeid(CDT));
+      add_output("lines", typeid(LineStringCollection));
+      add_output("attributes", typeid(AttributeMap));
     }
     void process();
   };
@@ -272,8 +276,8 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("lines", TT_line_string_collection);
-      add_output("lines", TT_line_string_collection);
+      add_input("lines", typeid(LineStringCollection));
+      add_output("lines", typeid(LineStringCollection));
 
       add_param("filepath", (std::string) "");
       add_param("thin_nth", (int)5);
@@ -289,9 +293,9 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("cgal_cdt", TT_any);
-      add_input("lines", TT_line_string_collection);
-      add_output("lines", TT_line_string_collection);
+      add_input("cgal_cdt", typeid(CDT));
+      add_input("lines", typeid(LineStringCollection));
+      add_output("lines", typeid(LineStringCollection));
 
       add_param("add_bbox", (bool)false);
       add_param("densify_interval", (float)2);
@@ -307,8 +311,8 @@ namespace geoflow::nodes::cgal {
   public:
     using Node::Node;
     void init() {
-      add_input("polygons", TT_linear_ring_collection);
-      add_output("polygons_simp", TT_linear_ring_collection);
+      add_input("polygons", typeid(LinearRingCollection));
+      add_output("polygons_simp", typeid(LinearRingCollection));
 
       add_param("threshold", (float)1.0);
     }

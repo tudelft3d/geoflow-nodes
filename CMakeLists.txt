@@ -72,6 +72,7 @@ include_directories(
   thirdparty/geoflow/thirdparty/imgui
   thirdparty/geoflow/thirdparty/imgui/examples
   thirdparty/geoflow/thirdparty/glm
+  thirdparty/geoflow/thirdparty/osdialog
 )
 if(${GF_BUILD_GUI})
   add_definitions(-DGF_BUILD_GUI)

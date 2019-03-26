@@ -1,6 +1,5 @@
 #include "cgal_nodes.hpp"
 
-#include "tinsimp.hpp"
 #include "linesimp.hpp"
 #include "isolines.hpp"
 #include "visvalingam_cost.hpp"
@@ -50,7 +49,6 @@ namespace geoflow::nodes::cgal {
 typedef tinsimp::K    K;
 typedef tinsimp::Gt   Gt;
 typedef tinsimp::Itag Itag;
-typedef tinsimp::CDT  CDT;
 typedef CDT::Point    Point;
 
 template<typename T> inline std::array<float,3> to_arr3f(T& p) {
@@ -64,7 +62,7 @@ void CDTNode::process(){
 
   CDT cdt;
 
-  if (geom_term.connected_type == TT_point_collection) {
+  if (geom_term.connected_type == typeid(PointCollection)) {
     auto points = geom_term.get<geoflow::PointCollection>();
     
     std::cout << "Adding points to CDT\n";
@@ -72,7 +70,7 @@ void CDTNode::process(){
       cdt.insert(Point(p[0], p[1], p[2]));
     }
   }
-  else if (geom_term.connected_type == TT_line_string_collection) {
+  else if (geom_term.connected_type == typeid(LineStringCollection)) {
     auto lines = geom_term.get<geoflow::LineStringCollection>();
 
     std::cout << "Adding lines to CDT\n";
@@ -357,7 +355,7 @@ void DensifyNode::process(){
 
   auto interval = param<float>("interval");
 
-  if (geom_term.connected_type == TT_line_string_collection) {
+  if (geom_term.connected_type == typeid(LineStringCollection)) {
     auto lines = geom_term.get<geoflow::LineStringCollection>();
     output("dense_linestrings").set(densify_linestrings(lines, interval));
   }
@@ -416,12 +414,12 @@ void TinSimpNode::process(){
   tinsimp::CDT cdt;
 
   std::cout << "Adding points to CDT\n";
-  if (geom_term.connected_type == TT_point_collection) {
+  if (geom_term.connected_type == typeid(PointCollection)) {
     auto points = geom_term.get<geoflow::PointCollection>();
     build_initial_tin(cdt, points.box());
     tinsimp::greedy_insert(cdt, points, double(thres_error));
     delete_initial_tin(cdt, points.box());
-  } else if (geom_term.connected_type == TT_line_string_collection) {
+  } else if (geom_term.connected_type == typeid(LineStringCollection)) {
     auto lines = geom_term.get<geoflow::LineStringCollection>();
     build_initial_tin(cdt, lines.box());
     std::vector<size_t> line_counts, selected_line_counts;

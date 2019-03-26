@@ -16,14 +16,14 @@ namespace geoflow::nodes::gdal {
   
   void OGRLoaderNode::push_attributes(OGRFeature& poFeature) {
     for(auto& [name, term] : output_group("attributes").terminals) {
-      if(term->type == TT_vec1i) {
+      if(term->type == typeid(vec1i)) {
 //        std::cout << term->has_data() << "\n";
         auto& term_data = term->get<vec1i&>();
         term_data.push_back(poFeature.GetFieldAsInteger64(name.c_str()));
-      } else if(term->type == TT_vec1f) {
+      } else if(term->type == typeid(vec1f)) {
         auto& term_data = term->get<vec1f&>();
         term_data.push_back(poFeature.GetFieldAsDouble(name.c_str()));
-      } else if(term->type == TT_vec1s) {
+      } else if(term->type == typeid(vec1s)) {
         auto& term_data = term->get<vec1s&>();
         term_data.push_back( (std::string) poFeature.GetFieldAsString(name.c_str()) );
       }
@@ -62,13 +62,13 @@ namespace geoflow::nodes::gdal {
       auto t = field_def->GetType();
       auto field_name = (std::string) field_def->GetNameRef();
       if (t==OFTInteger || t==OFTInteger64) {
-        auto& term = output_group("attributes").add(field_name, TT_vec1i);
+        auto& term = output_group("attributes").add(field_name, typeid(vec1i));
         term.set(vec1i());
       } else if (t==OFTString) {
-        auto& term = output_group("attributes").add(field_name, TT_vec1s);
+        auto& term = output_group("attributes").add(field_name, typeid(vec1s));
         term.set(vec1s());
       } else if (t==OFTReal) {
-        auto& term = output_group("attributes").add(field_name, TT_vec1f);
+        auto& term = output_group("attributes").add(field_name, typeid(vec1f));
         term.set(vec1f());
       }
     }
@@ -154,15 +154,15 @@ namespace geoflow::nodes::gdal {
     
 //    for(auto& [name, term] : output_group("attributes").terminals) {
 //      std::cout << "group_term " << name << "\n";
-//      if (term->type == TT_vec1f)
+//      if (term->type == typeid(vec1f))
 //        for (auto& val : term->get<vec1f>()) {
 //          std::cout << "\t" << val << "\n";
 //        }
-//      if (term->type == TT_vec1i)
+//      if (term->type == typeid(vec1i))
 //        for (auto& val : term->get<vec1i>()) {
 //          std::cout << "\t" << val << "\n";
 //        }
-//      if (term->type == TT_vec1s)
+//      if (term->type == typeid(vec1s))
 //        for (auto& val : term->get<vec1s>()) {
 //          std::cout << "\t" << val << "\n";
 //        }
@@ -201,11 +201,11 @@ void OGRWriterNode::process() {
     OGRwkbGeometryType wkbType;
     std::variant<LineStringCollection,LinearRingCollection> geometry_collection;
     size_t geom_count;
-    if (geom_term.connected_type == TT_linear_ring_collection) {
+    if (geom_term.connected_type == typeid(LinearRingCollection)) {
       wkbType = wkbPolygon;
       geometry_collection = geom_term.get<LinearRingCollection>();
       geom_count = std::get<LinearRingCollection>(geometry_collection).size();
-    } else if (geom_term.connected_type == TT_line_string_collection) {
+    } else if (geom_term.connected_type == typeid(LineStringCollection)) {
       wkbType = wkbLineString25D;
       geometry_collection = geom_term.get<LineStringCollection>();
       geom_count = std::get<LineStringCollection>(geometry_collection).size();
@@ -221,7 +221,7 @@ void OGRWriterNode::process() {
     int fcnt = poLayer->GetLayerDefn()->GetFieldCount();
     for(auto& [name, term] : input_group("attributes").terminals) {
 //      std::cout << "group_term " << name << "\n";
-      if (term->connected_type == TT_vec1f) {
+      if (term->connected_type == typeid(vec1f)) {
         OGRFieldDefn oField( name.c_str(), OFTReal );
         if( poLayer->CreateField( &oField ) != OGRERR_NONE )
         {
@@ -229,7 +229,7 @@ void OGRWriterNode::process() {
             exit( 1 );
         }
         attr_id_map[name] = fcnt++;
-      }else if (term->connected_type == TT_vec1i) {
+      }else if (term->connected_type == typeid(vec1i)) {
         OGRFieldDefn oField( name.c_str(), OFTInteger64 );
         if( poLayer->CreateField( &oField ) != OGRERR_NONE )
         {
@@ -237,7 +237,7 @@ void OGRWriterNode::process() {
           exit( 1 );
         }
         attr_id_map[name] = fcnt++;
-      } else if (term->connected_type == TT_vec1s) {
+      } else if (term->connected_type == typeid(vec1s)) {
         OGRFieldDefn oField( name.c_str(), OFTString );
         if( poLayer->CreateField( &oField ) != OGRERR_NONE )
         {
@@ -253,19 +253,19 @@ void OGRWriterNode::process() {
         OGRFeature *poFeature;
         poFeature = OGRFeature::CreateFeature( poLayer->GetLayerDefn() );
         for(auto& [tname, term] : input_group("attributes").terminals) {
-          if (term->connected_type == TT_vec1f) {
+          if (term->connected_type == typeid(vec1f)) {
             auto& val = term->get<vec1f&>();
             poFeature->SetField( attr_id_map[tname], val[i] );
-          } else if (term->connected_type == TT_vec1i) {
+          } else if (term->connected_type == typeid(vec1i)) {
             auto& val = term->get<vec1i&>();
             poFeature->SetField( attr_id_map[tname], val[i] );
-          } else if (term->connected_type == TT_vec1s) {
+          } else if (term->connected_type == typeid(vec1s)) {
             auto& val = term->get<vec1s&>();
             poFeature->SetField( attr_id_map[tname], val[i].c_str() );
           }
         }
       
-        if (geom_term.connected_type == TT_linear_ring_collection) {
+        if (geom_term.connected_type == typeid(LinearRingCollection)) {
           OGRLinearRing ogrring;
           LinearRingCollection& lr = std::get<LinearRingCollection>(geometry_collection);
           for (auto const& g: lr[i]) {
@@ -276,7 +276,7 @@ void OGRWriterNode::process() {
           bouwpoly.addRing( &ogrring );
           poFeature->SetGeometry( &bouwpoly );
         }
-        if (geom_term.connected_type == TT_line_string_collection) {
+        if (geom_term.connected_type == typeid(LineStringCollection)) {
           OGRLineString ogrlinestring;
           LineStringCollection& ls = std::get<LineStringCollection>(geometry_collection);
           for (auto const& g: ls[i]) {
@@ -326,11 +326,11 @@ void OGRWriterNoAttributesNode::process() {
     OGRwkbGeometryType wkbType;
     std::variant<LineStringCollection,LinearRingCollection> geometry_collection;
     size_t geom_count;
-    if (geom_term.connected_type == TT_linear_ring_collection) {
+    if (geom_term.connected_type == typeid(LinearRingCollection)) {
       wkbType = wkbPolygon;
       geometry_collection = geom_term.get<LinearRingCollection>();
       geom_count = std::get<LinearRingCollection>(geometry_collection).size();
-    } else if (geom_term.connected_type == TT_line_string_collection) {
+    } else if (geom_term.connected_type == typeid(LineStringCollection)) {
       wkbType = wkbLineString25D;
       geometry_collection = geom_term.get<LineStringCollection>();
       geom_count = std::get<LineStringCollection>(geometry_collection).size();
@@ -349,7 +349,7 @@ void OGRWriterNoAttributesNode::process() {
         poFeature = OGRFeature::CreateFeature( poLayer->GetLayerDefn() );
 
         
-        if (geom_term.connected_type == TT_linear_ring_collection) {
+        if (geom_term.connected_type == typeid(LinearRingCollection)) {
           OGRLinearRing ogrring;
           LinearRingCollection& lr = std::get<LinearRingCollection>(geometry_collection);
           for (auto const& g: lr[i]) {
@@ -360,7 +360,7 @@ void OGRWriterNoAttributesNode::process() {
           bouwpoly.addRing( &ogrring );
           poFeature->SetGeometry( &bouwpoly );
         }
-        if (geom_term.connected_type == TT_line_string_collection) {
+        if (geom_term.connected_type == typeid(LineStringCollection)) {
           OGRLineString ogrlinestring;
           LineStringCollection& ls = std::get<LineStringCollection>(geometry_collection);
           for (auto const& g: ls[i]) {
