@@ -9,7 +9,7 @@ namespace geoflow::nodes::general {
       throw new Exception("Geometry inputs must be of same type\n");
     }
 
-    if (geometries1.connected_type == TT_point_collection) {
+    if (geometries1.connected_type == typeid(PointCollection)) {
       auto mergedGeometries = geometries1.get<geoflow::PointCollection>();
       auto points2 = geometries2.get<geoflow::PointCollection>();
       for (auto& p : points2) {
@@ -17,7 +17,7 @@ namespace geoflow::nodes::general {
       }
       output("geometries").set(mergedGeometries);
     }
-    else if (geometries1.connected_type == TT_segment_collection) {
+    else if (geometries1.connected_type == typeid(SegmentCollection)) {
       auto mergedGeometries = geometries1.get<geoflow::SegmentCollection>();
       auto segments2 = geometries2.get<geoflow::SegmentCollection>();
       for (auto& s : segments2) {
@@ -25,7 +25,7 @@ namespace geoflow::nodes::general {
       }
       output("geometries").set(mergedGeometries);
     }
-    else if (geometries1.connected_type == TT_line_string_collection) {
+    else if (geometries1.connected_type == typeid(LineStringCollection)) {
       auto mergedGeometries = geometries1.get<geoflow::LineStringCollection>();
       auto lines2 = geometries2.get<geoflow::LineStringCollection>();
       for (auto& l : lines2) {
@@ -33,7 +33,7 @@ namespace geoflow::nodes::general {
       }
       output("geometries").set(mergedGeometries);
     }
-    else if (geometries1.connected_type == TT_linear_ring_collection) {
+    else if (geometries1.connected_type == typeid(LinearRingCollection)) {
       auto mergedGeometries = geometries1.get<geoflow::LinearRingCollection>();
       auto rings2 = geometries2.get<geoflow::LinearRingCollection>();
       for (auto& r : rings2) {

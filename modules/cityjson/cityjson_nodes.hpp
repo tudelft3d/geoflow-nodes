@@ -22,8 +22,8 @@ namespace geoflow::nodes::cityjson {
     
     void init() {
       // declare ouput terminals
-      add_output("faces", TT_linear_ring_collection);
-      add_output("surface_types", TT_vec1i);
+      add_output("faces", typeid(LinearRingCollection));
+      add_output("surface_types", typeid(vec1i));
 
       // declare parameters
       add_param("filepath", (std::string) "DenHaag_01.json");

@@ -67,13 +67,13 @@ namespace geoflow::nodes::stepedge {
     public:
     using Node::Node;
     void init() {
-      add_input("point_clouds", TT_point_collection_list);
-      add_input("polygons", TT_linear_ring_collection);
-      add_input_group("attributes", {TT_vec1i, TT_vec1f, TT_vec1s, TT_vec1b});
-      add_output("decomposed_footprints", TT_linear_ring_collection);
-//      add_output("attributes", TT_attribute_map_f);
-      add_output("building_class", TT_attribute_map_f);
-      add_output_group("attributes", {TT_vec1i, TT_vec1f, TT_vec1s, TT_vec1b});
+      add_input("point_clouds", typeid(std::vector<PointCollection>));
+      add_input("polygons", typeid(LinearRingCollection));
+      add_input_group("attributes", {typeid(vec1i), typeid(vec1f), typeid(vec1s), typeid(vec1b)});
+      add_output("decomposed_footprints", typeid(LinearRingCollection));
+//      add_output("attributes", typeid(AttributeMap));
+      add_output("building_class", typeid(AttributeMap));
+      add_output_group("attributes", {typeid(vec1i), typeid(vec1f), typeid(vec1s), typeid(vec1b)});
 
       add_param("step_height_threshold", (float) 2.0);
       // add_param("direct_alpharing", (bool) true);
@@ -119,28 +119,28 @@ namespace geoflow::nodes::stepedge {
       
       for(auto& [name, term] : input_group("attributes").terminals) {
         auto& oT = output_group("attributes").add(name, term->connected_type);
-        if(oT.type == TT_vec1f)
+        if(oT.type == typeid(vec1f))
           oT.set(vec1f());
-        else if(oT.type == TT_vec1i)
+        else if(oT.type == typeid(vec1i))
           oT.set(vec1i());
-        else if(oT.type == TT_vec1s)
+        else if(oT.type == typeid(vec1s))
           oT.set(vec1s());
-        else if(oT.type == TT_vec1b)
+        else if(oT.type == typeid(vec1b))
           oT.set(vec1b());
       }
       
       auto roof_pt_cnt_vec = vec1i();
-      output_group("attributes").add("roof_pt_cnt_vec", TT_vec1i);
+      output_group("attributes").add("roof_pt_cnt_vec", typeid(vec1i));
       auto noid_a_vec = vec1f();
-      output_group("attributes").add("noid_a", TT_vec1f);
+      output_group("attributes").add("noid_a", typeid(vec1f));
       auto noid_r_vec = vec1f();
-      output_group("attributes").add("noid_r", TT_vec1f);
+      output_group("attributes").add("noid_r", typeid(vec1f));
       auto height_vec = vec1f();
-      output_group("attributes").add("height", TT_vec1f);
+      output_group("attributes").add("height", typeid(vec1f));
       auto bclass_vec = vec1i();
-      output_group("attributes").add("bclass", TT_vec1i);
+      output_group("attributes").add("bclass", typeid(vec1i));
       auto segid_vec = vec1i();
-      output_group("attributes").add("segid", TT_vec1i);
+      output_group("attributes").add("segid", typeid(vec1i));
 
       LinearRingCollection all_cells;
       AttributeMap all_attributes;
@@ -189,17 +189,17 @@ namespace geoflow::nodes::stepedge {
           roof_pt_cnt_vec.push_back(roof_pt_cnt);
           for(auto& [name, iT] : input_group("attributes").terminals) {
             auto& oT = output_group("attributes").term(name);
-            if(oT.type == TT_vec1f) {
+            if(oT.type == typeid(vec1f)) {
               auto& veco = oT.get<vec1f&>();
               auto& veci = iT->get<vec1f&>();
               veco.push_back( veci[i] );
             }
-            else if(oT.type == TT_vec1i) {
+            else if(oT.type == typeid(vec1i)) {
               auto& veco = oT.get<vec1i&>();
               auto& veci = iT->get<vec1i&>();
               veco.push_back( veci[i] );
             }
-            else if(oT.type == TT_vec1s) {
+            else if(oT.type == typeid(vec1s)) {
               auto& veco = oT.get<vec1s&>();
               auto& veci = iT->get<vec1s&>();
               veco.push_back( veci[i] );
@@ -221,9 +221,9 @@ namespace geoflow::nodes::stepedge {
     public:
     using Node::Node;
     void init() {
-      add_input("point_clouds", TT_point_collection_list);
-      // add_output("attributes", TT_attribute_map_f);
-      add_output_group("attributes", {TT_vec1i, TT_vec1f, TT_vec1s, TT_vec1b});
+      add_input("point_clouds", typeid(std::vector<PointCollection>));
+      // add_output("attributes", typeid(AttributeMap));
+      add_output_group("attributes", {typeid(vec1i), typeid(vec1f), typeid(vec1s), typeid(vec1b)});
 
       add_param("z_percentile", (float) 0.9);
     }
@@ -236,13 +236,13 @@ namespace geoflow::nodes::stepedge {
       auto point_clouds = input("point_clouds").get<std::vector<PointCollection>>();
 
       // AttributeMap all_attributes;
-      output_group("attributes").add("bclass", TT_vec1i).set(vec1i());
+      output_group("attributes").add("bclass", typeid(vec1i)).set(vec1i());
       auto& bclass_vec = output_group("attributes").term("bclass").get<vec1i&>();
-      output_group("attributes").add("height", TT_vec1f).set(vec1f());
+      output_group("attributes").add("height", typeid(vec1f)).set(vec1f());
       auto& height_vec = output_group("attributes").term("height").get<vec1f&>();
-      output_group("attributes").add("rms_error", TT_vec1f).set(vec1f());
+      output_group("attributes").add("rms_error", typeid(vec1f)).set(vec1f());
       auto& rms_error_vec = output_group("attributes").term("rms_error").get<vec1f&>();
-      output_group("attributes").add("roof_pt_cnt", TT_vec1i).set(vec1i());
+      output_group("attributes").add("roof_pt_cnt", typeid(vec1i)).set(vec1i());
       auto& roof_pt_cnt_vec = output_group("attributes").term("roof_pt_cnt").get<vec1i&>();
 
       NodeRegister R("Nodes");
@@ -310,7 +310,6 @@ namespace geoflow::nodes::stepedge {
     R.register_node<ProcessArrangementNode>("ProcessArrangement");
     R.register_node<LinearRingtoRingsNode>("LinearRingtoRings");
     R.register_node<BuildArrangementNode>("BuildArrangement");
-    R.register_node<BuildArrFromRingsNode>("BuildArrFromRings");
     R.register_node<BuildArrFromRingsExactNode>("BuildArrFromRingsExact");
     R.register_node<DetectLinesNode>("DetectLines");
     R.register_node<DetectPlanesNode>("DetectPlanes");

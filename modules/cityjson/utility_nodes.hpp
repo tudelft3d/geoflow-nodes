@@ -42,11 +42,11 @@ namespace geoflow::nodes::utility {
     
     void init() {
       // declare ouput terminals
-      add_input("rings", TT_linear_ring_collection);
-      add_input("values", TT_vec1i);
-      add_output("values", TT_vec1i);
-      add_output("triangles", TT_triangle_collection);
-      add_output("normals", TT_vec3f);
+      add_input("rings", typeid(LinearRingCollection));
+      add_input("values", typeid(vec1i));
+      add_output("values", typeid(vec1i));
+      add_output("triangles", typeid(TriangleCollection));
+      add_output("normals", typeid(vec3f));
 
       // declare parameters
       // add_param("extract_lod", (int) 2);

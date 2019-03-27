@@ -41,7 +41,6 @@ vertex get_normal(vertex v0, vertex v1, vertex v2) {
 
 // interval list
 #include "interval.hpp"
-#include "line_regulariser.hpp"
 
 #include <unordered_set>
 #include <stack>
@@ -1146,7 +1145,7 @@ void BuildArrFromRingsExactNode::process() {
 
   auto fp_in = input("footprint");
   linereg::Polygon_2 footprint;
-  if (fp_in.connected_type == TT_any)
+  if (fp_in.connected_type == typeid(linereg::Polygon_2))
     footprint = fp_in.get<linereg::Polygon_2>();
   else {
     auto& lr = fp_in.get<LinearRing&>();
@@ -1489,7 +1488,7 @@ void DetectLinesNode::process(){
   vec1i ring_order, ring_id, is_start;
   std::vector<std::vector<size_t>> ring_idx;
   // fit lines in all input points
-  if (input_geom.connected_type == TT_point_collection) {
+  if (input_geom.connected_type == typeid(PointCollection)) {
     std::vector<linedect::Point> cgal_pts;
     auto points = input_geom.get<PointCollection>();
     for( auto& p : points ) {
@@ -1500,7 +1499,7 @@ void DetectLinesNode::process(){
     LD.get_bounded_edges(edge_segments);
 
   // fit lines per ring
-  } else if (input_geom.connected_type == TT_linear_ring_collection) {
+  } else if (input_geom.connected_type == typeid(LinearRingCollection)) {
     auto rings = input_geom.get<LinearRingCollection>();
     int n = param<int>("k");
     ring_idx.resize(rings.size());
@@ -2219,12 +2218,12 @@ void SimplifyPolygonNode::process(){
 
   auto threshold_stop_cost = param<float>("threshold_stop_cost");
 
-  if (geom_term.connected_type==TT_linear_ring) {
+  if (geom_term.connected_type==typeid(LinearRing)) {
     auto& polygon = geom_term.get<LinearRing&>();
     output("polygon_simp").set(
       simplify_footprint(polygon, threshold_stop_cost)
     );
-  } else if (geom_term.connected_type==TT_linear_ring_collection) {
+  } else if (geom_term.connected_type==typeid(LinearRingCollection)) {
     auto& polygons = geom_term.get<LinearRingCollection&>();
     LinearRingCollection polygons_out;
     for (auto& polygon : polygons) {
