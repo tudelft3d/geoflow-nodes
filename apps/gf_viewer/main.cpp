@@ -24,12 +24,12 @@ int main(int ac, const char * av[])
     std::string las_path = "/Users/ravi/surfdrive/Data/step-edge-detector/ahn3.las";
     std::string fp_path = "/Users/ravi/surfdrive/Data/step-edge-detector/rdam_sample_1.gpkg";
     // register nodes from various modules
-    NodeRegister stepedge = gfn::stepedge::create_register();
-    NodeRegister cgal = gfn::cgal::create_register();
-    NodeRegister gdal = gfn::gdal::create_register();
-    NodeRegister las = gfn::las::create_register();
-    NodeRegister mat = gfn::mat::create_register();
-    NodeRegister utility = gfn::utility::create_register();
+    auto stepedge = gfn::stepedge::create_register();
+    auto cgal = gfn::cgal::create_register();
+    auto gdal = gfn::gdal::create_register();
+    auto las = gfn::las::create_register();
+    auto mat = gfn::mat::create_register();
+    auto utility = gfn::utility::create_register();
 
     // create some nodes and connections
     NodeManager N;

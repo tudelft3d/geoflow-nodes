@@ -92,9 +92,9 @@ namespace geoflow::nodes::cityjson {
   };
 
   // Create a NodeRegister, ie a list of all available nodes
-  NodeRegister create_register() {
-    NodeRegister R("CityJSON");
-    R.register_node<CityJSONReaderNode>("CityJSONReader");
+  NodeRegisterHandle create_register() {
+    auto R = NodeRegister::create("CityJSON");
+    R->register_node<CityJSONReaderNode>("CityJSONReader");
     return R;
   }
 }

@@ -2,18 +2,37 @@
 
 namespace geoflow::nodes::stepedge {
 
+  class LOD10GeneratorNode;
+  class LOD13GeneratorNode;
+  NodeRegisterHandle create_register() {
+    auto R = NodeRegister::create("LoD13");
+    R->register_node<AlphaShapeNode>("AlphaShape");
+    R->register_node<PolygonExtruderNode>("PolygonExtruder");
+    R->register_node<Arr2LinearRingsNode>("Arr2LinearRings");
+    R->register_node<ExtruderNode>("Extruder");
+    R->register_node<ProcessArrangementNode>("ProcessArrangement");
+    R->register_node<LinearRingtoRingsNode>("LinearRingtoRings");
+    R->register_node<BuildArrangementNode>("BuildArrangement");
+    R->register_node<BuildArrFromRingsExactNode>("BuildArrFromRings");
+    R->register_node<DetectLinesNode>("DetectLines");
+    R->register_node<DetectPlanesNode>("DetectPlanes");
+    R->register_node<ClassifyEdgePointsNode>("ClassifyEdgePoints");
+    R->register_node<ComputeMetricsNode>("ComputeMetrics");
+    R->register_node<LASInPolygonsNode>("LASInPolygons");
+    R->register_node<BuildingSelectorNode>("BuildingSelector");
+    R->register_node<RegulariseLinesNode>("RegulariseLines");
+    R->register_node<RegulariseRingsNode>("RegulariseRings");
+    R->register_node<SimplifyPolygonNode>("SimplifyPolygon");
+    R->register_node<LOD10GeneratorNode>("LOD10Generator");
+    R->register_node<LOD13GeneratorNode>("LOD13Generator");
+    R->register_node<Ring2SegmentsNode>("Ring2Segments");
+    R->register_node<PrintResultNode>("PrintResult");
+    R->register_node<PolygonGrowerNode>("PolygonGrower");
+    return R;
+  }
+
   void create_lod13chart(NodeManager& N, bool use_linedetector) {
-    NodeRegister R("Nodes");
-    R.register_node<AlphaShapeNode>("AlphaShape");
-    R.register_node<SimplifyPolygonNode>("SimplifyPolygon");
-    R.register_node<DetectPlanesNode>("DetectPlanes");
-    R.register_node<DetectLinesNode>("DetectLines");
-    R.register_node<RegulariseRingsNode>("RegulariseRings");
-    R.register_node<BuildArrFromRingsExactNode>("BuildArrFromRings");
-    // R.register_node<BuildArrFromRingsNode>("BuildArrFromRings");
-    // R.register_node<ProcessArrangementNode>("ProcessArrangement");
-    R.register_node<Arr2LinearRingsNode>("Arr2LinearRings");
-    R.register_node<Ring2SegmentsNode>("Ring2Segments");
+    auto R = create_register();
 
     auto DetectPlanes_node = N.create_node(R, "DetectPlanes", {300,75});
     N.name_node(DetectPlanes_node, "DetectPlanes_node");
@@ -245,8 +264,7 @@ namespace geoflow::nodes::stepedge {
       output_group("attributes").add("roof_pt_cnt", typeid(vec1i)).set(vec1i());
       auto& roof_pt_cnt_vec = output_group("attributes").term("roof_pt_cnt").get<vec1i&>();
 
-      NodeRegister R("Nodes");
-      R.register_node<DetectPlanesNode>("DetectPlanes");
+      auto R = create_register();
       
       for(int i=0; i<point_clouds.size(); i++) {
         std::cout << "10 fid: " << i << "\n";
@@ -300,31 +318,4 @@ namespace geoflow::nodes::stepedge {
       // output_group("attributes").term("rms_error").set(std::move(rms_error_vec));
     }
   };
-
-  NodeRegister create_register() {
-    auto R = NodeRegister("LoD13");
-    R.register_node<AlphaShapeNode>("AlphaShape");
-    R.register_node<PolygonExtruderNode>("PolygonExtruder");
-    R.register_node<Arr2LinearRingsNode>("Arr2LinearRings");
-    R.register_node<ExtruderNode>("Extruder");
-    R.register_node<ProcessArrangementNode>("ProcessArrangement");
-    R.register_node<LinearRingtoRingsNode>("LinearRingtoRings");
-    R.register_node<BuildArrangementNode>("BuildArrangement");
-    R.register_node<BuildArrFromRingsExactNode>("BuildArrFromRingsExact");
-    R.register_node<DetectLinesNode>("DetectLines");
-    R.register_node<DetectPlanesNode>("DetectPlanes");
-    R.register_node<ClassifyEdgePointsNode>("ClassifyEdgePoints");
-    R.register_node<ComputeMetricsNode>("ComputeMetrics");
-    R.register_node<LASInPolygonsNode>("LASInPolygons");
-    R.register_node<BuildingSelectorNode>("BuildingSelector");
-    R.register_node<RegulariseLinesNode>("RegulariseLines");
-    R.register_node<RegulariseRingsNode>("RegulariseRings");
-    R.register_node<SimplifyPolygonNode>("SimplifyPolygon");
-    R.register_node<LOD10GeneratorNode>("LOD10Generator");
-    R.register_node<LOD13GeneratorNode>("LOD13Generator");
-    R.register_node<Ring2SegmentsNode>("Ring2Segments");
-    R.register_node<PrintResultNode>("PrintResult");
-    R.register_node<PolygonGrowerNode>("PolygonGrower");
-    return R;
-  }
 }

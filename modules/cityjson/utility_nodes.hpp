@@ -94,9 +94,9 @@ namespace geoflow::nodes::utility {
   };
 
   // Create a NodeRegister, ie a list of all available nodes
-  NodeRegister create_register() {
-    NodeRegister R("Utility");
-    R.register_node<RingTriangulatorNode>("RingTriangulator");
+  NodeRegisterHandle create_register() {
+    auto R = NodeRegister::create("Utility");
+    R->register_node<RingTriangulatorNode>("RingTriangulator");
     return R;
   }
 }
