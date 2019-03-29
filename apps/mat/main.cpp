@@ -17,9 +17,9 @@ int main(int ac, const char * av[])
     geoflow::NodeManager N;
 
     // register nodes
-    NodeRegister cgal = gfn::cgal::create_register();
-    NodeRegister mat = gfn::mat::create_register();
-    NodeRegister las = gfn::las::create_register();
+    auto cgal = gfn::cgal::create_register();
+    auto mat = gfn::mat::create_register();
+    auto las = gfn::las::create_register();
 
     launch_flowchart(N, {cgal, las, mat});
 }
