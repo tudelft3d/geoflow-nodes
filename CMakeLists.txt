@@ -128,6 +128,10 @@ add_subdirectory(apps/mat)
 
 add_subdirectory(apps/cityjson)
 
+if (CGAL_FOUND AND Boost_FOUND AND GDAL_FOUND AND GEOS_FOUND)
+  add_subdirectory(apps/footprint-decomposition)
+endif()
+
 # add_subdirectory(point-based)
 # add_subdirectory(raster-based)
 # add_subdirectory(viewer)
