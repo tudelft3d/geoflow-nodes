@@ -18,6 +18,12 @@ namespace geoflow::nodes::mat {
       add_output("ma_radii", typeid(vec1f));
       add_output("ma_qidx", typeid(vec1i));
       add_output("ma_is_interior", typeid(vec1i));
+      add_output("ma_is_interior", typeid(vec1i));
+      add_output("ma_sepangle", typeid(vec1f));
+      add_output("ma_bisector", typeid(vec3f));
+      add_output("ma_spoke_f1", typeid(vec3f));
+      add_output("ma_spoke_f2", typeid(vec3f));
+      add_output("ma_spokecross", typeid(vec3f));
     }
     void gui(){
       ImGui::SliderFloat("initial_radius", &params.initial_radius, 0, 1000);
@@ -39,6 +45,19 @@ namespace geoflow::nodes::mat {
     }
     void gui(){
       ImGui::SliderInt("K", &params.k, 1, 100);
+    }
+    void process();
+  };
+
+  class SegmentMakerNode:public Node {
+    public:
+    using Node::Node;
+    void init() {
+      add_input("sources", typeid(PointCollection));
+      add_input("directions", typeid(vec3f));
+      add_output("segments", typeid(SegmentCollection));
+    }
+    void gui(){
     }
     void process();
   };

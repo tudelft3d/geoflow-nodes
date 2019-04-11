@@ -1,4 +1,5 @@
 #include "masb_nodes.hpp"
+#include <cmath>
 
 #include <algorithm>
 
@@ -8,6 +9,7 @@ void ComputeMedialAxisNode::process(){
   auto point_collection = input("points").get<PointCollection>();
   auto normals_vec3f = input("normals").get<vec3f>();
 
+  // prepare data structures and transfer data
   masb::ma_data madata;
   madata.m = point_collection.size();
   
@@ -29,8 +31,10 @@ void ComputeMedialAxisNode::process(){
   madata.ma_coords = &ma_coords_;
   madata.ma_qidx = ma_qidx_.data();
 
+  // compute mat points
   masb::compute_masb_points(params, madata);
 
+  // retrieve mat points
   vec1i ma_qidx;
   ma_qidx.reserve(madata.m*2);
   for(size_t i=0 ; i<madata.m*2; ++i) {
@@ -39,23 +43,53 @@ void ComputeMedialAxisNode::process(){
 
   PointCollection ma_coords;
   ma_coords.reserve(madata.m*2);
-  for(auto& c : *madata.ma_coords) {
+  for(auto& c : ma_coords_) {
     ma_coords.push_back({c[0], c[1], c[2]});
   }
 
+  // Compute medial geometry
   vec1f ma_radii(madata.m*2);
+  vec1f ma_sepangle(madata.m*2);
+  vec3f ma_spoke_f1(madata.m*2);
+  vec3f ma_spoke_f2(madata.m*2);
+  vec3f ma_bisector(madata.m*2);
+  vec3f ma_spokecross(madata.m*2);
   for(size_t i=0; i<madata.m*2; ++i) {
-    ma_radii.push_back( Vrui::Geometry::dist(coords[i%madata.m], ma_coords_[i]) );
+    auto i_ = i%madata.m;
+    auto& c = ma_coords_[i];
+    // feature points
+    auto& f1 = coords[i_];
+    auto& f2 = coords[ma_qidx[i]];
+    // radius
+    ma_radii[i] = Vrui::Geometry::dist(f1, c);
+    // spoke vectors
+    auto s1 = f1-c;
+    auto s2 = f2-c;
+    ma_spoke_f1[i] = {s1[0], s1[1], s1[2]};
+    ma_spoke_f2[i] = {s2[0], s2[1], s2[2]};
+    // bisector
+    s1.normalize();
+    s2.normalize();
+    auto b = (s1+s2).normalize();
+    ma_bisector[i] = {b[0], b[1], b[2]};
+    // separation angle
+    ma_sepangle[i] = std::acos(s1*s2);
+    // cross product of spoke vectors
+    auto scross = Vrui::Geometry::cross(s1,s2).normalize();
+    ma_spokecross[i] = {scross[0], scross[1], scross[2]};
   }
-
-
   vec1i ma_is_interior(madata.m*2, 0);
   std::fill_n(ma_is_interior.begin(), madata.m, 1);
 
   output("ma_coords").set(ma_coords);
-  output("ma_radii").set(ma_radii);
   output("ma_qidx").set(ma_qidx);
+  output("ma_radii").set(ma_radii);
   output("ma_is_interior").set(ma_is_interior);
+  output("ma_sepangle").set(ma_sepangle);
+  output("ma_bisector").set(ma_bisector);
+  output("ma_spoke_f1").set(ma_spoke_f1);
+  output("ma_spoke_f2").set(ma_spoke_f2);
+  output("ma_spokecross").set(ma_spokecross);
 }
 
 
@@ -82,6 +116,24 @@ void ComputeNormalsNode::process(){
   }
 
   output("normals").set(normals_vec3f);
+}
+
+
+void SegmentMakerNode::process(){
+  auto sources = input("sources").get<PointCollection>();
+  auto directions = input("directions").get<vec3f>();
+
+  std::cout << "size of sources: " << sources.size() << ", size of directions: " << directions.size() << "\n";
+  if (sources.size()!=directions.size()) {
+    return;
+  }
+
+  SegmentCollection segments;
+  for(size_t i=0; i<sources.size(); ++i) {
+    arr3f target = {sources[i][0] + directions[i][0], sources[i][1] + directions[i][1], sources[i][2] + directions[i][2]};
+    segments.push_back({sources[i], target});
+  }
+  output("segments").set(segments);
 }
 
 }
