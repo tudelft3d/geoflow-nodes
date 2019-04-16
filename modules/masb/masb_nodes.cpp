@@ -123,7 +123,6 @@ void SegmentMakerNode::process(){
   auto sources = input("sources").get<PointCollection>();
   auto directions = input("directions").get<vec3f>();
 
-  std::cout << "size of sources: " << sources.size() << ", size of directions: " << directions.size() << "\n";
   if (sources.size()!=directions.size()) {
     return;
   }

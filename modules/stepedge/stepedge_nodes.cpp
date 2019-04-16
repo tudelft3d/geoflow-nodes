@@ -249,6 +249,7 @@ void AlphaShapeNode::process(){
   output("segment_ids").set(segment_ids);
   output("edge_points").set(edge_points);
   output("boundary_points").set(boundary_points);
+  output("roofplane_ids").set(plane_idx);
 }
 
 void Ring2SegmentsNode::process() {
@@ -1139,7 +1140,7 @@ void arr_insert_polygon(Arrangement_2& arr, const linereg::Polygon_2& polygon) {
 
 void BuildArrFromRingsExactNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
-  auto rings = input("rings").get<std::vector<linereg::Polygon_2>>();
+  auto rings = input("rings").get<std::unordered_map<size_t, linereg::Polygon_2>>();
   // auto plane_idx = input("plane_idx").get<vec1i>();
   auto points_per_plane = input("pts_per_roofplane").get<std::unordered_map<int, std::vector<Point>>>();
 
@@ -1169,12 +1170,14 @@ void BuildArrFromRingsExactNode::process() {
     Arrangement_2 arr_overlay;
     size_t i=0;
     // NOTE: rings and points_per_plane must be aligned!! (matching length and order)
-    for (auto& kv : points_per_plane) {
-      if (kv.first==-1) continue;
-      auto& polygon = rings[i++];
+    for (auto& kv : rings) {
+      auto plane_id = kv.first;
+      if (plane_id<1) continue;
+      auto& polygon = kv.second;
       if (polygon.size()>2) {
-        auto plane_id = kv.first;
-        auto& points = kv.second;
+        
+        auto& points = points_per_plane[plane_id];
+        if (points.size()==0) continue;
         std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
           return p1.z() < p2.z();
         });
@@ -1483,10 +1486,11 @@ inline size_t DetectLinesNode::detect_lines_ring_m2(linedect::LineDetector& LD, 
 
 void DetectLinesNode::process(){
   auto input_geom = input("edge_points");
+  
 
   SegmentCollection edge_segments, lines3d;
   vec1i ring_order, ring_id, is_start;
-  std::vector<std::vector<size_t>> ring_idx;
+  std::unordered_map<size_t,std::vector<size_t>> ring_idx;
   // fit lines in all input points
   if (input_geom.connected_type == typeid(PointCollection)) {
     std::vector<linedect::Point> cgal_pts;
@@ -1501,13 +1505,13 @@ void DetectLinesNode::process(){
   // fit lines per ring
   } else if (input_geom.connected_type == typeid(LinearRingCollection)) {
     auto rings = input_geom.get<LinearRingCollection>();
+    auto roofplane_ids = input("roofplane_ids").get<vec1i>();
     int n = param<int>("k");
-    ring_idx.resize(rings.size());
     
     size_t ring_cntr=0;
-    size_t seg_cntr=0;
+    size_t seg_cntr=0, plane_id;
     for (auto& ring : rings) {
-      
+      plane_id = roofplane_ids[ring_cntr++];
       std::vector<linedect::Point> cgal_pts;
       for( auto& p : ring ) {
         cgal_pts.push_back(linedect::Point(p[0], p[1], p[2]));
@@ -1540,15 +1544,14 @@ void DetectLinesNode::process(){
 
         for (size_t j=0; j<n_detected; ++j) {
           // edge_segments.push_back(ring_edges[j]);
-          ring_idx[ring_cntr].push_back(seg_cntr++);
+          ring_idx[plane_id].push_back(seg_cntr++);
           ring_order.push_back(j);
-          ring_id.push_back(ring_cntr);
+          ring_id.push_back(plane_id);
           ring_order.push_back(j);
-          ring_id.push_back(ring_cntr);
+          ring_id.push_back(plane_id);
           is_start.push_back(1);
           is_start.push_back(0);
         }
-        ++ring_cntr;
         // std::cout << "number of shapes: " << LD.segment_shapes.size() <<"\n";
         // std::cout << "number of segments: " << order_cnt <<"\n";
       }
@@ -2083,7 +2086,7 @@ void chain(Segment& a, Segment& b, LinearRing& ring, const float& snap_threshold
 void RegulariseRingsNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto edges = input("edge_segments").get<SegmentCollection>();
-  auto ring_idx = input("ring_idx").get<std::vector<std::vector<size_t>>>();
+  auto ring_idx = input("ring_idx").get<std::unordered_map<size_t,std::vector<size_t>>>();
   auto footprint = input("footprint").get<LinearRing>();
   // auto ring_id = input("ring_id").get<vec1i>();
   // auto ring_order = input("ring_order").get<vec1i>();
@@ -2116,11 +2119,10 @@ void RegulariseRingsNode::process(){
   LR.angle_threshold = param<float>("angle_threshold");
   LR.cluster(param<bool>("weighted_avg"), param<bool>("angle_per_distcluster"));
 
-  std::vector<linereg::Polygon_2> exact_polygons;
+  std::unordered_map<size_t, linereg::Polygon_2> exact_polygons;
   for (auto& idx : ring_idx) {
-    exact_polygons.push_back(
-      linereg::chain_ring<linereg::EK>(idx, LR.get_segments(0), param<float>("snap_threshold"))
-    );
+    exact_polygons[idx.first] = 
+      linereg::chain_ring<linereg::EK>(idx.second, LR.get_segments(0), param<float>("snap_threshold"));
     // std::cout << "ch ring size : "<< exact_polygons.back().size() << ", " << exact_polygons.back().is_simple() << "\n";
   }
   // std::cout << "ch fp size : "<< exact_fp.size() << ", " << exact_fp.is_simple() << "\n";
@@ -2140,7 +2142,7 @@ void RegulariseRingsNode::process(){
   LinearRingCollection lrc;
   for (auto& poly : exact_polygons) {
     LinearRing lr;
-    for (auto p=poly.vertices_begin(); p!=poly.vertices_end(); ++p) {
+    for (auto p=poly.second.vertices_begin(); p!=poly.second.vertices_end(); ++p) {
       lr.push_back({
         float(CGAL::to_double(p->x())),
         float(CGAL::to_double(p->y())),
