@@ -477,6 +477,8 @@ void ExtruderNode::process(){
 
         auto h1 = edge->face()->data().elevation_avg;
         auto h2 = edge->twin()->face()->data().elevation_avg;
+        if (left && !right) h1=0;
+        if (!left && right) h2=0;
         // push 2 triangles to form the quad between lower and upper edges
         // notice that this is not always topologically correct, but fine for visualisation
         
