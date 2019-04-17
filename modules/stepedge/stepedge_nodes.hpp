@@ -533,6 +533,7 @@ namespace geoflow::nodes::stepedge {
       // add_output("rings_out", typeid(LinearRingCollection));
       // add_output("footprint_out", typeid(LinearRing));
       add_output("rings_out", typeid(LinearRingCollection));
+      add_output("plane_id", typeid(vec1i));
       add_output("exact_rings_out", typeid(std::unordered_map<size_t, linereg::Polygon_2>));
       add_output("exact_footprint_out", typeid(linereg::Polygon_2));
       // add_output("footprint_labels", typeid(vec1i));

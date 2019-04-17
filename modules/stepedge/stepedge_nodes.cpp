@@ -156,7 +156,6 @@ void AlphaShapeNode::process(){
   vec1i segment_ids, plane_idx;
   for (auto& it : points_per_segment ) {
     if (it.first == -1) continue; // skip points if they put at index -1 (eg if we care not about slanted surfaces for ring extraction)
-    plane_idx.push_back(it.first);
     auto points = it.second;
     as::Triangulation_2 T;
     T.insert(points.begin(), points.end());
@@ -240,6 +239,7 @@ void AlphaShapeNode::process(){
       } while (v_next != v_start);
       // finally, store the ring 
       alpha_rings.push_back(ring);
+      plane_idx.push_back(it.first);
     }
   }
   
@@ -2140,6 +2140,7 @@ void RegulariseRingsNode::process(){
   }
 
   LinearRingCollection lrc;
+  vec1i plane_ids;
   for (auto& poly : exact_polygons) {
     LinearRing lr;
     for (auto p=poly.second.vertices_begin(); p!=poly.second.vertices_end(); ++p) {
@@ -2148,10 +2149,12 @@ void RegulariseRingsNode::process(){
         float(CGAL::to_double(p->y())),
         0
       });
+      plane_ids.push_back(poly.first);
     }
     lrc.push_back(lr);
   }
   output("rings_out").set(lrc);
+  output("plane_id").set(plane_ids);
 
   SegmentCollection new_segments;
   vec1i priorities;
