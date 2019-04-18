@@ -143,7 +143,7 @@ namespace as {
 namespace geoflow::nodes::stepedge {
 
 void AlphaShapeNode::process(){
-  auto points_per_segment = input("pts_per_roofplane").get<std::unordered_map<int, std::vector<Point>>>();
+  auto points_per_segment = input("pts_per_roofplane").get<std::unordered_map<int, std::pair<Plane, std::vector<Point>>>>();
 
   auto thres_alpha = param<float>("thres_alpha");
   auto optimal_alpha = param<bool>("optimal_alpha");
@@ -156,7 +156,7 @@ void AlphaShapeNode::process(){
   vec1i segment_ids, plane_idx;
   for (auto& it : points_per_segment ) {
     if (it.first == -1) continue; // skip points if they put at index -1 (eg if we care not about slanted surfaces for ring extraction)
-    auto points = it.second;
+    auto points = it.second.second;
     as::Triangulation_2 T;
     T.insert(points.begin(), points.end());
     as::Alpha_shape_2 A(T,
@@ -446,7 +446,14 @@ void ExtruderNode::process(){
         for (size_t i=0; i<indices.size()/3; ++i) {
           Triangle triangle;
           for (size_t j=0; j<3; ++j) {
-            triangle[j] = {vertices[i*3+j][0], vertices[i*3+j][1], face->data().elevation_avg};
+            auto& px = vertices[i*3+j][0];
+            auto& py = vertices[i*3+j][1];
+            float h;
+            auto& plane = face->data().plane;
+            if (param<bool>("LoD2")) {
+              h = (plane.a()*px + plane.b()*py + plane.d()) / (-plane.c());
+            } else h = face->data().elevation_avg;
+            triangle[j] = {px, py, h};
             labels.push_back(1);
             normals.push_back({0,0,1});
             cell_id_vec1i.push_back(cell_id);
@@ -960,8 +967,7 @@ void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
     for (auto& kv : face_map) {
       std::stack<Face_handle> candidate_stack;
       // std::cout << "Growing face with elevation=" << kv.first << "\n";
-      auto& cur_segid = kv.second->data().segid;
-      auto& cur_elev = kv.second->data().elevation_avg;
+      auto& cur_data = kv.second->data();
       candidate_stack.push(kv.second);
       while (!candidate_stack.empty()) {
         auto fh = candidate_stack.top(); candidate_stack.pop();
@@ -978,8 +984,7 @@ void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
           if (!he->data().blocks) {
             auto candidate = he->twin()->face();
             if (candidate->data().segid == 0 && candidate->data().in_footprint) {
-              candidate->data().segid = cur_segid;
-              candidate->data().elevation_avg = cur_elev;
+              candidate->data() = cur_data;
               candidate_stack.push(candidate);
             }
           }
@@ -1002,11 +1007,9 @@ void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
           // should add face merge call back in face observer class...
           // pick elevation of the segment with the highest count
           if (f2->data().elevation_avg < f1->data().elevation_avg) {
-            f2->data().elevation_avg = f1->data().elevation_avg;
-            f2->data().segid = f1->data().segid;
+            f2->data()= f1->data();
           } else {
-            f1->data().elevation_avg = f2->data().elevation_avg;
-            f1->data().segid = f2->data().segid;
+            f1->data() = f2->data();
           }
           arr.remove_edge(edge);
         }
@@ -1144,7 +1147,7 @@ void BuildArrFromRingsExactNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto rings = input("rings").get<std::unordered_map<size_t, linereg::Polygon_2>>();
   // auto plane_idx = input("plane_idx").get<vec1i>();
-  auto points_per_plane = input("pts_per_roofplane").get<std::unordered_map<int, std::vector<Point>>>();
+  auto points_per_plane = input("pts_per_roofplane").get<std::unordered_map<int, std::pair<Plane, std::vector<Point>>>>();
 
   auto fp_in = input("footprint");
   linereg::Polygon_2 footprint;
@@ -1159,7 +1162,7 @@ void BuildArrFromRingsExactNode::process() {
 
   Arrangement_2 arr_base;
   {
-    Face_index_observer obs (arr_base, true, 0, 0);
+    Face_index_observer obs (arr_base, true, 0, 0, Plane());
     insert(arr_base, footprint.edges_begin(), footprint.edges_end());
     // arr_insert_polygon(arr_base, footprint);
     // insert_non_intersecting_curves(arr_base, footprint.edges_begin(), footprint.edges_end());
@@ -1178,7 +1181,8 @@ void BuildArrFromRingsExactNode::process() {
       auto& polygon = kv.second;
       if (polygon.size()>2) {
         
-        auto& points = points_per_plane[plane_id];
+        auto& points = points_per_plane[plane_id].second;
+        auto& plane = points_per_plane[plane_id].first;
         if (points.size()==0) continue;
         std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
           return p1.z() < p2.z();
@@ -1187,7 +1191,7 @@ void BuildArrFromRingsExactNode::process() {
 
         // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
         Arrangement_2 arr;
-        Face_index_observer obs (arr, false, plane_id, points[elevation_id].z());
+        Face_index_observer obs (arr, false, plane_id, points[elevation_id].z(), plane);
         insert(arr, polygon.edges_begin(), polygon.edges_end());
         // arr_insert_polygon(arr, polygon);
 
@@ -1206,7 +1210,7 @@ void BuildArrFromRingsExactNode::process() {
   if(param<bool>("snap_clean_fp")) arr_snapclean_from_fp(arr_base);
 
   if(param<bool>("extrude_unsegmented") && points_per_plane.count(-1)) {
-    arr_assign_pts_to_unsegmented(arr_base, points_per_plane[-1]);
+    arr_assign_pts_to_unsegmented(arr_base, points_per_plane[-1].second);
   }
   auto nosegid_area = arr_measure_nosegid(arr_base);
   
@@ -1648,10 +1652,10 @@ void DetectPlanesNode::process() {
   PD.detect();
 
   // classify horizontal/vertical planes using plane normals
-  std::unordered_map<int, std::vector<Point>> pts_per_roofplane;
+  std::unordered_map<int, std::pair<Plane, std::vector<Point>>> pts_per_roofplane;
   size_t horiz_roofplane_cnt=0;
   size_t slant_roofplane_cnt=0;
-  if (param<bool>("only_horizontal")) pts_per_roofplane[-1] = std::vector<Point>();
+  if (param<bool>("only_horizontal")) pts_per_roofplane[-1].second = std::vector<Point>();
   size_t horiz_pt_cnt=0, total_pt_cnt=0;
   for(auto seg: PD.segment_shapes){
     auto& plane = seg.second;
@@ -1667,11 +1671,12 @@ void DetectPlanesNode::process() {
       total_pt_cnt += segpts.size();
       if (!param<bool>("only_horizontal") ||
           (param<bool>("only_horizontal") && is_horizontal)) {
-        pts_per_roofplane[seg.first] = segpts;
+        pts_per_roofplane[seg.first].second = segpts;
+        pts_per_roofplane[seg.first].first = plane;
         horiz_pt_cnt += segpts.size();
       } else if (!is_horizontal) {
-        pts_per_roofplane[-1].insert(
-          pts_per_roofplane[-1].end(),
+        pts_per_roofplane[-1].second.insert(
+          pts_per_roofplane[-1].second.end(),
           segpts.begin(),
           segpts.end()
         );

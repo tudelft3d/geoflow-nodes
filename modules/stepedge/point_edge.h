@@ -118,6 +118,7 @@ struct FaceInfo {
   float rms_error_to_avg=0;
   float max_error=0;
   float total_count;
+  Plane plane;
 };
 struct EdgeInfo {
   bool blocks = false;
@@ -142,18 +143,14 @@ struct overlay_functor {
     r.is_finite = true;
 
     if (a.segid!=0 && b.segid==0) {
-      r.segid = a.segid;
-      r.elevation_avg = a.elevation_avg;
+      r = a;
     } else if (a.segid==0 && b.segid!=0) {
-      r.segid = b.segid;
-      r.elevation_avg = b.elevation_avg;
+      r = b;
     } else if (a.segid!=0 && b.segid!=0) { // we need to merge 2 faces with a plane
       if (a.elevation_avg > b.elevation_avg) {
-        r.elevation_avg = a.elevation_avg;
-        r.segid = a.segid;
+        r=a;
       } else {
-        r.elevation_avg = b.elevation_avg;
-        r.segid = b.segid;
+        r=b;
       }
     }
 
@@ -182,10 +179,11 @@ private:
   size_t  plane_id;
   bool    in_footprint;
   float   elevation=0;
+  Plane   plane;
 public:
-  Face_index_observer (Arrangement_2& arr, bool is_footprint, size_t pid, float elevation) :
+  Face_index_observer (Arrangement_2& arr, bool is_footprint, size_t pid, float elevation, Plane plane) :
     CGAL::Arr_observer<Arrangement_2> (arr),
-    n_faces (0), in_footprint(is_footprint), plane_id(pid), elevation(elevation)
+    n_faces (0), in_footprint(is_footprint), plane_id(pid), elevation(elevation), plane(plane)
   {
     CGAL_precondition (arr.is_empty());
     arr.unbounded_face()->data().is_finite=false;
@@ -199,6 +197,7 @@ public:
     new_face->data().is_finite = true;
     new_face->data().segid = plane_id;
     new_face->data().elevation_avg = elevation;
+    new_face->data().plane = plane;
     n_faces++;
   }
 };
