@@ -80,34 +80,37 @@ struct Region {
   size_t count=0;
 };
 
-class TesterMAT_bisector {
+class AngleOfVectorsTester {
   public:
   float threshold;
-  TesterMAT_bisector(float threshold=5) : 
+  AngleOfVectorsTester(float threshold=5) : 
   threshold(glm::cos(threshold*(3.14159265359/180))) {};
 
   bool is_valid(MaData& cds, size_t candidate, size_t neighbour, Region& shape) {
     auto b1 = glm::make_vec3(cds.ma_bisector[candidate].data());
     auto b2 = glm::make_vec3(cds.ma_bisector[neighbour].data());
-    return glm::dot(b1,b2) < threshold;
+    return glm::dot(b1,b2) > threshold;
   }
 };
-class TesterMAT_sepangle {
+class DiffOfAnglesTester {
   public:
   float threshold;
-  TesterMAT_sepangle(float threshold=5) : 
+  DiffOfAnglesTester(float threshold=5) : 
   threshold(threshold*(3.14159265359/180)) {};
 
   bool is_valid(MaData& cds, size_t candidate, size_t neighbour, Region& shape) {
     auto a1 = cds.ma_sepangle[candidate];
     auto a2 = cds.ma_sepangle[neighbour];
+    // auto b1 = glm::make_vec3(cds.ma_points[candidate].data());
+    // auto b2 = glm::make_vec3(cds.ma_points[neighbour].data());
+    // std::cout << "neighbour " << neighbour << " of candidate " << candidate << ", dist: " << glm::distance(b1,b2) << "\n";
     return glm::abs(a1-a2) < threshold;
   }
 };
-class Tester_count {
+class CountTester {
   public:
   size_t threshold;
-  Tester_count(size_t threshold=50) : 
+  CountTester(size_t threshold=50) : 
   threshold(threshold) {};
 
   bool is_valid(MaData& cds, size_t candidate, size_t neighbour, Region& shape) {

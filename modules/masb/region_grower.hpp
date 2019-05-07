@@ -26,21 +26,22 @@ namespace regiongrower {
   // };
 
 // typename std::enable_if<std::is_base_of<Implementation, T>::value, bool>::type 
-  template <typename candidateDS, typename handleType, typename regionType> class RegionGrower {
+  template <typename candidateDS, typename regionType> class RegionGrower {
     public:
-    unordered_map<handleType, size_t> region_ids;
+    vector<size_t> region_ids;
     vector<regionType> regions;
     size_t min_segment_count=15;
+    size_t cur_region_id=1;
 
     private:
-    template <typename Tester> inline bool grow_one_region(candidateDS& cds, Tester& tester, handleType& seed_handle) {
-      deque<handleType> candidates;
-      vector<handleType> handles_in_region;
+    template <typename Tester> inline bool grow_one_region(candidateDS& cds, Tester& tester, size_t& seed_handle) {
+      deque<size_t> candidates;
+      vector<size_t> handles_in_region;
       regions.push_back(regionType());
 
       candidates.push_back(seed_handle);
       handles_in_region.push_back(seed_handle);
-      region_ids[seed_handle] = regions.size();
+      region_ids[seed_handle] = cur_region_id;//regions.size();
 
       while (candidates.size()>0) {
         auto candidate = candidates.front(); candidates.pop_front();
@@ -49,9 +50,8 @@ namespace regiongrower {
           if (tester.is_valid(cds, candidate, neighbour, regions.back())) {
             candidates.push_back(neighbour);
             handles_in_region.push_back(neighbour);
-            region_ids[neighbour] = regions.size();
+            region_ids[neighbour] = cur_region_id;//regions.size();
           }
-
         }
       }
       // undo region if it doesn't satisfy quality criteria
@@ -66,12 +66,9 @@ namespace regiongrower {
     public:
     template <typename Tester> void grow_regions(candidateDS& cds, Tester& tester) {
       std::vector<size_t> new_regions;
-      std::deque<handleType> seeds = cds.get_seeds();
+      std::deque<size_t> seeds = cds.get_seeds();
 
-      // get candidate points
-      for (auto& i : seeds) {
-        region_ids.emplace(make_pair(i,0));
-      }
+      region_ids.resize(cds.size, 0);
       // first region means unsegmented
       regions.push_back(regionType());
 
@@ -81,6 +78,7 @@ namespace regiongrower {
         seeds.erase(seeds.begin());
         if (region_ids[idx]==0) {
           grow_one_region(cds, tester, idx);
+          ++cur_region_id;
         }
       }
     };

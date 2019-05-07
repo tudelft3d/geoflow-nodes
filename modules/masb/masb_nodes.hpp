@@ -61,6 +61,40 @@ namespace geoflow::nodes::mat {
     void process();
   };
 
+  class TestPointsNode:public Node {
+    public:
+    using Node::Node;
+    void init() {
+      add_output("points", typeid(PointCollection));
+      add_output("normals", typeid(vec3f));
+      add_output("values", typeid(vec1f));
+      add_param("grid", (int) 10);
+    }
+    void gui(){
+      ImGui::InputInt("grid", &param<int>("grid"));
+    }
+    void process() {
+      PointCollection points;
+      vec3f normals;
+      vec1f values;
+      auto& N = param<int>("grid");
+      for(int i = 0; i<N; ++i) {
+        for(int j = 0; j<N; ++j) {
+          points.push_back({float(i),float(j),0});
+          normals.push_back({0,0,1});
+          values.push_back(0);
+
+          points.push_back({0,float(j),float(i)});
+          normals.push_back({1,0,0});
+          values.push_back(42);
+        }
+      }
+      output("normals").set(normals);
+      output("points").set(points);
+      output("values").set(values);
+    }
+  };
+
   class SegmentMedialAxisNode:public Node {
     public:
     using Node::Node;

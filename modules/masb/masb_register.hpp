@@ -7,6 +7,7 @@ namespace geoflow::nodes::mat {
     R->register_node<ComputeMedialAxisNode>("ComputeMedialAxisNode");
     R->register_node<ComputeNormalsNode>("ComputeNormalsNode");
     R->register_node<SegmentMakerNode>("SegmentMaker");
+    R->register_node<TestPointsNode>("TestPoints");
     R->register_node<SegmentMedialAxisNode>("SegmentMedialAxis");
     return R;
   }
