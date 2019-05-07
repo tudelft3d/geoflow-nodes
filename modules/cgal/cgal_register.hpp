@@ -16,6 +16,7 @@ namespace geoflow::nodes::cgal {
     R->register_node<SimplifyLinesNode>("SimplifyLines");
     R->register_node<SimplifyFootprintsCDTNode>("SimplifyFootprintsCDT");
     R->register_node<PLYWriterNode>("PLYWriter");
+    R->register_node<PLYReaderNode>("PLYReader");
     R->register_node<IsoLineNode>("IsoLine");
     R->register_node<IsoLineSlicerNode>("IsoLineSlicer");
     R->register_node<LineHeightNode>("LineHeight");

@@ -739,6 +739,43 @@ void PLYWriterNode::process() {
   f.close();
 }
 
+void PLYReaderNode::process() {
+  typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
+  typedef Kernel::Point_3 Point;
+  typedef Kernel::Vector_3 Vector;
+  typedef boost::tuple<Point, Vector> PL;
+  typedef CGAL::Nth_of_tuple_property_map<0, PL> Point_map;
+  typedef CGAL::Nth_of_tuple_property_map<1, PL> Normal_map;
+  // typedef CGAL::Nth_of_tuple_property_map<1, PL> Label_map;
+  typedef std::vector<PL>                        PN_vector;
+
+  auto filepath = param<std::string>("filepath");
+  
+  PN_vector pn_points;
+
+  std::ifstream f(filepath);
+
+  if (!f || !CGAL::read_ply_points_with_properties
+    (f, std::back_inserter(pn_points),
+     CGAL::make_ply_point_reader (Point_map()),
+     CGAL::make_ply_normal_reader (Normal_map())
+    )) {
+      std::cerr << "Error: cannot read file " << filepath << std::endl;
+    }
+  f.close();
+
+  PointCollection points;
+  vec3f normals;
+  for (auto& pn : pn_points) {
+    auto& p = boost::get<0>(pn);
+    auto& n = boost::get<1>(pn);
+    points.push_back({float(p.x()), float(p.y()), float(p.z())});
+    normals.push_back({float(n.x()), float(n.y()), float(n.z())});
+  }
+  output("points").set(points);
+  output("normals").set(normals);
+}
+
 vec3f create_line(CGAL::Point_3<K> p1, CGAL::Point_3<K> p2, float z) {
   vec3f line_vec3f;
   line_vec3f.push_back({ float(p1.x()),float(p1.y()), z });
