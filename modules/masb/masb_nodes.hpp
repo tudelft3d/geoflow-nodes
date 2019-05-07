@@ -18,7 +18,6 @@ namespace geoflow::nodes::mat {
       add_output("ma_radii", typeid(vec1f));
       add_output("ma_qidx", typeid(vec1i));
       add_output("ma_is_interior", typeid(vec1i));
-      add_output("ma_is_interior", typeid(vec1i));
       add_output("ma_sepangle", typeid(vec1f));
       add_output("ma_bisector", typeid(vec3f));
       add_output("ma_spoke_f1", typeid(vec3f));
@@ -58,6 +57,33 @@ namespace geoflow::nodes::mat {
       add_output("segments", typeid(SegmentCollection));
     }
     void gui(){
+    }
+    void process();
+  };
+
+  class SegmentMedialAxisNode:public Node {
+    public:
+    using Node::Node;
+    void init() {
+      add_input("ma_coords", typeid(PointCollection));
+      add_input("ma_bisector", typeid(vec3f));
+      add_input("ma_sepangle", typeid(vec1f));
+      add_output("segment_ids", typeid(vec1i));
+
+      add_param("shape_count", (int) 15);
+      add_param("min_count", (int) 10);
+      add_param("bisector_angle", (float) 5);
+      add_param("separation_angle", (float) 5);
+      add_param("k", (int) 10);
+      add_param("method", (int) 0);
+    }
+    void gui(){
+      ImGui::SliderInt("k", &param<int>("k"), 0, 100);
+      ImGui::SliderInt("min_count", &param<int>("min_count"), 1, 1000);
+      ImGui::Combo("method", &param<int>("method"), "bisector\0sepangle\0count\0\0");
+      ImGui::SliderFloat("bisector_angle", &param<float>("bisector_angle"), 0, 180);
+      ImGui::SliderFloat("separation_angle", &param<float>("separation_angle"), 0, 180);
+      ImGui::SliderInt("shape_count", &param<int>("shape_count"), 1, 1000);
     }
     void process();
   };

@@ -1,0 +1,88 @@
+#pragma once
+
+#include <unordered_map>
+#include <deque>
+#include <type_traits>
+
+namespace regiongrower {
+
+  // search structure for nn queries with traits to get nn qeury result
+  // input points with traits to retreive them using index or handle
+  // a way to hold results
+  // validate candidate function that uses input point retrieval traits to get information about the points
+  // eg define a class name and some trait specialisations for that class 
+
+  using namespace std;
+
+  // typedef vector<vector<size_t>> NeighbourVec;
+
+  // template <typename handleType> class CandidateDatastructure {
+  //   virtual vector<handleType> get_candidates() = 0;
+  //   virtual vector<handleType> get_neighbours(handleType) = 0;
+  // };
+
+  // template <typename candidateDS, typename handleType, typename regionType> class CandidateTester {
+  //   virtual bool is_valid(candidateDS& cds, handleType candidate, handleType neighbour, regionType& shape) = 0;
+  // };
+
+// typename std::enable_if<std::is_base_of<Implementation, T>::value, bool>::type 
+  template <typename candidateDS, typename handleType, typename regionType> class RegionGrower {
+    public:
+    unordered_map<handleType, size_t> region_ids;
+    vector<regionType> regions;
+    size_t min_segment_count=15;
+
+    private:
+    template <typename Tester> inline bool grow_one_region(candidateDS& cds, Tester& tester, handleType& seed_handle) {
+      deque<handleType> candidates;
+      vector<handleType> handles_in_region;
+      regions.push_back(regionType());
+
+      candidates.push_back(seed_handle);
+      handles_in_region.push_back(seed_handle);
+      region_ids[seed_handle] = regions.size();
+
+      while (candidates.size()>0) {
+        auto candidate = candidates.front(); candidates.pop_front();
+        for (auto neighbour: cds.get_neighbours(candidate)) {
+          if (region_ids[neighbour]!=0) continue;
+          if (tester.is_valid(cds, candidate, neighbour, regions.back())) {
+            candidates.push_back(neighbour);
+            handles_in_region.push_back(neighbour);
+            region_ids[neighbour] = regions.size();
+          }
+
+        }
+      }
+      // undo region if it doesn't satisfy quality criteria
+      if (handles_in_region.size() < min_segment_count) {
+        regions.erase(regions.end()-1);
+        for (auto handle: handles_in_region)
+          region_ids[handle] = 0;
+        return false;
+      } return true;
+    };
+
+    public:
+    template <typename Tester> void grow_regions(candidateDS& cds, Tester& tester) {
+      std::vector<size_t> new_regions;
+      std::deque<handleType> seeds = cds.get_seeds();
+
+      // get candidate points
+      for (auto& i : seeds) {
+        region_ids.emplace(make_pair(i,0));
+      }
+      // first region means unsegmented
+      regions.push_back(regionType());
+
+      // region growing from seed points
+      while (seeds.size()>0) {
+        auto idx = seeds.front();
+        seeds.erase(seeds.begin());
+        if (region_ids[idx]==0) {
+          grow_one_region(cds, tester, idx);
+        }
+      }
+    };
+  };
+}

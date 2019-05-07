@@ -1,6 +1,8 @@
 #include "masb_nodes.hpp"
-#include <cmath>
+#include "region_grower.hpp"
+#include "region_grower_mat.hpp"
 
+#include <cmath>
 #include <algorithm>
 
 namespace geoflow::nodes::mat {
@@ -133,6 +135,41 @@ void SegmentMakerNode::process(){
     segments.push_back({sources[i], target});
   }
   output("segments").set(segments);
+}
+
+void SegmentMedialAxisNode::process() {
+  auto ma_coords = input("ma_coords").get<PointCollection>();
+  auto ma_bisector = input("ma_bisector").get<vec3f>();
+  auto ma_sepangle = input("ma_sepangle").get<vec1f>();
+
+  regiongrower::RegionGrower<MaData,size_t,Region> R;
+  R.min_segment_count = param<int>("min_count");
+
+  MaData D(ma_coords, ma_bisector, ma_sepangle, param<int>("k"));
+
+  switch (param<int>("method"))
+  {
+  case 0:{
+    TesterMAT_bisector T_bisector_angle(param<float>("bisector_angle"));
+    R.grow_regions(D, T_bisector_angle);
+    break;}
+  case 1:{
+    TesterMAT_sepangle T_separation_angle(param<float>("separation_angle"));
+    R.grow_regions(D, T_separation_angle);
+    break;}
+  case 2:{
+    Tester_count T_shape_count(param<int>("shape_count"));
+    R.grow_regions(D, T_shape_count);
+    break;}
+  default:
+    break;
+  };
+  
+  vec1i segment_ids;
+  for(auto& [point_id, region_id] : R.region_ids) {
+    segment_ids.push_back(region_id);
+  }
+  output("segment_ids").set(segment_ids);
 }
 
 }
