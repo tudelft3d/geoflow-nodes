@@ -6,24 +6,7 @@
 
 namespace regiongrower {
 
-  // search structure for nn queries with traits to get nn qeury result
-  // input points with traits to retreive them using index or handle
-  // a way to hold results
-  // validate candidate function that uses input point retrieval traits to get information about the points
-  // eg define a class name and some trait specialisations for that class 
-
   using namespace std;
-
-  // typedef vector<vector<size_t>> NeighbourVec;
-
-  // template <typename handleType> class CandidateDatastructure {
-  //   virtual vector<handleType> get_candidates() = 0;
-  //   virtual vector<handleType> get_neighbours(handleType) = 0;
-  // };
-
-  // template <typename candidateDS, typename handleType, typename regionType> class CandidateTester {
-  //   virtual bool is_valid(candidateDS& cds, handleType candidate, handleType neighbour, regionType& shape) = 0;
-  // };
 
 // typename std::enable_if<std::is_base_of<Implementation, T>::value, bool>::type 
   template <typename candidateDS, typename regionType> class RegionGrower {

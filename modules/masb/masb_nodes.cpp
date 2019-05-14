@@ -1,6 +1,6 @@
 #include "masb_nodes.hpp"
 #include "region_grower.hpp"
-#include "region_grower_mat.hpp"
+#include "region_grower_testers.hpp"
 
 #include <cmath>
 #include <algorithm>
@@ -137,32 +137,32 @@ void SegmentMakerNode::process(){
   output("segments").set(segments);
 }
 
-void SegmentMedialAxisNode::process() {
+void RegionGrowMedialAxisNode::process() {
   auto ma_coords = input("ma_coords").get<PointCollection>();
   auto ma_bisector = input("ma_bisector").get<vec3f>();
   auto ma_sepangle = input("ma_sepangle").get<vec1f>();
+  auto ma_radii = input("ma_radii").get<vec1f>();
 
   regiongrower::RegionGrower<MaData,Region> R;
   R.min_segment_count = param<int>("min_count");
 
-  MaData D(ma_coords, ma_bisector, ma_sepangle, param<int>("k"));
+  MaData D(ma_coords, ma_bisector, ma_sepangle, ma_radii, param<int>("k"));
 
   switch (param<int>("method"))
   {
-  case 0:{
+  case 0: {
     AngleOfVectorsTester T_bisector_angle(param<float>("bisector_angle"));
-    R.grow_regions(D, T_bisector_angle);
-    break;}
-  case 1:{
+    R.grow_regions(D, T_bisector_angle); break;
+  } case 1: {
     DiffOfAnglesTester T_separation_angle(param<float>("separation_angle"));
-    R.grow_regions(D, T_separation_angle);
-    break;}
-  case 2:{
+    R.grow_regions(D, T_separation_angle); break;
+  } case 2: {
+    BallOverlapTester T_ball_overlap(param<float>("ball_overlap"));
+    R.grow_regions(D, T_ball_overlap); break;
+  } case 3: {
     CountTester T_shape_count(param<int>("shape_count"));
-    R.grow_regions(D, T_shape_count);
-    break;}
-  default:
-    break;
+    R.grow_regions(D, T_shape_count); break;
+  } default: break;
   };
   
   vec1i segment_ids;

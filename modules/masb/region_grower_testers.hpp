@@ -32,10 +32,12 @@ class MaData {
   geoflow::PointCollection& ma_points;
   geoflow::vec3f& ma_bisector;
   geoflow::vec1f& ma_sepangle;
+  geoflow::vec1f& ma_radii;
   vecvecui neighbours;
   size_t size;
   
-  MaData(geoflow::PointCollection& ma_points, geoflow::vec3f& ma_bisector, geoflow::vec1f& ma_sepangle, size_t N=15) : ma_points(ma_points), ma_bisector(ma_bisector), ma_sepangle(ma_sepangle)
+  MaData(geoflow::PointCollection& ma_points, geoflow::vec3f& ma_bisector, geoflow::vec1f& ma_sepangle, geoflow::vec1f& ma_radii, size_t N=15) 
+    : ma_points(ma_points), ma_bisector(ma_bisector), ma_sepangle(ma_sepangle), ma_radii(ma_radii)
   {
     size = ma_points.size();
     
@@ -105,6 +107,21 @@ class DiffOfAnglesTester {
     // auto b2 = glm::make_vec3(cds.ma_points[neighbour].data());
     // std::cout << "neighbour " << neighbour << " of candidate " << candidate << ", dist: " << glm::distance(b1,b2) << "\n";
     return glm::abs(a1-a2) < threshold;
+  }
+};
+class BallOverlapTester {
+  public:
+  float threshold;
+  BallOverlapTester(float threshold=1.2) : 
+  threshold(threshold) {};
+
+  bool is_valid(MaData& cds, size_t candidate, size_t neighbour, Region& shape) {
+    auto r1 = cds.ma_radii[candidate];
+    auto r2 = cds.ma_radii[neighbour];
+    auto c1 = glm::make_vec3(cds.ma_points[candidate].data());
+    auto c2 = glm::make_vec3(cds.ma_points[neighbour].data());
+    auto d = glm::distance(c1,c2);
+    return (r1+r2)/d > threshold;
   }
 };
 class CountTester {

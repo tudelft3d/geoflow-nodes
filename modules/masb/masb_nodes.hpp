@@ -95,29 +95,44 @@ namespace geoflow::nodes::mat {
     }
   };
 
-  class SegmentMedialAxisNode:public Node {
+  class RegionGrowMedialAxisNode:public Node {
     public:
     using Node::Node;
     void init() {
       add_input("ma_coords", typeid(PointCollection));
       add_input("ma_bisector", typeid(vec3f));
       add_input("ma_sepangle", typeid(vec1f));
+      add_input("ma_radii", typeid(vec1f));
       add_output("segment_ids", typeid(vec1i));
 
       add_param("shape_count", (int) 15);
       add_param("min_count", (int) 10);
       add_param("bisector_angle", (float) 5);
       add_param("separation_angle", (float) 5);
+      add_param("ball_overlap", (float) 1.2);
       add_param("k", (int) 10);
       add_param("method", (int) 0);
     }
     void gui(){
       ImGui::SliderInt("k", &param<int>("k"), 0, 100);
       ImGui::SliderInt("min_count", &param<int>("min_count"), 1, 1000);
-      ImGui::Combo("method", &param<int>("method"), "bisector\0sepangle\0count\0\0");
-      ImGui::SliderFloat("bisector_angle", &param<float>("bisector_angle"), 0, 180);
-      ImGui::SliderFloat("separation_angle", &param<float>("separation_angle"), 0, 180);
-      ImGui::SliderInt("shape_count", &param<int>("shape_count"), 1, 1000);
+      ImGui::Separator();
+      ImGui::Combo("method", &param<int>("method"), "bisector\0sepangle\0balloverlap\0count\0\0");
+      switch (param<int>("method")) {
+        case 0: {
+          ImGui::SliderFloat("bisector_angle", 
+          &param<float>("bisector_angle"), 0, 180); break;
+        } case 1: {
+          ImGui::SliderFloat("separation_angle", 
+          &param<float>("separation_angle"), 0, 180); break;
+        } case 2: {
+          ImGui::SliderFloat("ball_overlap", 
+          &param<float>("ball_overlap"), 0, 10); break;
+        } case 3: {
+          ImGui::SliderInt("shape_count", 
+          &param<int>("shape_count"), 1, 1000); break;
+        } default: break;
+      };
     }
     void process();
   };
