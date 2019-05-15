@@ -8,8 +8,7 @@ namespace geoflow::nodes::mat {
   class ComputeMedialAxisNode:public Node {
     public:
     masb::ma_parameters params;
-    float interval = 2;
-    double zero=0,pi=3.14;
+    const double zero=0,pi=3.14;
     using Node::Node;
     void init() {
       add_input("points", typeid(PointCollection));
@@ -23,12 +22,17 @@ namespace geoflow::nodes::mat {
       add_output("ma_spoke_f1", typeid(vec3f));
       add_output("ma_spoke_f2", typeid(vec3f));
       add_output("ma_spokecross", typeid(vec3f));
+
+      add_param("initial_radius", (float)200);
+      add_param("denoise_preserve", (float)((PI / 180.0) * 20));
+      add_param("denoise_planar", (float)((PI / 180.0) * 32));
+      add_param("nan_for_initr", (bool)false);
     }
-    void gui(){
-      ImGui::SliderFloat("initial_radius", &params.initial_radius, 0, 1000);
-      ImGui::SliderScalar("denoise_preserve", ImGuiDataType_Double, &params.denoise_preserve, &zero, &pi);
-      ImGui::SliderScalar("denoise_planar", ImGuiDataType_Double, &params.denoise_planar, &zero, &pi);
-      ImGui::Checkbox("nan_for_initr", &params.nan_for_initr);
+    void gui() {
+      ImGui::SliderFloat("initial_radius", &param<float>("initial_radius"), 0, 1000);
+      ImGui::SliderFloat("denoise_preserve", &param<float>("denoise_preserve"), 0, 3.1415);
+      ImGui::SliderFloat("denoise_planar", &param<float>("denoise_planar"), 0, 3.1415);
+      ImGui::Checkbox("nan_for_initr", &param<bool>("nan_for_initr"));
     }
     void process();
   };
@@ -55,8 +59,11 @@ namespace geoflow::nodes::mat {
       add_input("sources", typeid(PointCollection));
       add_input("directions", typeid(vec3f));
       add_output("segments", typeid(SegmentCollection));
+      
+      add_param("length", (float) 1.0);
     }
     void gui(){
+      ImGui::SliderFloat("Length multiplyer", &param<float>("length"), 0.01, 10);
     }
     void process();
   };

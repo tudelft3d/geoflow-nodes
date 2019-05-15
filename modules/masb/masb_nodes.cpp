@@ -11,6 +11,12 @@ void ComputeMedialAxisNode::process(){
   auto point_collection = input("points").get<PointCollection>();
   auto normals_vec3f = input("normals").get<vec3f>();
 
+  masb::ma_parameters params;
+  params.initial_radius = param<float>("initial_radius");
+  params.denoise_preserve = param<float>("denoise_preserve");
+  params.denoise_planar = param<float>("denoise_planar");
+  params.nan_for_initr = param<bool>("nan_for_initr");
+
   // prepare data structures and transfer data
   masb::ma_data madata;
   madata.m = point_collection.size();
@@ -125,13 +131,15 @@ void SegmentMakerNode::process(){
   auto sources = input("sources").get<PointCollection>();
   auto directions = input("directions").get<vec3f>();
 
+  auto& s = param<float>("length");
+
   if (sources.size()!=directions.size()) {
     return;
   }
 
   SegmentCollection segments;
   for(size_t i=0; i<sources.size(); ++i) {
-    arr3f target = {sources[i][0] + directions[i][0], sources[i][1] + directions[i][1], sources[i][2] + directions[i][2]};
+    arr3f target = {sources[i][0] + s*directions[i][0], sources[i][1] + s*directions[i][1], sources[i][2] + s*directions[i][2]};
     segments.push_back({sources[i], target});
   }
   output("segments").set(segments);
