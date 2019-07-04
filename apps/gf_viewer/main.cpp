@@ -6,12 +6,12 @@
 #include <geoflow/gui/flowchart.hpp>
 
 #include <geoflow/core/geoflow.hpp>
-#include <cgal_register.hpp>
-#include <gdal_register.hpp>
-#include <las_register.hpp>
-#include <stepedge_register.hpp>
-#include <masb_register.hpp>
-#include <utility_nodes.hpp>
+#include <cgal/cgal_register.hpp>
+#include <gdal/register.hpp>
+#include <las/las_register.hpp>
+#include <stepedge/stepedge_register.hpp>
+#include <masb/masb_register.hpp>
+#include <cityjson/utility_nodes.hpp>
 
 namespace gfn = geoflow::nodes;
 

@@ -2,7 +2,7 @@
 	path = thirdparty/geoflow
 	url = https://github.com/tudelft3d/geoflow.git
 [submodule "thirdparty/LAStools"]
-	path = thirdparty/LAStools
+	path = modules/las/thirdparty/LAStools
 	url = https://github.com/LAStools/LAStools.git
 [submodule "thirdparty/masbcpp"]
 	path = thirdparty/masbcpp

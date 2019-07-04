@@ -1,12 +1,29 @@
+cmake_minimum_required(VERSION 3.14)
+project (io-pointcloud VERSION 0.0.1)
 
-add_library(las_nodes STATIC
-  las_nodes.cpp
+add_definitions(-DGF_PLUGIN_NAME=\"${CMAKE_PROJECT_NAME}\")
+
+find_package(geoflow REQUIRED)
+
+# LASlib
+add_subdirectory(thirdparty/LAStools/LASlib/src)
+include_directories(
+  thirdparty/LAStools/LASlib/inc
+  thirdparty/LAStools/LASzip/inc
+  thirdparty/LAStools/LASzip/src
 )
-target_link_libraries( las_nodes
+
+add_library(gfp_las MODULE
+  las_nodes.cpp
+  plugin.cpp
+)
+target_link_libraries( gfp_las
   geoflow-core
   LASlib
 )
 set_target_properties(
-  las_nodes
+  gfp_las
   PROPERTIES CXX_STANDARD 17
 )
+
+install(TARGETS gfp_las DESTINATION ${geoflow_PLUGIN_FOLDER})

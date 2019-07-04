@@ -6,8 +6,6 @@
 namespace geoflow::nodes::las {
 
 void LASLoaderNode::process(){
-  auto filepath = param<std::string>("filepath");
-  auto thin_nth = param<int>("thin_nth");
 
   PointCollection points;
   vec1i classification;
@@ -53,8 +51,6 @@ void LASLoaderNode::process(){
 }
 
 void LASGroundLoaderNode::process() {
-  auto filepath = param<std::string>("filepath");
-  auto thin_nth = param<int>("thin_nth");
 
   PointCollection points;
   vec1i classification;
@@ -142,7 +138,6 @@ void LASWriterNode::write_point_cloud_collection(PointCollection& point_cloud, s
 }
 
 void LASWriterNode::process(){
-  auto filepath = param<std::string>("filepath");
 
   auto input_geom = input("point_clouds");
 

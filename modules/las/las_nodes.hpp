@@ -1,9 +1,10 @@
-#include <geoflow/core/geoflow.hpp>
-#include <geoflow/gui/osdialog.hpp>
+#include <geoflow/geoflow.hpp>
 
 namespace geoflow::nodes::las {
 
   class LASLoaderNode:public Node {
+    std::string filepath = "";
+    int thin_nth=5, thin_nth_min=0, thin_nth_max=100;
     public:
     using Node::Node;
     void init() {
@@ -11,33 +12,28 @@ namespace geoflow::nodes::las {
       add_output("classification", typeid(vec1i));
       add_output("intensity", typeid(vec1f));
 
-      add_param("filepath", (std::string) "");
-      add_param("thin_nth", (int)5);
-    }
-    void gui(){
-      ImGui::FilePicker(OSDIALOG_OPEN, param<std::string>("filepath"));
-      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 1, 100);
+      add_param("filepath", ParamPath(filepath));
+      add_param("thin_nth", ParamIntRange(thin_nth, thin_nth_min, thin_nth_max));
     }
     void process();
   };
 
   class LASGroundLoaderNode:public Node {
-  public:
+    std::string filepath = "";
+    int thin_nth=5, thin_nth_min=0, thin_nth_max=100;
+    public:
     using Node::Node;
     void init() {
       add_output("points", typeid(PointCollection));
 
-      add_param("filepath", (std::string) "");
-      add_param("thin_nth", (int)5);
-    }
-    void gui() {
-      ImGui::FilePicker(OSDIALOG_OPEN, param<std::string>("filepath"));
-      ImGui::SliderInt("Thin nth", &param<int>("thin_nth"), 1, 100);
+      add_param("filepath", ParamPath(filepath));
+      add_param("thin_nth", ParamIntRange(thin_nth, thin_nth_min, thin_nth_max));
     }
     void process();
   };
 
   class LASWriterNode:public Node {
+    std::string filepath = "";
     public:
     using Node::Node;
     void init() {
@@ -45,11 +41,7 @@ namespace geoflow::nodes::las {
       add_output("classification", typeid(vec1i));
       add_output("intensity", typeid(vec1f));
       
-      add_param("filepath", (std::string) "");
-    }
-    void gui(){
-      ImGui::FilePicker(OSDIALOG_SAVE, param<std::string>("filepath"));
-      ImGui::Checkbox("Write multiple files in case of point cloud list", &param<bool>("multiple_files"));
+      add_param("filepath", ParamPath(filepath));
     }
     void write_point_cloud_collection(PointCollection& point_cloud, std::string path);
     void process();
