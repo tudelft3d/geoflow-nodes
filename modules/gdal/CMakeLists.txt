@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project (io-vector VERSION 0.0.1)
+project (io-gdal VERSION 0.0.1)
 
 add_definitions(-DGF_PLUGIN_NAME=\"${CMAKE_PROJECT_NAME}\")
 

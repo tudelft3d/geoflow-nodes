@@ -22,19 +22,6 @@ endif()
 find_package( Boost REQUIRED COMPONENTS program_options)
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
 
-# GDAL
-find_package( GDAL )
-include_directories(${GDAL_INCLUDE_DIR})
-
-# GEOS
-find_package( GEOS )
-if (GEOS_FOUND)
-  include_directories(${GEOS_INCLUDE_DIR})
-endif()
-
-# CGAL
-find_package( CGAL QUIET COMPONENTS )
-include_directories(${CGAL_INCLUDE_DIR})
 
 add_definitions(
   -DGLM_FORCE_CTOR_INIT # FIXME: get rid of this (by doing proper initialisation of glm objects, especially the quaternions)

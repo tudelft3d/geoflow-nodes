@@ -1,8 +1,7 @@
 #pragma once
 
-#include <geoflow/core/geoflow.hpp>
+#include <geoflow/geoflow.hpp>
 #include "tinsimp.hpp"
-#include <geoflow/gui/osdialog.hpp>
 
 namespace geoflow::nodes::cgal {
 
