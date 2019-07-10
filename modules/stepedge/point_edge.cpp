@@ -12,36 +12,36 @@ Polygon_2 ring_to_cgal_polygon(geoflow::LinearRing& ring) {
   return Polygon_2(footprint_pts.begin(), footprint_pts.end());
 }
 
-void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<point_type>> &footprints, std::vector<PNL_vector> &points_vec) {
-  LASreadOpener lasreadopener;
-  lasreadopener.set_file_name(las_filename.c_str());
-  LASreader* lasreader = lasreadopener.open();
+// void pc_in_footprint(std::string las_filename, std::vector<bg::model::polygon<point_type>> &footprints, std::vector<PNL_vector> &points_vec) {
+//   LASreadOpener lasreadopener;
+//   lasreadopener.set_file_name(las_filename.c_str());
+//   LASreader* lasreader = lasreadopener.open();
 
-  for (auto footprint:footprints)
-    points_vec.push_back(PNL_vector());
+//   for (auto footprint:footprints)
+//     points_vec.push_back(PNL_vector());
 
-  while (lasreader->read_point()) {
-    if (lasreader->point.get_classification() == 6){
-      point_type p;
-      p.set<0>(lasreader->point.get_x());
-      p.set<1>(lasreader->point.get_y());
-      // p.set<2>(lasreader->point.get_z());
-      int i=0;
-      for (auto footprint:footprints) {
-        if (bg::within(p,footprint)){
-          PNL pv;
-          boost::get<0>(pv) = Point(lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z());
-          points_vec[i].push_back(pv);
-          break;
-          // laswriter->write_point(&lasreader->point);
-        }
-        i++;
-      }
-    }
-  }
-  lasreader->close();
-  delete lasreader;
-}
+//   while (lasreader->read_point()) {
+//     if (lasreader->point.get_classification() == 6){
+//       point_type p;
+//       p.set<0>(lasreader->point.get_x());
+//       p.set<1>(lasreader->point.get_y());
+//       // p.set<2>(lasreader->point.get_z());
+//       int i=0;
+//       for (auto footprint:footprints) {
+//         if (bg::within(p,footprint)){
+//           PNL pv;
+//           boost::get<0>(pv) = Point(lasreader->point.get_x(), lasreader->point.get_y(), lasreader->point.get_z());
+//           points_vec[i].push_back(pv);
+//           break;
+//           // laswriter->write_point(&lasreader->point);
+//         }
+//         i++;
+//       }
+//     }
+//   }
+//   lasreader->close();
+//   delete lasreader;
+// }
 
 void compute_metrics(PNL_vector &points, config c) {
 

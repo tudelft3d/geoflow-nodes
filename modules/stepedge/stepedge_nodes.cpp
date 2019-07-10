@@ -4,6 +4,8 @@
 #include "ptinpoly.h"
 #include <earcut.hpp>
 
+#include <lasreader.hpp>
+
 // #include "nlohmann/json.hpp"
 // using json = nlohmann::json;
 
@@ -144,10 +146,6 @@ namespace geoflow::nodes::stepedge {
 
 void AlphaShapeNode::process(){
   auto points_per_segment = input("pts_per_roofplane").get<std::unordered_map<int, std::pair<Plane, std::vector<Point>>>>();
-
-  auto thres_alpha = param<float>("thres_alpha");
-  auto optimal_alpha = param<bool>("optimal_alpha");
-  auto optimal_only_if_needed = param<bool>("optimal_only_if_needed");
 
   PointCollection edge_points, boundary_points;
   LineStringCollection alpha_edges;
@@ -342,7 +340,6 @@ inline arr3f grow(const arr3f& p_, const arr3f& q_, const arr3f& r_, const float
 
 void PolygonGrowerNode::process(){
   auto rings = input("rings").get<LinearRingCollection>();
-  auto extension = param<float>("extension");
 
   LinearRingCollection new_rings;
  
@@ -370,7 +367,7 @@ void Arr2LinearRingsNode::process(){
   AttributeMap attributes;
   for (auto face: arr.face_handles()){
     if(
-      !(param<bool>("only_in_footprint") && !face->data().in_footprint)
+      !(only_in_footprint && !face->data().in_footprint)
       &&
       !(face->is_fictitious() || face->is_unbounded())
       ) {
@@ -450,7 +447,7 @@ void ExtruderNode::process(){
             auto& py = vertices[i*3+j][1];
             float h;
             auto& plane = face->data().plane;
-            if (param<bool>("LoD2")) {
+            if (LoD2) {
               h = (plane.a()*px + plane.b()*py + plane.d()) / (-plane.c());
             } else h = face->data().elevation_avg;
             triangle[j] = {px, py, h};
@@ -596,13 +593,13 @@ void ProcessArrangementNode::process(){
   auto arr = input("arrangement").get<Arrangement_2>();
 
   config c;
-  c.step_height_threshold = param<float>("step_height_threshold");
-  c.zrange_threshold = param<float>("zrange_threshold");
-  c.merge_segid = param<bool>("merge_segid");
-  c.merge_zrange = param<bool>("merge_zrange");
-  c.merge_step_height = param<bool>("merge_step_height");
-  c.merge_unsegmented = param<bool>("merge_unsegmented");
-  c.merge_dangling_egdes = param<bool>("merge_dangling_egdes");
+  c.step_height_threshold = step_height_threshold;
+  c.zrange_threshold = zrange_threshold;
+  c.merge_segid = merge_segid;
+  c.merge_zrange = merge_zrange;
+  c.merge_step_height = merge_step_height;
+  c.merge_unsegmented = merge_unsegmented;
+  c.merge_dangling_egdes = merge_dangling_egdes;
 
   process_arrangement(points, arr, c);
   
@@ -704,7 +701,7 @@ void BuildArrFromRingsExactNode::arr_snapclean_from_fp(Arrangement_2& arr) {
   typedef Arrangement_2::Traits_2 AT;
   typedef std::variant<Arrangement_2::Vertex_handle, Arrangement_2::Halfedge_handle> Candidate;
   typedef std::unordered_map<Arrangement_2::Vertex_handle, std::vector<Candidate>> CandidateMap;
-  float snap_dist = param<float>("snap_dist")*param<float>("snap_dist");
+  float snap_dist_sq = snap_dist*snap_dist;
 
   PointCollection snap_to_v, snap_v;
   SegmentCollection snap_to_e;
@@ -745,7 +742,7 @@ void BuildArrFromRingsExactNode::arr_snapclean_from_fp(Arrangement_2& arr) {
           if( check_this_edge ) {
             // compute distance and compare to threshold
             auto s = AT::Segment_2(fhe->source()->point(), fhe->target()->point());
-            if (snap_dist > CGAL::squared_distance(v->point(), s)) {
+            if (snap_dist_sq > CGAL::squared_distance(v->point(), s)) {
               candidates[v].push_back(fhe);
               snap_to_e.push_back({
                 arr3f{float(CGAL::to_double(s.source().x())), float(CGAL::to_double(s.source().y())), 0},
@@ -753,7 +750,7 @@ void BuildArrFromRingsExactNode::arr_snapclean_from_fp(Arrangement_2& arr) {
               });
               snap_v.push_back({float(CGAL::to_double(v->point().x())), float(CGAL::to_double(v->point().y())), 0});
             }
-            if (snap_dist > CGAL::squared_distance(v->point(), fhe->source()->point())) {
+            if (snap_dist_sq > CGAL::squared_distance(v->point(), fhe->source()->point())) {
               candidates[v].push_back(fhe->source());
               snap_to_v.push_back({float(CGAL::to_double(s.source().x())), float(CGAL::to_double(s.source().y())), 0});
               snap_v.push_back({float(CGAL::to_double(v->point().x())), float(CGAL::to_double(v->point().y())), 0});
@@ -764,7 +761,7 @@ void BuildArrFromRingsExactNode::arr_snapclean_from_fp(Arrangement_2& arr) {
     } while (++vhe!=vdone);    
 
     // perform snapping for this vertex
-    if (candidates.count(v) && !param<bool>("snap_detect_only")) {
+    if (candidates.count(v) && !snap_detect_only) {
       auto& cvec = candidates[v];
       // std::cout << cvec.size() << "\n";
       // merge v with an edge
@@ -829,7 +826,7 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
   typedef Arrangement_2::Traits_2 AT;
   typedef std::variant<Arrangement_2::Vertex_handle, Arrangement_2::Halfedge_handle> Candidate;
   typedef std::unordered_map<Arrangement_2::Vertex_handle, std::map<double,Candidate>> CandidateMap;
-  float snap_dist = param<float>("snap_dist")*param<float>("snap_dist");
+  float snap_dist_sq = snap_dist*snap_dist;
 
   PointCollection snap_to_v, snap_v;
   SegmentCollection snap_to_e;
@@ -869,7 +866,7 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
             // compute distance and compare to threshold
             auto s = AT::Segment_2(fhe->source()->point(), fhe->target()->point());
             double d = CGAL::to_double(CGAL::squared_distance(v->point(), s));
-            if (snap_dist > d) {
+            if (snap_dist_sq > d) {
               candidates[v][d] = fhe;
               snap_to_e.push_back({
                 arr3f{float(CGAL::to_double(s.source().x())), float(CGAL::to_double(s.source().y())), 0},
@@ -878,7 +875,7 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
               snap_v.push_back({float(CGAL::to_double(v->point().x())), float(CGAL::to_double(v->point().y())), 0});
             }
             d = CGAL::to_double(CGAL::squared_distance(v->point(), fhe->source()->point()));
-            if (snap_dist > d) {
+            if (snap_dist_sq > d) {
               candidates[v][d] = fhe->source();
               snap_to_v.push_back({float(CGAL::to_double(s.source().x())), float(CGAL::to_double(s.source().y())), 0});
               snap_v.push_back({float(CGAL::to_double(v->point().x())), float(CGAL::to_double(v->point().y())), 0});
@@ -889,7 +886,7 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
     } while (++vhe!=vdone);    
 
     // perform snapping for this vertex
-    if (candidates.count(v) && !param<bool>("snap_detect_only")) {
+    if (candidates.count(v) && !snap_detect_only) {
       auto& cvec = candidates[v];
       // std::cout << cvec.size() << "\n";
       // merge v with an edge
@@ -953,12 +950,7 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
 
 void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
 
-  bool& flood_unsegmented = param<bool>("flood_to_unsegmented");
-  bool& dissolve_edges = param<bool>("dissolve_edges");
-  bool& dissolve_stepedges = param<bool>("dissolve_stepedges");
-  float& step_height_threshold = param<float>("step_height_threshold");
-
-  if (flood_unsegmented) {
+  if (flood_to_unsegmented) {
     std::map<float, Face_handle> face_map;
     for (auto& face : arr.face_handles()) {
       if (face->data().segid!=0 && face->data().in_footprint)
@@ -1105,11 +1097,11 @@ void BuildArrFromRingsExactNode::arr_assign_pts_to_unsegmented(Arrangement_2& ar
   // find elevation percentile for each face
   for(auto& ppf : points_per_face) {
     double area = CGAL::to_double(CGAL::abs(arr_cell2polygon(ppf.first).area()));
-    if (ppf.second.size()/area > param<float>("extrude_mindensity")) {
+    if (ppf.second.size()/area > extrude_mindensity) {
       std::sort(ppf.second.begin(), ppf.second.end(), [](linedect::Point& p1, linedect::Point& p2) {
         return p1.z() < p2.z();
       });
-      auto pid = int(param<float>("z_percentile")*float(ppf.second.size()-1));
+      auto pid = int(z_percentile*float(ppf.second.size()-1));
       // auto pid = get_percentile(ppf.second, percentile);
       ppf.first->data().segid = -1;
       ppf.first->data().elevation_avg = ppf.second[pid].z();
@@ -1167,7 +1159,7 @@ void BuildArrFromRingsExactNode::process() {
     // arr_insert_polygon(arr_base, footprint);
     // insert_non_intersecting_curves(arr_base, footprint.edges_begin(), footprint.edges_end());
     if (!footprint.is_simple()) {
-      arr_filter_biggest_face(arr_base, param<float>("rel_area_thres"));
+      arr_filter_biggest_face(arr_base, rel_area_thres);
     }
   }
   // insert step-edge lines
@@ -1187,7 +1179,7 @@ void BuildArrFromRingsExactNode::process() {
         std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
           return p1.z() < p2.z();
         });
-        int elevation_id = std::floor(param<float>("z_percentile")*float(points.size()-1));
+        int elevation_id = std::floor(z_percentile*float(points.size()-1));
 
         // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
         Arrangement_2 arr;
@@ -1196,7 +1188,7 @@ void BuildArrFromRingsExactNode::process() {
         // arr_insert_polygon(arr, polygon);
 
         if (!polygon.is_simple()) {
-          arr_filter_biggest_face(arr, param<float>("rel_area_thres"));
+          arr_filter_biggest_face(arr, rel_area_thres);
         }
 
         Overlay_traits overlay_traits;
@@ -1206,10 +1198,10 @@ void BuildArrFromRingsExactNode::process() {
       }
     }
   }
-  if(param<bool>("snap_clean")) arr_snapclean(arr_base);
-  if(param<bool>("snap_clean_fp")) arr_snapclean_from_fp(arr_base);
+  if(snap_clean) arr_snapclean(arr_base);
+  if(snap_clean_fp) arr_snapclean_from_fp(arr_base);
 
-  if(param<bool>("extrude_unsegmented") && points_per_plane.count(-1)) {
+  if(extrude_unsegmented && points_per_plane.count(-1)) {
     arr_assign_pts_to_unsegmented(arr_base, points_per_plane[-1].second);
   }
   auto nosegid_area = arr_measure_nosegid(arr_base);
@@ -1308,10 +1300,10 @@ void BuildArrFromRingsExactNode::process() {
 // }
 
 inline void DetectLinesNode::detect_lines_ring_m1(linedect::LineDetector& LD, SegmentCollection& segments_out) {
-  LD.dist_thres = param<float>("dist_thres") * param<float>("dist_thres");
-  LD.N = param<int>("k");
-  auto& c_upper = param<int>("min_cnt_upper");
-  auto& c_lower = param<int>("min_cnt_lower");
+  LD.dist_thres = dist_thres * dist_thres;
+  LD.N = k;
+  auto& c_upper = min_cnt_range.first;
+  auto& c_lower = min_cnt_range.second;
   std::vector<size_t> detected_regions;
   size_t ringsize = LD.point_segment_idx.size();
   RingSegMap ring_seg_map;
@@ -1364,20 +1356,20 @@ inline void DetectLinesNode::detect_lines_ring_m1(linedect::LineDetector& LD, Se
   }
 }
 inline void DetectLinesNode::detect_lines(linedect::LineDetector& LD) {
-  LD.dist_thres = param<float>("dist_thres") * param<float>("dist_thres");
-  LD.N = param<int>("k");
-  auto& c_upper = param<int>("min_cnt_upper");
-  auto& c_lower = param<int>("min_cnt_lower");
+  LD.dist_thres = dist_thres * dist_thres;
+  LD.N = k;
+  auto& c_upper = min_cnt_range.second;
+  auto& c_lower = min_cnt_range.first;
   for (size_t i=c_upper; i>=c_lower; --i){
     LD.min_segment_count = i;
     LD.detect();
   }
 }
 inline size_t DetectLinesNode::detect_lines_ring_m2(linedect::LineDetector& LD, SegmentCollection& segments_out) {
-  LD.dist_thres = param<float>("dist_thres") * param<float>("dist_thres");
-  LD.N = param<int>("k");
-  auto& c_upper = param<int>("min_cnt_upper");
-  auto& c_lower = param<int>("min_cnt_lower");
+  LD.dist_thres = dist_thres * dist_thres;
+  LD.N = k;
+  auto& c_upper = min_cnt_range.second;
+  auto& c_lower = min_cnt_range.first;
   for (size_t i=c_upper; i>=c_lower; --i){
     LD.min_segment_count = i;
     LD.detect();
@@ -1438,7 +1430,7 @@ inline size_t DetectLinesNode::detect_lines_ring_m2(linedect::LineDetector& LD, 
       sorted_segments.insert(el.second);
     }
     // TODO: better check for overlapping segments! Following is not 100% robust...
-    if (param<bool>("remove_overlap")) {
+    if (remove_overlap) {
       auto el_prev = sorted_segments.begin();
       // el_prev.first-=sorted_segments.size();
       // el_prev.second-=sorted_segments.size();
@@ -1453,16 +1445,16 @@ inline size_t DetectLinesNode::detect_lines_ring_m2(linedect::LineDetector& LD, 
         sorted_segments.erase(el);
       }
     }
-    if (param<bool>("perform_chaining")) {
+    if (perform_chaining) {
       std::vector<SCK::Segment_2> prechain_segments;
       std::vector<size_t> idx; size_t idcnt=0;
       for (auto& [i0,i1] : sorted_segments) {
         // segments_out.push_back( LD.project(i0, i1) );
-        prechain_segments.push_back( LD.project_cgal(i0, i1, param<float>("line_extend")) );
+        prechain_segments.push_back( LD.project_cgal(i0, i1, line_extend) );
         idx.push_back(idcnt++);
       }
       // TODO: chain the ring? for better regularisation results
-      auto chained_segments = linereg::chain_ring<SCK>(idx, prechain_segments, param<float>("snap_threshold"));
+      auto chained_segments = linereg::chain_ring<SCK>(idx, prechain_segments, snap_threshold);
 
       // for (auto e=prechain_segments.begin(); e!=prechain_segments.end(); ++e) {
       for (auto e=chained_segments.edges_begin(); e!=chained_segments.edges_end(); ++e) {
@@ -1512,7 +1504,7 @@ void DetectLinesNode::process(){
   } else if (input_geom.connected_type == typeid(LinearRingCollection)) {
     auto rings = input_geom.get<LinearRingCollection>();
     auto roofplane_ids = input("roofplane_ids").get<vec1i>();
-    int n = param<int>("k");
+    int n = k;
     
     size_t ring_cntr=0;
     size_t seg_cntr=0, plane_id;
@@ -1523,7 +1515,7 @@ void DetectLinesNode::process(){
         cgal_pts.push_back(linedect::Point(p[0], p[1], p[2]));
       }
 
-      if (param<bool>("linear_knn")) {
+      if (linear_knn) {
         int kb = n/2; //backward neighbors
         int kf = n-kb-1; //forward neighbours
 
@@ -1573,41 +1565,34 @@ void DetectLinesNode::process(){
   output("is_start").set(is_start);
 }
 
-void ClassifyEdgePointsNode::process(){
-  // Set up vertex data (and buffer(s)) and attribute pointers
-  auto points = input("points").get<PNL_vector>();
+// void ClassifyEdgePointsNode::process(){
+//   // Set up vertex data (and buffer(s)) and attribute pointers
+//   auto points = input("points").get<PNL_vector>();
 
-  config c;
-  c.classify_jump_count_min = param<int>("classify_jump_count_min");
-  c.classify_jump_count_max = param<int>("classify_jump_count_max");
-  c.classify_line_dist = param<float>("classify_line_dist");
-  c.classify_jump_ele = param<float>("classify_jump_ele");
+//   config c;
+//   c.classify_jump_count_min = param<int>("classify_jump_count_min");
+//   c.classify_jump_count_max = param<int>("classify_jump_count_max");
+//   c.classify_line_dist = param<float>("classify_line_dist");
+//   c.classify_jump_ele = param<float>("classify_jump_ele");
 
-  std::vector<linedect::Point> edge_points;
-  classify_edgepoints(edge_points, points, c);
-  output("edge_points").set(edge_points);
+//   std::vector<linedect::Point> edge_points;
+//   classify_edgepoints(edge_points, points, c);
+//   output("edge_points").set(edge_points);
 
-  vec3f edge_points_vec3f;
-  for(auto& p : edge_points) {
-      std::array<float,3> a = {{
-        float(p.x()), 
-        float(p.y()), 
-        float(p.z())
-      }};
-      edge_points_vec3f.push_back(a);
-    }
-  output("edge_points_vec3f").set(edge_points_vec3f);
-}
+//   vec3f edge_points_vec3f;
+//   for(auto& p : edge_points) {
+//       std::array<float,3> a = {{
+//         float(p.x()), 
+//         float(p.y()), 
+//         float(p.z())
+//       }};
+//       edge_points_vec3f.push_back(a);
+//     }
+//   output("edge_points_vec3f").set(edge_points_vec3f);
+// }
 
 void DetectPlanesNode::process() {
   auto points = input("points").get<PointCollection>();
-
-  auto metrics_normal_k = param<int>("metrics_normal_k");
-  auto metrics_plane_min_points = param<int>("metrics_plane_min_points");
-  auto metrics_plane_epsilon = param<float>("metrics_plane_epsilon");
-  auto metrics_plane_normal_threshold = param<float>("metrics_plane_normal_threshold");
-  auto metrics_is_wall_threshold = param<float>("metrics_is_wall_threshold");
-  auto metrics_is_horizontal_threshold = param<float>("metrics_is_horizontal_threshold");
 
   // convert to cgal points with attributes
   PNL_vector pnl_points;
@@ -1648,14 +1633,14 @@ void DetectPlanesNode::process() {
   PD.normal_thres = metrics_plane_normal_threshold;
   PD.min_segment_count = metrics_plane_min_points;
   PD.N = metrics_normal_k;
-  PD.n_refit = param<int>("n_refit");
+  PD.n_refit = n_refit;
   PD.detect();
 
   // classify horizontal/vertical planes using plane normals
   std::unordered_map<int, std::pair<Plane, std::vector<Point>>> pts_per_roofplane;
   size_t horiz_roofplane_cnt=0;
   size_t slant_roofplane_cnt=0;
-  if (param<bool>("only_horizontal")) pts_per_roofplane[-1].second = std::vector<Point>();
+  if (only_horizontal) pts_per_roofplane[-1].second = std::vector<Point>();
   size_t horiz_pt_cnt=0, total_pt_cnt=0;
   for(auto seg: PD.segment_shapes){
     auto& plane = seg.second;
@@ -1669,8 +1654,8 @@ void DetectPlanesNode::process() {
     if (!is_wall) {
       auto segpts = PD.get_points(seg.first);
       total_pt_cnt += segpts.size();
-      if (!param<bool>("only_horizontal") ||
-          (param<bool>("only_horizontal") && is_horizontal)) {
+      if (!only_horizontal ||
+          (only_horizontal && is_horizontal)) {
         pts_per_roofplane[seg.first].second = segpts;
         pts_per_roofplane[seg.first].first = plane;
         horiz_pt_cnt += segpts.size();
@@ -1695,7 +1680,7 @@ void DetectPlanesNode::process() {
     }
   }
 
-  bool b_is_horizontal = float(horiz_pt_cnt)/float(total_pt_cnt) > param<float>("horiz_min_count");
+  bool b_is_horizontal = float(horiz_pt_cnt)/float(total_pt_cnt) > horiz_min_count;
   int building_type=-2; // as built: -2=undefined; -1=no pts; 0=LOD1, 1=LOD1.3, 2=LOD2
   if (PD.segment_shapes.size()==0) {
     building_type=-1;
@@ -1729,14 +1714,14 @@ void ComputeMetricsNode::process() {
   auto points = input("points").get<PointCollection>();
 
   config c;
-  c.metrics_normal_k = param<int>("metrics_normal_k");
-  c.metrics_plane_min_points = param<int>("metrics_plane_min_points");
-  c.metrics_plane_epsilon = param<float>("metrics_plane_epsilon");
-  c.metrics_plane_normal_threshold = param<float>("metrics_plane_normal_threshold");
-  c.metrics_is_wall_threshold = param<float>("metrics_is_wall_threshold");
-  c.metrics_is_horizontal_threshold = param<float>("metrics_is_horizontal_threshold");
-  c.metrics_k_linefit = param<int>("metrics_k_linefit");
-  c.metrics_k_jumpcnt_elediff = param<int>("metrics_k_jumpcnt_elediff");
+  c.metrics_normal_k = metrics_normal_k;
+  c.metrics_plane_min_points = metrics_plane_min_points;
+  c.metrics_plane_epsilon = metrics_plane_epsilon;
+  c.metrics_plane_normal_threshold = metrics_plane_normal_threshold;
+  c.metrics_is_wall_threshold = metrics_is_wall_threshold;
+  c.metrics_is_horizontal_threshold = metrics_is_horizontal_threshold;
+  c.metrics_k_linefit = metrics_k_linefit;
+  c.metrics_k_jumpcnt_elediff = metrics_k_jumpcnt_elediff;
 
   PNL_vector pnl_points;
   for (auto& p : points) {
@@ -1800,7 +1785,7 @@ void LASInPolygonsNode::process() {
   }
 
   LASreadOpener lasreadopener;
-  lasreadopener.set_file_name(param<std::string>("las_filepath").c_str());
+  lasreadopener.set_file_name(filepath.c_str());
   LASreader* lasreader = lasreadopener.open();
 
   while (lasreader->read_point()) {
@@ -1835,7 +1820,6 @@ void LASInPolygonsNode::process() {
 void BuildingSelectorNode::process() {
   auto& point_clouds = input("point_clouds").get<std::vector<PointCollection>&>();
   auto& polygons = input("polygons").get<LinearRingCollection&>();
-  polygon_count = polygons.size();
   output("point_cloud").set(point_clouds[building_id]);
   output("polygon").set(polygons[building_id]);
 };
@@ -1844,9 +1828,6 @@ void RegulariseLinesNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto edges = input("edge_segments").get<SegmentCollection>();
   auto footprint = input("footprint").get<LinearRing>();
-
-  auto dist_threshold = param<float>("dist_threshold");
-  auto angle_threshold = param<float>("angle_threshold");
 
   typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_2 Point_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_3 Point_3;
@@ -2121,26 +2102,26 @@ void RegulariseRingsNode::process(){
   // get clusters from line regularisation 
   auto LR = linereg::LineRegulariser();
   LR.add_segments(0,edges);
-  LR.add_segments(1,ek_footprint, (double) param<float>("fp_offset"));
-  LR.dist_threshold = param<float>("dist_threshold");
-  LR.angle_threshold = param<float>("angle_threshold");
-  LR.cluster(param<bool>("weighted_avg"), param<bool>("angle_per_distcluster"));
+  LR.add_segments(1,ek_footprint, (double) fp_offset);
+  LR.dist_threshold = dist_threshold;
+  LR.angle_threshold = angle_threshold;
+  LR.cluster(weighted_avg, angle_per_distcluster);
 
   std::unordered_map<size_t, linereg::Polygon_2> exact_polygons;
   for (auto& idx : ring_idx) {
     exact_polygons[idx.first] = 
-      linereg::chain_ring<linereg::EK>(idx.second, LR.get_segments(0), param<float>("snap_threshold"));
+      linereg::chain_ring<linereg::EK>(idx.second, LR.get_segments(0), snap_threshold);
     // std::cout << "ch ring size : "<< exact_polygons.back().size() << ", " << exact_polygons.back().is_simple() << "\n";
   }
   // std::cout << "ch fp size : "<< exact_fp.size() << ", " << exact_fp.is_simple() << "\n";
   output("exact_rings_out").set(exact_polygons);
 
-  if (param<bool>("regularise_fp")) {
+  if (regularise_fp) {
     std::vector<size_t> fp_idx;
     for (size_t i=0; i < LR.get_segments(1).size(); ++i) {
       fp_idx.push_back(i);
     }
-    auto ek_reg_fp = linereg::chain_ring<linereg::EK>(fp_idx, LR.get_segments(1), param<float>("snap_threshold"));
+    auto ek_reg_fp = linereg::chain_ring<linereg::EK>(fp_idx, LR.get_segments(1), snap_threshold);
     output("exact_footprint_out").set(ek_reg_fp);
   } else {
     output("exact_footprint_out").set(ek_footprint);
@@ -2227,8 +2208,6 @@ void SimplifyPolygonNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
 
   auto geom_term = input("polygons");
-
-  auto threshold_stop_cost = param<float>("threshold_stop_cost");
 
   if (geom_term.connected_type==typeid(LinearRing)) {
     auto& polygon = geom_term.get<LinearRing&>();

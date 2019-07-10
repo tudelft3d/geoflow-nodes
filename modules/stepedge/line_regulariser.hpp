@@ -1,7 +1,7 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/Polygon_2.h>
-#include<geoflow/core/geoflow.hpp>
+#include<geoflow/geoflow.hpp>
 
 namespace linereg {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel::Point_2 Point_2;

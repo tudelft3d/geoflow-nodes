@@ -12,7 +12,7 @@
 
 typedef CGAL::Cartesian<double> SCK;
 
-#include <geoflow/core/geoflow.hpp>
+#include <geoflow/geoflow.hpp>
 
 namespace linedect {
   typedef CGAL::Exact_predicates_inexact_constructions_kernel cgal_kernel;

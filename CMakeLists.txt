@@ -35,21 +35,9 @@ include_directories(
   thirdparty/masbcpp/thirdparty/vrui
 )
 
-# ptinpoly
-add_library(ptinpoly STATIC thirdparty/ptinpoly/ptinpoly.c)
-set_target_properties(
-  ptinpoly
-  PROPERTIES C_STANDARD 11
-)
-include_directories(thirdparty/ptinpoly)
 
 # geoflow
 find_package(geoflow REQUIRED)
-
-#earcut
-include_directories(
-  thirdparty/earcut
-)
 
 # MODULES
 include_directories(modules)
