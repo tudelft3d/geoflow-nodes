@@ -6,24 +6,21 @@ add_definitions(-DGF_PLUGIN_NAME=\"${CMAKE_PROJECT_NAME}\")
 find_package(geoflow REQUIRED)
 
 # CGAL
-find_package( CGAL QUIET COMPONENTS )
-include_directories(${CGAL_INCLUDE_DIR})
-
 find_package(LASlib)
+find_package(glm)
+find_package(CGAL QUIET COMPONENTS Core)
 
-add_library(cgal_nodes MODULE
+add_library(gfp_cgal MODULE
   cgal_nodes.cpp
   isolines.cpp
   linesimp.cpp
   tinsimp.cpp
   plugin.cpp
 )
-target_link_libraries( cgal_nodes
+target_link_libraries( gfp_cgal
   geoflow-core
-  ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} 
   LASlib
+  CGAL::CGAL CGAL::CGAL_Core
 )
-set_target_properties(
-  cgal_nodes
-  PROPERTIES CXX_STANDARD 17
-)
+set_target_properties(gfp_cgal PROPERTIES CXX_STANDARD 17)
+install(TARGETS gfp_cgal DESTINATION ${geoflow_PLUGIN_FOLDER})

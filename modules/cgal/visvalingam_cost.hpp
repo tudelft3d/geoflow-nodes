@@ -1,6 +1,7 @@
 #include <CGAL/algorithm.h>
 #include <CGAL/Constrained_triangulation_plus_2.h>
 #include <boost/optional.hpp>
+#include <glm/glm.hpp>
 
 namespace CGAL {
 

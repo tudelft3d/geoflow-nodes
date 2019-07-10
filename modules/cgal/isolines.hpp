@@ -4,7 +4,7 @@
 #include <CGAL/boost/graph/Euler_operations.h>
 
 
-#include <geoflow/core/geoflow.hpp>
+#include <geoflow/geoflow.hpp>
 
 namespace isolines {
   typedef tinsimp::CDT          CDT;

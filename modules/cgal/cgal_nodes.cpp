@@ -58,8 +58,6 @@ template<typename T> inline std::array<float,3> to_arr3f(T& p) {
 void CDTNode::process(){
   auto geom_term = input("geometries");
 
-  auto create_triangles = param<bool>("create_triangles");
-
   CDT cdt;
 
   if (geom_term.connected_type == typeid(PointCollection)) {
@@ -136,11 +134,6 @@ void ComparePointDistanceNode::process(){
   typedef CGAL::AABB_traits<K, Primitive> AABB_triangle_traits;
   typedef CGAL::AABB_tree<AABB_triangle_traits> Tree;
 
-  // params
-  auto las_filepath = param<std::string>("las_filepath").c_str();
-  auto log_filepath = param<std::string>("log_filepath").c_str();
-  auto thin_nth = param<int>("thin_nth");
-
   // Triangles 1
   auto trin1 = input("triangles1_vec3f").get<vec3f>();
   std::list<Triangle> triangles1;
@@ -166,7 +159,7 @@ void ComparePointDistanceNode::process(){
   tree2.accelerate_distance_queries();
 
   LASreadOpener lasreadopener;
-  lasreadopener.set_file_name(las_filepath);
+  lasreadopener.set_file_name(las_filepath.c_str());
   LASreader* lasreader = lasreadopener.open();
 
   vec1f distances1, distances2, diff;
@@ -225,10 +218,6 @@ void PointDistanceNode::process() {
   typedef CGAL::AABB_traits<K, Primitive> AABB_triangle_traits;
   typedef CGAL::AABB_tree<AABB_triangle_traits> Tree;
 
-  auto filepath = param<std::string>("filepath").c_str();
-  auto thin_nth = param<int>("thin_nth");
-  auto overwritez = param<bool>("overwritez");
-
   auto trin = input("triangles").get<TriangleCollection>();
   std::list<Triangle> triangles;
   for (auto& t : trin) {
@@ -243,7 +232,7 @@ void PointDistanceNode::process() {
   tree.accelerate_distance_queries();
 
   LASreadOpener lasreadopener;
-  lasreadopener.set_file_name(filepath);
+  lasreadopener.set_file_name(filepath.c_str());
   LASreader* lasreader = lasreadopener.open();
 
   vec1f distances;
@@ -353,8 +342,6 @@ LineStringCollection densify_linestrings(LineStringCollection line_strings, floa
 void DensifyNode::process(){
   auto geom_term = input("geometries");
 
-  auto interval = param<float>("interval");
-
   if (geom_term.connected_type == typeid(LineStringCollection)) {
     auto lines = geom_term.get<geoflow::LineStringCollection>();
     output("dense_linestrings").set(densify_linestrings(lines, interval));
@@ -406,10 +393,6 @@ void delete_initial_tin(tinsimp::CDT& cdt, geoflow::Box& bbox) {
 
 void TinSimpNode::process(){
   auto geom_term = input("geometries");
-
-  auto thres_error = param<float>("thres_error");
-  auto densify_interval = param<float>("densify_interval");
-  auto create_triangles = param<bool>("create_triangles");
 
   tinsimp::CDT cdt;
 
@@ -476,10 +459,6 @@ void TinSimpNode::process(){
 }
 
 void TinSimpLASReaderNode::process() {
-  auto filepath = param<std::string>("filepath");
-  auto thin_nth = param<int>("thin_nth");
-  auto thres_error = param<float>("thres_error");
-  auto create_triangles = param<bool>("create_triangles");
 
   std::vector<Point> points;
   LASreadOpener lasreadopener;
@@ -556,8 +535,6 @@ void SimplifyLine3DNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto lines = input("lines").get<LineStringCollection>();
 
-  auto area_threshold = param<float>("area_threshold");
-
   LineStringCollection simplified_lines;
   for (auto& line_string : lines) {
     simplified_lines.push_back( linesimp::visvalingam(line_string, area_threshold) );
@@ -569,8 +546,6 @@ void SimplifyLine3DNode::process(){
 void SimplifyLineNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto lines = input("lines").get<LineStringCollection>();
-
-  auto threshold_stop_cost = param<float>("threshold_stop_cost");
   
   namespace PS = CGAL::Polyline_simplification_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -615,8 +590,6 @@ void SimplifyLinesNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto lines = input("lines").get<LineStringCollection>();
 
-  auto threshold_stop_cost = param<float>("threshold_stop_cost");
-
   namespace PS = CGAL::Polyline_simplification_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef CGAL::Projection_traits_xy_3<K>                     Gt;
@@ -659,8 +632,6 @@ void SimplifyLinesNode::process() {
 
 void SimplifyFootprintsCDTNode::process(){
   auto polygons = input("polygons").get<LinearRingCollection>();
-
-  auto threshold_stop_cost = param<float>("threshold_stop_cost");
 
   namespace PS = CGAL::Polyline_simplification_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -713,9 +684,6 @@ void PLYWriterNode::process() {
 
   auto points = input("points").get<PointCollection>();
   auto labels = input("labels").get<vec1i>();
-
-  auto filepath = param<std::string>("filepath");
-  auto write_binary = param<bool>("write_binary");
   
   PL_vector pl_points;
   pl_points.resize(points.size());
@@ -748,8 +716,6 @@ void PLYReaderNode::process() {
   typedef CGAL::Nth_of_tuple_property_map<1, PL> Normal_map;
   // typedef CGAL::Nth_of_tuple_property_map<1, PL> Label_map;
   typedef std::vector<PL>                        PN_vector;
-
-  auto filepath = param<std::string>("filepath");
   
   PN_vector pn_points;
 
@@ -788,16 +754,12 @@ void IsoLineNode::process() {
   float min = input("min").get<float>();
   float max = input("max").get<float>();
 
-  float interval = param<float>("interval");
-  float exclude_begin = param<float>("exclude_begin");
-  float exclude_end = param<float>("exclude_end");
-
   float start = std::floor(min);
   float end = std::ceil(max);
 
   vec1f isoheights;
   for (float i = start; i < end; i += interval) {
-    if (exclude_begin <= i && i <= exclude_end) {
+    if (exclude_interval.first <= i && i <= exclude_interval.second) {
       continue;
     }
     isoheights.push_back(i);
@@ -963,9 +925,6 @@ void IsoLineSlicerNode::process() {
 void LineHeightNode::process() {
   auto lines = input("lines").get<LineStringCollection>();
 
-  auto filepath = param<std::string>("filepath").c_str();
-  auto thin_nth = param<int>("thin_nth");
-
   typedef CGAL::Simple_cartesian<float> K;
   typedef CGAL::Search_traits_3<K> TreeTraits;
   typedef CGAL::Orthogonal_k_neighbor_search<TreeTraits> Neighbor_search;
@@ -975,7 +934,7 @@ void LineHeightNode::process() {
   Tree tree;
 
   LASreadOpener lasreadopener;
-  lasreadopener.set_file_name(filepath);
+  lasreadopener.set_file_name(filepath.c_str());
   LASreader* lasreader = lasreadopener.open();
 
   LineStringCollection lines_out;
@@ -1009,9 +968,6 @@ void LineHeightNode::process() {
 void LineHeightCDTNode::process() {
   auto cdt = input("cgal_cdt").get<CDT>();
   auto lines = input("lines").get<LineStringCollection>();
-
-  auto add_bbox = param<bool>("add_bbox");
-  auto densify_interval = param<float>("densify_interval");
 
   std::cout << "Starting LineHeight with " << lines.size() << " lines\n";
   
@@ -1073,8 +1029,6 @@ void SimplifyLinesBufferNode::process() {
   typedef linesimp::Point2 Point2;
 
   auto polygons = input("polygons").get<LinearRingCollection>();
-
-  auto threshold = param<float>("threshold");
   LinearRingCollection polygonssimp;
 
   std::cout << "Creating simplified polylines by buffering and joining\n";
