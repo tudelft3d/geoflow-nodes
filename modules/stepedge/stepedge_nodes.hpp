@@ -268,7 +268,7 @@ namespace geoflow::nodes::stepedge {
   class DetectLinesNode:public Node {
     bool linear_knn = false;
     float dist_thres = 0.4;
-    std::pair<int,int> min_cnt_range = {10,5};
+    std::pair<int,int> min_cnt_range = {5,10};
     int k = 10;
     float snap_threshold = 1;
     float line_extend = 0.05;
@@ -366,13 +366,15 @@ namespace geoflow::nodes::stepedge {
       add_param("metrics_plane_min_points", ParamInt(metrics_plane_min_points, "Plane min points"));
       add_param("metrics_plane_epsilon", ParamFloat(metrics_plane_epsilon, "Plane epsilon"));
       add_param("metrics_plane_normal_threshold", ParamFloat(metrics_plane_normal_threshold, "Plane normal thres"));
-      add_param("metrics_is_horizontal_threshold", ParamFloat(metrics_is_horizontal_threshold, "Is horizontal"));
+      add_param("", ParamFloat(metrics_is_horizontal_threshold, "Is horizontal"));
       add_param("metrics_is_wall_threshold", ParamFloat(metrics_is_wall_threshold, "Wall angle thres"));
       add_param("n_refit", ParamInt(n_refit, "Refit every n points"));
     }
     void before_gui(){
-      auto param = std::get<ParamBool>(parameters.at("horiz_min_count"));
-      param.set_visible(only_horizontal);
+      auto param_count = std::get<ParamFloat>(parameters.at("horiz_min_count"));
+      auto param_ishoriz = std::get<ParamFloat>(parameters.at("metrics_is_horizontal_threshold"));
+      param_count.set_visible(only_horizontal);
+      param_ishoriz.set_visible(only_horizontal);
     }
     void process();
   };
