@@ -366,7 +366,7 @@ namespace geoflow::nodes::stepedge {
       add_param("metrics_plane_min_points", ParamInt(metrics_plane_min_points, "Plane min points"));
       add_param("metrics_plane_epsilon", ParamFloat(metrics_plane_epsilon, "Plane epsilon"));
       add_param("metrics_plane_normal_threshold", ParamFloat(metrics_plane_normal_threshold, "Plane normal thres"));
-      add_param("", ParamFloat(metrics_is_horizontal_threshold, "Is horizontal"));
+      add_param("metrics_is_horizontal_threshold", ParamFloat(metrics_is_horizontal_threshold, "Is horizontal"));
       add_param("metrics_is_wall_threshold", ParamFloat(metrics_is_wall_threshold, "Wall angle thres"));
       add_param("n_refit", ParamInt(n_refit, "Refit every n points"));
     }
