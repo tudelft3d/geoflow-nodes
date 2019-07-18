@@ -403,7 +403,6 @@ void ExtruderNode::process(){
   vec1i labels;
   vec1f rms_errors, max_errors, segment_coverages, elevations;
   using N = uint32_t;
-
   
   size_t cell_id=0, pid;
   float rms_error, max_error, segment_coverage;
@@ -426,7 +425,7 @@ void ExtruderNode::process(){
       for (size_t i=0; i<indices.size()/3; ++i) {
         Triangle triangle;
         for (size_t j=0; j<3; ++j) {
-          triangle[j] = {vertices[i*3+j][0], vertices[i*3+j][1], 0};
+          triangle[j] = {vertices[i*3+j][0], vertices[i*3+j][1], base_elevation};
           labels.push_back(0);
           normals.push_back({0,0,-1});
           cell_id_vec1i.push_back(cell_id);
@@ -449,7 +448,9 @@ void ExtruderNode::process(){
             auto& plane = face->data().plane;
             if (LoD2) {
               h = (plane.a()*px + plane.b()*py + plane.d()) / (-plane.c());
-            } else h = face->data().elevation_avg;
+            } else {
+              h = face->data().elevation_avg;
+            }
             triangle[j] = {px, py, h};
             labels.push_back(1);
             normals.push_back({0,0,1});
@@ -470,43 +471,58 @@ void ExtruderNode::process(){
     vertex n;
     for (auto edge : arr.edge_handles()) {
       // skip if faces on both sides of this edge are not finite
-      // bool left = edge->twin()->face()->data().in_footprint;
-      // bool right = edge->face()->data().in_footprint;
-      bool left = edge->twin()->face()->data().in_footprint;
-      bool right = edge->face()->data().in_footprint;
-      if (left || right) {
+      bool fp_u = edge->twin()->face()->data().in_footprint;
+      bool fp_l = edge->face()->data().in_footprint;
+      auto plane_u = edge->twin()->face()->data().plane;
+      auto plane_l = edge->face()->data().plane;
+      if (fp_u || fp_l) {
+        auto& source = edge->source()->point();
+        auto& target = edge->target()->point();
         int wall_label = 2;
-        if (left && right)
+        if (fp_u && fp_l)
           wall_label = 3;
 
-        auto h1 = edge->face()->data().elevation_avg;
-        auto h2 = edge->twin()->face()->data().elevation_avg;
-        if (left && !right) h1=0;
-        if (!left && right) h2=0;
+        float u1z,u2z,l1z,l2z;
+        if(LoD2){
+          u1z = 
+          (plane_u.a()*CGAL::to_double(source.x()) + plane_u.b()*CGAL::to_double(source.y()) + plane_u.d()) / (-plane_u.c());
+          u2z = 
+          (plane_u.a()*CGAL::to_double(target.x()) + plane_u.b()*CGAL::to_double(target.y()) + plane_u.d()) / (-plane_u.c());
+          l1z = 
+          (plane_l.a()*CGAL::to_double(source.x()) + plane_l.b()*CGAL::to_double(source.y()) + plane_l.d()) / (-plane_l.c());
+          l2z = 
+          (plane_l.a()*CGAL::to_double(target.x()) + plane_l.b()*CGAL::to_double(target.y()) + plane_l.d()) / (-plane_l.c());
+        } else {
+          l1z = l2z = edge->face()->data().elevation_avg;
+          u1z = u2z = edge->twin()->face()->data().elevation_avg;
+        }
+        // set base (ground) elevation to vertices adjacent to a face oustide the building fp
+        if (fp_u && !fp_l) l1z=l2z=base_elevation;
+        if (!fp_u && fp_l) u1z=u2z=base_elevation;
         // push 2 triangles to form the quad between lower and upper edges
         // notice that this is not always topologically correct, but fine for visualisation
         
         // define four points of the quad between upper and lower edge
         std::array<float,3> l1,l2,u1,u2;
         l1 = {
-          float(CGAL::to_double(edge->source()->point().x())),
-          float(CGAL::to_double(edge->source()->point().y())),
-          h1
+          float(CGAL::to_double(source.x())),
+          float(CGAL::to_double(source.y())),
+          l1z
         };
         l2 = {
-          float(CGAL::to_double(edge->target()->point().x())),
-          float(CGAL::to_double(edge->target()->point().y())),
-          h1
+          float(CGAL::to_double(target.x())),
+          float(CGAL::to_double(target.y())),
+          l2z
         };
         u1 = {
-          float(CGAL::to_double(edge->source()->point().x())),
-          float(CGAL::to_double(edge->source()->point().y())),
-          h2
+          float(CGAL::to_double(source.x())),
+          float(CGAL::to_double(source.y())),
+          u1z
         };
         u2 = {
-          float(CGAL::to_double(edge->target()->point().x())),
-          float(CGAL::to_double(edge->target()->point().y())),
-          h2
+          float(CGAL::to_double(target.x())),
+          float(CGAL::to_double(target.y())),
+          u2z
         };
 
         // 1st triangle

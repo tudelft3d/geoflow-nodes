@@ -90,6 +90,7 @@ namespace geoflow::nodes::stepedge {
     bool do_walls=true, do_roofs=true;
     bool in_footprint = false;
     bool LoD2 = false;
+    float base_elevation = 0;
     public:
     using Node::Node;
     void init() {
@@ -108,8 +109,8 @@ namespace geoflow::nodes::stepedge {
       add_param("do_roofs", ParamBool(do_roofs, "Do roofs"));
       add_param("in_footprint", ParamBool(in_footprint, "in_footprint"));
       add_param("LoD2", ParamBool(LoD2, "LoD2"));
+      add_param("base_elevation", ParamFloat(base_elevation, "Base elevation"));
     }
-
     void process();
   };
 
