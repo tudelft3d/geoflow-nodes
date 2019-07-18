@@ -1,4 +1,4 @@
-#include <geoflow/core/geoflow.hpp>
+#include <geoflow/geoflow.hpp>
 
 #include <compute_ma_processing.h>
 #include <compute_normals_processing.h>
@@ -23,12 +23,11 @@ namespace geoflow::nodes::mat {
       add_output("ma_spoke_f1", typeid(vec3f));
       add_output("ma_spoke_f2", typeid(vec3f));
       add_output("ma_spokecross", typeid(vec3f));
-    }
-    void gui(){
-      ImGui::SliderFloat("initial_radius", &params.initial_radius, 0, 1000);
-      ImGui::SliderScalar("denoise_preserve", ImGuiDataType_Double, &params.denoise_preserve, &zero, &pi);
-      ImGui::SliderScalar("denoise_planar", ImGuiDataType_Double, &params.denoise_planar, &zero, &pi);
-      ImGui::Checkbox("nan_for_initr", &params.nan_for_initr);
+
+      add_param("initial_radius", ParamBoundedFloat(params.initial_radius, 0, 1000, "Initial radius");
+      add_param("denoise_preserve", ParamBoundedDouble(params.denoise_preserve, 0, pi, "Denoise preserve");
+      add_param("denoise_planar", ParamBoundedDouble(params.denoise_planar, 0, pi, "Denoise planar");
+      add_param("nan_for_initr", ParamBool(params.nan_for_initr, "NaN for initR"));
     }
     void process();
   };
@@ -41,9 +40,8 @@ namespace geoflow::nodes::mat {
     void init() {
       add_input("points", typeid(PointCollection));
       add_output("normals", typeid(vec3f));
-    }
-    void gui(){
-      ImGui::SliderInt("K", &params.k, 1, 100);
+      
+      add_param("k", ParamBoundedFloat(params.k, 1, 100, "k"));
     }
     void process();
   };
@@ -56,28 +54,25 @@ namespace geoflow::nodes::mat {
       add_input("directions", typeid(vec3f));
       add_output("segments", typeid(SegmentCollection));
     }
-    void gui(){
-    }
     void process();
   };
 
   class TestPointsNode:public Node {
+    int grid=10;
     public:
     using Node::Node;
     void init() {
       add_output("points", typeid(PointCollection));
       add_output("normals", typeid(vec3f));
       add_output("values", typeid(vec1f));
-      add_param("grid", (int) 10);
-    }
-    void gui(){
-      ImGui::InputInt("grid", &param<int>("grid"));
+      
+      add_param("grid", ParamInt(grid, "Grid size"));
     }
     void process() {
       PointCollection points;
       vec3f normals;
       vec1f values;
-      auto& N = param<int>("grid");
+      auto& N = grid;
       for(int i = 0; i<N; ++i) {
         for(int j = 0; j<N; ++j) {
           points.push_back({float(i),float(j),0});
@@ -96,6 +91,13 @@ namespace geoflow::nodes::mat {
   };
 
   class RegionGrowMedialAxisNode:public Node {
+    int shape_count = 15;
+    int min_count = 10;
+    float bisector_angle = 5;
+    float separation_angle = 5;
+    float ball_overlap = 1.2;
+    int k = 10;
+    int method = 0;
     public:
     using Node::Node;
     void init() {
@@ -105,13 +107,13 @@ namespace geoflow::nodes::mat {
       add_input("ma_radii", typeid(vec1f));
       add_output("segment_ids", typeid(vec1i));
 
-      add_param("shape_count", (int) 15);
-      add_param("min_count", (int) 10);
-      add_param("bisector_angle", (float) 5);
-      add_param("separation_angle", (float) 5);
-      add_param("ball_overlap", (float) 1.2);
-      add_param("k", (int) 10);
-      add_param("method", (int) 0);
+      add_param("shape_count", ParamInt(shape_count, "shape_count"));
+      add_param("min_count", ParamInt(min_count, "min_count"));
+      add_param("bisector_angle", ParamBoundedFloat(bisector_angle, 0, 180, "bisector_angle"));
+      add_param("separation_angle", ParamBoundedFloat(separation_angle, 0, 180, "separation_angle"));
+      add_param("ball_overlap", ParamBoundedFloat(ball_overlap, 0,10, "ball_overlap"));
+      add_param("k", ParamInt(k, "k"));
+      add_param("method", ParamInt(method, "method"));
     }
     void gui(){
       ImGui::SliderInt("k", &param<int>("k"), 0, 100);
