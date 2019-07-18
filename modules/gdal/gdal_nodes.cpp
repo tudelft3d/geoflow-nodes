@@ -56,7 +56,7 @@ namespace geoflow::nodes::gdal {
     auto layer_def = poLayer->GetLayerDefn();
     auto field_count = layer_def->GetFieldCount();
   
-//    output_group("attributes").clear();
+   output_group("attributes").clear();
     for (size_t i=0; i < field_count; ++i) {
       auto field_def = layer_def->GetFieldDefn(i);
       auto t = field_def->GetType();
