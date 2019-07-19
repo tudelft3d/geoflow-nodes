@@ -8,19 +8,30 @@ namespace regiongrower {
 
   using namespace std;
 
+  class Region {
+    size_t region_id;
+    public:
+    Region(size_t region_id) : region_id(region_id) {};
+    
+    size_t get_region_id() {
+      return region_id;
+    }
+  };
+
 // typename std::enable_if<std::is_base_of<Implementation, T>::value, bool>::type 
   template <typename candidateDS, typename regionType> class RegionGrower {
+    size_t cur_region_id=1;
     public:
     vector<size_t> region_ids;
     vector<regionType> regions;
     size_t min_segment_count=15;
-    size_t cur_region_id=1;
+    map<pair<size_t, size_t>, size_t> adjacencies; // key: pair of region ids with lowest id first, value: number of neighbour detect between the two regions
 
     private:
     template <typename Tester> inline bool grow_one_region(candidateDS& cds, Tester& tester, size_t& seed_handle) {
       deque<size_t> candidates;
       vector<size_t> handles_in_region;
-      regions.push_back(regionType());
+      regions.push_back(regionType(cur_region_id));
 
       candidates.push_back(seed_handle);
       handles_in_region.push_back(seed_handle);
@@ -29,7 +40,14 @@ namespace regiongrower {
       while (candidates.size()>0) {
         auto candidate = candidates.front(); candidates.pop_front();
         for (auto neighbour: cds.get_neighbours(candidate)) {
-          if (region_ids[neighbour]!=0) continue;
+          if (region_ids[neighbour]!=0) {
+            continue;
+            auto region_pair = make_pair(region_ids[neighbour], cur_region_id);
+            if (adjacencies.count(region_pair)>0)
+              adjacencies[region_pair]++;
+            else
+              adjacencies[region_pair]=1;
+          }
           if (tester.is_valid(cds, candidate, neighbour, regions.back())) {
             candidates.push_back(neighbour);
             handles_in_region.push_back(neighbour);
@@ -53,7 +71,7 @@ namespace regiongrower {
 
       region_ids.resize(cds.size, 0);
       // first region means unsegmented
-      regions.push_back(regionType());
+      regions.push_back(regionType(0));
 
       // region growing from seed points
       while (seeds.size()>0) {

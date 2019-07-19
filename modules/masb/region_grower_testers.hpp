@@ -1,84 +1,24 @@
 #pragma once
 
-#include <deque>
-#include <random>
-#include <algorithm>
-
 #include <geoflow/common.hpp>
-
-#include <CGAL/property_map.h>
-#include <CGAL/Orthogonal_k_neighbor_search.h>
-#include <CGAL/Search_traits_3.h>
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Search_traits_adapter.h>
+#include "../region_grower_DS_CGAL.hpp"
+#include "../region_grower.hpp"
 
 using namespace std;
 
-class MaData {
-
-  typedef CGAL::Exact_predicates_inexact_constructions_kernel cgal_kernel;
-  typedef cgal_kernel::Point_3 Point;
-  typedef std::pair<Point,size_t> point_index;
-  typedef CGAL::Search_traits_3<cgal_kernel>                       Traits_base;
-  typedef CGAL::Search_traits_adapter<point_index,
-  CGAL::First_of_pair_property_map<point_index>,
-  Traits_base>                                              TreeTraits;
-  typedef CGAL::Orthogonal_k_neighbor_search<TreeTraits> Neighbor_search;
-  typedef Neighbor_search::Tree Tree;
-
-  typedef vector<vector<size_t>> vecvecui;
-
+class MaData : public CGAL_RegionGrowerDS
   public:
-  geoflow::PointCollection& ma_points;
   geoflow::vec3f& ma_bisector;
   geoflow::vec1f& ma_sepangle;
   geoflow::vec1f& ma_radii;
-  vecvecui neighbours;
-  size_t size;
   
   MaData(geoflow::PointCollection& ma_points, geoflow::vec3f& ma_bisector, geoflow::vec1f& ma_sepangle, geoflow::vec1f& ma_radii, size_t N=15) 
-    : ma_points(ma_points), ma_bisector(ma_bisector), ma_sepangle(ma_sepangle), ma_radii(ma_radii)
-  {
-    size = ma_points.size();
-    
-    vector<point_index> indexed_points;
-    indexed_points.reserve(size);
-    
-    size_t i=0;
-    for(auto p: ma_points)
-      indexed_points.push_back(std::make_pair(Point(p[0], p[1], p[2]),i++));
-    Tree tree;
-    tree.insert(indexed_points.begin(), indexed_points.end());
-    neighbours.resize(size);
-    
-    for(auto pi : indexed_points){
-      auto p = pi.first;
-      neighbours[pi.second].reserve(N);
-      Neighbor_search search(tree, p, N+1);
-      auto gp = glm::make_vec3(ma_points[pi.second].data());
-      // skip the first point since it is identical to the query point
-      for (auto neighbour = search.begin()+1 ; neighbour < search.end(); ++neighbour) {
-        neighbours[pi.second].push_back(neighbour->first.second);
-        // std::cout << pi.second << " : " << glm::distance(gp,glm::make_vec3(ma_points[neighbour->first.second].data())) << "\n";
-      }
-    }
-  };
-  deque<size_t> get_seeds() {
-    deque<size_t> seeds;
-    for (size_t i=0; i<size; ++i) {
-      seeds.push_back(i);
-    }
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(seeds.begin(), seeds.end(), g);
-    return seeds;
-  }
-  vector<size_t> get_neighbours(size_t idx) {
-    return neighbours[idx];
-  }
+    : CGAL_RegionGrowerDS(ma_points, N), ma_bisector(ma_bisector), ma_sepangle(ma_sepangle), ma_radii(ma_radii)
 };
 
-struct Region {
+class Region : public: regiongrower::Region {
+  public:
+  using Region::Region;
   size_t count=0;
 };
 

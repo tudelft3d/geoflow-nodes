@@ -1,7 +1,3 @@
-#include "stepedge_nodes.hpp"
-#include "region_growing_plane.h"
-// #include "gloo.h"
-#include "ptinpoly.h"
 #include <earcut.hpp>
 
 #include <lasreader.hpp>
@@ -20,6 +16,10 @@
 #include <CGAL/Polyline_simplification_2/simplify.h>
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Constrained_triangulation_plus_2.h>
+
+#include "stepedge_nodes.hpp"
+#include "plane_detect.hpp"
+#include "ptinpoly.h"
 
 // #include <filesystem>
 // namespace fs=std::filesystem;
@@ -1636,21 +1636,30 @@ void DetectPlanesNode::process() {
 
   // convert to lists required by the planedetector class
   // size_t i=0;
-  std::vector<Point> points_vec;
-  std::vector<Vector> normals_vec;
+  PointCollection points_vec;
+  vec3f normals_vec;
   points_vec.reserve(points.size());
-  for (auto &p : pnl_points) {
-    points_vec.push_back(boost::get<0>(p));
-    normals_vec.push_back(boost::get<1>(p));
+  for (auto &pt : pnl_points) {
+    auto& p = boost::get<0>(pt);
+    auto& n = boost::get<1>(pt);
+    points_vec.push_back(
+      {float(CGAL::to_double(p.x())), float(CGAL::to_double(p.y())), float(CGAL::to_double(p.z()))}
+    );
+    normals_vec.push_back(
+      {float(CGAL::to_double(n.x())), float(CGAL::to_double(n.y())), float(CGAL::to_double(n.z()))}
+    );
   }
   // perform plane detection
-  planedect::PlaneDetector PD(points_vec, normals_vec);
-  PD.dist_thres = metrics_plane_epsilon * metrics_plane_epsilon;
-  PD.normal_thres = metrics_plane_normal_threshold;
-  PD.min_segment_count = metrics_plane_min_points;
-  PD.N = metrics_normal_k;
-  PD.n_refit = n_refit;
-  PD.detect();
+  planedect::PlaneDS PDS(points_vec, normals_vec, metrics_normal_k);
+  planedect::DistAndNormalTester DNTester(
+    metrics_plane_epsilon * metrics_plane_epsilon,
+    metrics_plane_normal_threshold,
+    n_refit
+  );
+  regiongrower::RegionGrower<planedect::PlaneDS, planedect::PlaneRegion> R;
+  R.min_segment_count = metrics_plane_min_points;
+  R.grow_regions(PDS, DNTester);
+
 
   // classify horizontal/vertical planes using plane normals
   std::unordered_map<int, std::pair<Plane, std::vector<Point>>> pts_per_roofplane;
@@ -1658,8 +1667,8 @@ void DetectPlanesNode::process() {
   size_t slant_roofplane_cnt=0;
   if (only_horizontal) pts_per_roofplane[-1].second = std::vector<Point>();
   size_t horiz_pt_cnt=0, total_pt_cnt=0;
-  for(auto seg: PD.segment_shapes){
-    auto& plane = seg.second;
+  for(auto region: R.regions){
+    auto& plane = region.plane;
     Vector n = plane.orthogonal_vector();
     // this dot product is close to 0 for vertical planes
     auto horizontality = CGAL::abs(n*Vector(0,0,1));
@@ -1668,12 +1677,15 @@ void DetectPlanesNode::process() {
 
     // put slanted surface points at index -1 if we care only about horzontal surfaces
     if (!is_wall) {
-      auto segpts = PD.get_points(seg.first);
+      std::vector<Point> segpts;
+      for (auto& i : region.inliers) {
+        segpts.push_back(boost::get<0>(pnl_points[i]));
+      }
       total_pt_cnt += segpts.size();
       if (!only_horizontal ||
           (only_horizontal && is_horizontal)) {
-        pts_per_roofplane[seg.first].second = segpts;
-        pts_per_roofplane[seg.first].first = plane;
+        pts_per_roofplane[region.get_region_id()].second = segpts;
+        pts_per_roofplane[region.get_region_id()].first = plane;
         horiz_pt_cnt += segpts.size();
       } else if (!is_horizontal) {
         pts_per_roofplane[-1].second.insert(
@@ -1688,9 +1700,8 @@ void DetectPlanesNode::process() {
     else if (!is_wall && !is_horizontal)
       ++slant_roofplane_cnt;
 
-    auto plane_idx = PD.get_point_indices(seg.first);
-    for (size_t& i : plane_idx) {
-      boost::get<2>(pnl_points[i]) = seg.first;
+    for (size_t& i : region.inliers) {
+      boost::get<2>(pnl_points[i]) = region.get_region_id();
       boost::get<3>(pnl_points[i]) = is_wall;
       boost::get<9>(pnl_points[i]) = is_horizontal;
     }
@@ -1698,7 +1709,7 @@ void DetectPlanesNode::process() {
 
   bool b_is_horizontal = float(horiz_pt_cnt)/float(total_pt_cnt) > horiz_min_count;
   int building_type=-2; // as built: -2=undefined; -1=no pts; 0=LOD1, 1=LOD1.3, 2=LOD2
-  if (PD.segment_shapes.size()==0) {
+  if (R.regions.size()==0) {
     building_type=-1;
   } else if (horiz_roofplane_cnt==1 && slant_roofplane_cnt==0){
     building_type=0;
