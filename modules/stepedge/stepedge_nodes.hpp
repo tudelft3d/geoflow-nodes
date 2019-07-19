@@ -127,47 +127,6 @@ namespace geoflow::nodes::stepedge {
     void process();
   };
 
-  class ProcessArrangementNode:public Node {
-    float step_height_threshold = 1.0;
-    float zrange_threshold = 0.2;
-    bool merge_segid = true;
-    bool merge_zrange = false;
-    bool merge_step_height = true;
-    bool merge_unsegmented = false;
-    bool merge_dangling_egdes = false;
-    public:
-    using Node::Node;
-    void init() {
-      add_input("arrangement", typeid(Arrangement_2));
-      add_input("points", typeid(PNL_vector));
-      add_output("arrangement", typeid(Arrangement_2));
-
-      add_param("step_height_threshold", ParamFloat(step_height_threshold, "step_height_threshold"));
-      add_param("zrange_threshold", ParamFloat(zrange_threshold, "zrange_threshold"));
-      add_param("merge_segid", ParamBool(merge_segid, "merge_segid"));
-      add_param("merge_zrange", ParamBool(merge_zrange, "merge_zrange"));
-      add_param("merge_step_height", ParamBool(merge_step_height, "merge_step_height"));
-      add_param("merge_unsegmented", ParamBool(merge_unsegmented, "merge_unsegmented"));
-      add_param("merge_dangling_egdes", ParamBool(merge_dangling_egdes, "merge_dangling_egdes"));
-    }
-    void process();
-  };
-
-  class BuildArrangementNode:public Node {
-    bool remove_unsupported=false;
-    public:
-    using Node::Node;
-    void init() {
-      add_input("edge_segments", {typeid(LineStringCollection), typeid(LinearRingCollection)});
-      add_input("footprint", typeid(LinearRing));
-      add_output("arrangement", typeid(Arrangement_2));
-      add_output("arr_segments", typeid(LineStringCollection));
-
-      add_param("remove_unsupported", ParamBool(remove_unsupported, "Remove unsupported edges"));
-    }
-    void process();
-  };
-
   class BuildArrFromRingsExactNode:public Node {
     bool extrude_unsegmented = true;
     float extrude_mindensity = 5;
@@ -360,6 +319,7 @@ namespace geoflow::nodes::stepedge {
       add_output("classf", typeid(float));
       add_output("horiz_roofplane_cnt", typeid(float));
       add_output("slant_roofplane_cnt", typeid(float));
+      add_output("plane_adjancenies", typeid(std::map<std::pair<size_t, size_t>, size_t>));
 
       add_param("only_horizontal", ParamBool(only_horizontal, "Output only horizontal planes"));
       add_param("horiz_min_count", ParamFloat(horiz_min_count, "Min horiz point count"));
@@ -376,40 +336,6 @@ namespace geoflow::nodes::stepedge {
       auto param_ishoriz = std::get<ParamFloat>(parameters.at("metrics_is_horizontal_threshold"));
       param_count.set_visible(only_horizontal);
       param_ishoriz.set_visible(only_horizontal);
-    }
-    void process();
-  };
-
-  class ComputeMetricsNode:public Node {
-    int metrics_normal_k = 10;
-    int metrics_plane_min_points = 50;
-    float metrics_plane_epsilon = 0.15;
-    float metrics_plane_normal_threshold = 0.75;
-    float metrics_is_horizontal_threshold = 0.9;
-    float metrics_is_wall_threshold = 0.3;
-    int metrics_k_linefit = 15;
-    int metrics_k_jumpcnt_elediff = 10;
-    public:
-    using Node::Node;
-    void init() {
-      add_output("points", typeid(PNL_vector));
-      add_input("points", typeid(PointCollection)); // change to Feature
-      add_output("plane_id", typeid(vec1i));
-      add_output("is_wall", typeid(vec1i));
-      add_output("is_horizontal", typeid(vec1i));
-      add_output("line_dist", typeid(vec1f));
-      add_output("jump_count", typeid(vec1f));
-      add_output("jump_ele", typeid(vec1f));
-      add_output("points_c", typeid(PointCollection));
-
-      add_param("metrics_normal_k", ParamInt(metrics_normal_k, "K estimate normal"));
-      add_param("metrics_plane_min_points", ParamInt(metrics_plane_min_points, "Plane min points"));
-      add_param("metrics_plane_epsilon", ParamFloat(metrics_plane_epsilon, "Plane epsilon"));
-      add_param("metrics_plane_normal_threshold", ParamFloat(metrics_plane_normal_threshold, "Plane normal thres"));
-      add_param("metrics_is_horizontal_threshold", ParamFloat(metrics_is_horizontal_threshold, "Is horizontal"));
-      add_param("metrics_is_wall_threshold", ParamFloat(metrics_is_wall_threshold, "Wall angle thres"));
-      add_param("metrics_k_linefit", ParamInt(metrics_k_linefit, "K linefit"));
-      add_param("metrics_k_jumpcnt_elediff", ParamInt(metrics_k_jumpcnt_elediff, "K jumpedge"));
     }
     void process();
   };

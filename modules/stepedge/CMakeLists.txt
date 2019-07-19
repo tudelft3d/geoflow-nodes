@@ -29,7 +29,6 @@ add_library(gfp_stepedge MODULE
   plugin.cpp
   stepedge_nodes.cpp
   point_edge.cpp
-  region_growing_plane.cpp
   region_growing.cpp
 )
 target_link_libraries( gfp_stepedge

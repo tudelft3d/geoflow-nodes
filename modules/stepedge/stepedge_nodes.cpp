@@ -603,25 +603,6 @@ void ExtruderNode::process(){
   output("labels_vec1i").set(labels);
 }
 
-void ProcessArrangementNode::process(){
-  // Set up vertex data (and buffer(s)) and attribute pointers
-  auto points = input("points").get<PNL_vector>();
-  auto arr = input("arrangement").get<Arrangement_2>();
-
-  config c;
-  c.step_height_threshold = step_height_threshold;
-  c.zrange_threshold = zrange_threshold;
-  c.merge_segid = merge_segid;
-  c.merge_zrange = merge_zrange;
-  c.merge_step_height = merge_step_height;
-  c.merge_unsegmented = merge_unsegmented;
-  c.merge_dangling_egdes = merge_dangling_egdes;
-
-  process_arrangement(points, arr, c);
-  
-  output("arrangement").set(arr);
-}
-
 void arr2segments(Face_handle& face, LineStringCollection& segments) {
   auto he = face->outer_ccb();
   auto first = he;
@@ -654,23 +635,6 @@ void arr2segments(Face_handle& face, LineStringCollection& segments) {
   //   }
   // });
 }
-
-void BuildArrangementNode::process(){
-  // Set up vertex data (and buffer(s)) and attribute pointers
-  auto footprint = input("footprint").get<LinearRing>();
-  auto geom_term = input("edge_segments");
-
-  Arrangement_2 arr;
-  auto edge_segments = geom_term.get<LineStringCollection>();
-  build_arrangement(footprint, edge_segments, arr, remove_unsupported);
-  LineStringCollection segments;
-  for (auto& face: arr.face_handles()){
-    if (face->data().in_footprint)
-      arr2segments(face, segments);
-  }
-  output("arr_segments").set(segments);
-  output("arrangement").set(arr);
-};
 
 void LinearRingtoRingsNode::process(){
   auto lr = input("linear_ring").get<LinearRing>();
@@ -1735,53 +1699,8 @@ void DetectPlanesNode::process() {
   output("plane_id").set(plane_id);
   output("is_wall").set(is_wall);
   output("is_horizontal").set(is_horizontal);
-}
 
-void ComputeMetricsNode::process() {
-  auto points = input("points").get<PointCollection>();
-
-  config c;
-  c.metrics_normal_k = metrics_normal_k;
-  c.metrics_plane_min_points = metrics_plane_min_points;
-  c.metrics_plane_epsilon = metrics_plane_epsilon;
-  c.metrics_plane_normal_threshold = metrics_plane_normal_threshold;
-  c.metrics_is_wall_threshold = metrics_is_wall_threshold;
-  c.metrics_is_horizontal_threshold = metrics_is_horizontal_threshold;
-  c.metrics_k_linefit = metrics_k_linefit;
-  c.metrics_k_jumpcnt_elediff = metrics_k_jumpcnt_elediff;
-
-  PNL_vector pnl_points;
-  for (auto& p : points) {
-    PNL pv;
-    boost::get<0>(pv) = Point(p[0], p[1], p[2]);
-    pnl_points.push_back(pv);
-  }
-  compute_metrics(pnl_points, c);
-  vec1f line_dist, jump_count, jump_ele;
-  vec1i plane_id, is_wall, is_horizontal;
-  PointCollection points_c;
-  for(auto& p : pnl_points){
-    plane_id.push_back(boost::get<2>(p));
-    is_wall.push_back(boost::get<3>(p));
-    is_horizontal.push_back(boost::get<9>(p));
-    line_dist.push_back(boost::get<4>(p));
-    jump_count.push_back(boost::get<5>(p));
-    jump_ele.push_back(boost::get<7>(p));
-    std::array<float,3> a = {
-            float(boost::get<0>(p).x()),
-            float(boost::get<0>(p).y()),
-            float(boost::get<0>(p).z())
-          };
-    points_c.push_back(a);
-  }
-  output("points").set(pnl_points);
-  output("points_c").set(points_c);
-  output("plane_id").set(plane_id);
-  output("is_wall").set(is_wall);
-  output("is_horizontal").set(is_horizontal);
-  output("line_dist").set(line_dist);
-  output("jump_count").set(jump_count);
-  output("jump_ele").set(jump_ele);
+  output("plane_adjancenies").set(R.adjacencies);
 }
 
 pGridSet build_grid(vec3f& ring) {

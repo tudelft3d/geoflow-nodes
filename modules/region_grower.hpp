@@ -25,7 +25,7 @@ namespace regiongrower {
     vector<size_t> region_ids;
     vector<regionType> regions;
     size_t min_segment_count=15;
-    map<pair<size_t, size_t>, size_t> adjacencies; // key: pair of region ids with lowest id first, value: number of neighbour detect between the two regions
+    map<size_t, vector<size_t>> adjacencies; // key: highes plane id, value: vector with adjacent plane_ids (all lower)
 
     private:
     template <typename Tester> inline bool grow_one_region(candidateDS& cds, Tester& tester, size_t& seed_handle) {
@@ -42,11 +42,10 @@ namespace regiongrower {
         for (auto neighbour: cds.get_neighbours(candidate)) {
           if (region_ids[neighbour]!=0) {
             continue;
-            auto region_pair = make_pair(region_ids[neighbour], cur_region_id);
-            if (adjacencies.count(region_pair)>0)
-              adjacencies[region_pair]++;
+            if (adjacencies.count(cur_region_id)>0)
+              adjacencies.emplace(cur_region_id, std::vector<size_t>());
             else
-              adjacencies[region_pair]=1;
+              adjacencies[cur_region_id].push_back(region_ids[neighbour]);
           }
           if (tester.is_valid(cds, candidate, neighbour, regions.back())) {
             candidates.push_back(neighbour);
