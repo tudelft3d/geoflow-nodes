@@ -298,6 +298,7 @@ namespace geoflow::nodes::stepedge {
     bool only_horizontal = true;
     float horiz_min_count = 0.95;
     int metrics_normal_k = 10;
+    int metrics_plane_k = 10;
     int metrics_plane_min_points = 20;
     float metrics_plane_epsilon = 0.2;
     float metrics_plane_normal_threshold = 0.75;
@@ -319,11 +320,12 @@ namespace geoflow::nodes::stepedge {
       add_output("classf", typeid(float));
       add_output("horiz_roofplane_cnt", typeid(float));
       add_output("slant_roofplane_cnt", typeid(float));
-      add_output("plane_adjancenies", typeid(std::map<std::pair<size_t, size_t>, size_t>));
+      add_output("plane_adj", typeid(std::map<size_t, std::map<size_t, size_t>>));
 
       add_param("only_horizontal", ParamBool(only_horizontal, "Output only horizontal planes"));
       add_param("horiz_min_count", ParamFloat(horiz_min_count, "Min horiz point count"));
       add_param("metrics_normal_k", ParamInt(metrics_normal_k, "K estimate normal"));
+      add_param("metrics_plane_k", ParamInt(metrics_plane_k, "Knn plane segmentation"));
       add_param("metrics_plane_min_points", ParamInt(metrics_plane_min_points, "Plane min points"));
       add_param("metrics_plane_epsilon", ParamFloat(metrics_plane_epsilon, "Plane epsilon"));
       add_param("metrics_plane_normal_threshold", ParamFloat(metrics_plane_normal_threshold, "Plane normal thres"));
@@ -464,6 +466,23 @@ namespace geoflow::nodes::stepedge {
       return "Result: " + std::to_string(input("in").get<float>());
     }
     void process(){};
+  };
+
+
+  class PlaneIntersectNode:public Node {
+    public:
+    using Node::Node;
+    void init() {
+      add_input("pts_per_roofplane", 
+        {typeid(std::unordered_map<int, std::pair<Plane, std::vector<Point>>>)});
+      add_input("plane_adj", 
+        {typeid(std::map<size_t, std::map<size_t, size_t>>)});
+      add_input("alpha_rings", 
+        {typeid(LinearRingCollection)});
+
+      add_output("lines", typeid(SegmentCollection));
+    }
+    void process();
   };
 
 

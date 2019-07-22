@@ -1614,7 +1614,7 @@ void DetectPlanesNode::process() {
     );
   }
   // perform plane detection
-  planedect::PlaneDS PDS(points_vec, normals_vec, metrics_normal_k);
+  planedect::PlaneDS PDS(points_vec, normals_vec, metrics_plane_k);
   planedect::DistAndNormalTester DNTester(
     metrics_plane_epsilon * metrics_plane_epsilon,
     metrics_plane_normal_threshold,
@@ -1700,7 +1700,7 @@ void DetectPlanesNode::process() {
   output("is_wall").set(is_wall);
   output("is_horizontal").set(is_horizontal);
 
-  output("plane_adjancenies").set(R.adjacencies);
+  output("plane_adj").set(R.adjacencies);
 }
 
 pGridSet build_grid(vec3f& ring) {
@@ -2148,6 +2148,77 @@ LinearRing simplify_footprint(LinearRing& polygon, float& threshold_stop_cost) {
       return footprint_vec3f;
     } else 
       return polygon;
+}
+
+void PlaneIntersectNode::process() {
+  auto pts_per_roofplane = input("pts_per_roofplane").get<std::unordered_map<int, std::pair<Plane, std::vector<Point>>>>();
+  auto plane_adj = input("plane_adj").get<std::map<size_t, std::map<size_t, size_t>>>();
+  auto alpha_rings = input("alpha_rings").get<LinearRingCollection>();
+
+  SegmentCollection lines;
+  size_t ring_cntr=0;
+  // std::cerr << "\n#ar's=" << alpha_rings.size() << "\n";
+  std::cerr << "\n#adfjs=" << plane_adj.size() << "\n";
+  for(auto& [id_hi, ids_lo] : plane_adj) {
+    std::cerr << id_hi << " - ";
+    auto& plane_hi = pts_per_roofplane[id_hi].first;
+    auto& plane_pts = pts_per_roofplane[id_hi].second;
+    // auto& alpha_ring = alpha_rings[ring_cntr++];
+    for (auto& [id_lo, cnt] : ids_lo) {
+      std::cerr << id_lo << " ";
+      auto& plane_lo = pts_per_roofplane[id_lo].first;
+      auto result = CGAL::intersection(plane_hi, plane_lo);
+      if (result) {
+        // bound the line to projection of alpha shape
+        if (auto l = boost::get<typename Kernel::Line_3>(&*result)) {
+          std::cerr << " (i) ";
+          // auto lp = l->point();
+          // auto lv = l->to_vector();
+          // lv = lv / CGAL::sqrt(lv.squared_length());
+          // double dmin, dmax;
+          // Point pmin, pmax;
+          // bool setminmax=false;
+          // // std::cerr << "\nar len=" << alpha_ring.size() << "\n";
+          // for (auto& p : plane_pts) {
+          //   std::cerr << " [" << p[0] << ", "<< p[1] << ", " << p[2] << "] ";
+          //   auto av = p-lp;
+          //   auto d = av*lv;
+          //   if (!setminmax) {
+          //     setminmax=true;
+          //     dmin=dmax=d;
+          //     pmin=pmax=p;
+          //   }
+          //   if (d < dmin){
+          //     dmin = d;
+          //     pmin = p;
+          //   }
+          //   if (d > dmax) {
+          //     dmax = d;
+          //     pmax = p;
+          //   }
+          // }
+          // auto ppmin = l->projection(pmin);
+          // auto ppmax = l->projection(pmax);
+          auto ppmin = l->projection(Point(-100,-100,-100));
+          auto ppmax = l->projection(Point(100,100,100));
+          arr3f source = {
+            float(CGAL::to_double(ppmin.x())),
+            float(CGAL::to_double(ppmin.y())),
+            float(CGAL::to_double(ppmin.z()))
+          };
+          arr3f target = {
+            float(CGAL::to_double(ppmax.x())),
+            float(CGAL::to_double(ppmax.y())),
+            float(CGAL::to_double(ppmax.z()))
+          };
+          lines.push_back({source,target});
+        }
+      }
+    }
+    std::cerr << "\n";
+  }
+
+  output("lines").set(lines);
 }
 
 void SimplifyPolygonNode::process(){

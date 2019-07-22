@@ -21,6 +21,7 @@ void register_nodes(geoflow::NodeRegister& node_register) {
     node_register.register_node<Ring2SegmentsNode>("Ring2Segments");
     node_register.register_node<PrintResultNode>("PrintResult");
     node_register.register_node<PolygonGrowerNode>("PolygonGrower");
+    node_register.register_node<PlaneIntersectNode>("PlaneIntersect");
 }
 
 namespace geoflow::nodes::las {

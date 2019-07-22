@@ -25,7 +25,7 @@ namespace regiongrower {
     vector<size_t> region_ids;
     vector<regionType> regions;
     size_t min_segment_count=15;
-    map<size_t, vector<size_t>> adjacencies; // key: highes plane id, value: vector with adjacent plane_ids (all lower)
+    map<size_t, map<size_t, size_t>> adjacencies; // key: highes plane id, value: vector with adjacent plane_ids (all lower)
 
     private:
     template <typename Tester> inline bool grow_one_region(candidateDS& cds, Tester& tester, size_t& seed_handle) {
@@ -41,11 +41,10 @@ namespace regiongrower {
         auto candidate = candidates.front(); candidates.pop_front();
         for (auto neighbour: cds.get_neighbours(candidate)) {
           if (region_ids[neighbour]!=0) {
+            if (region_ids[neighbour]!=cur_region_id){
+              adjacencies[cur_region_id][region_ids[neighbour]]++;
+            }
             continue;
-            if (adjacencies.count(cur_region_id)>0)
-              adjacencies.emplace(cur_region_id, std::vector<size_t>());
-            else
-              adjacencies[cur_region_id].push_back(region_ids[neighbour]);
           }
           if (tester.is_valid(cds, candidate, neighbour, regions.back())) {
             candidates.push_back(neighbour);
@@ -57,6 +56,7 @@ namespace regiongrower {
       // undo region if it doesn't satisfy quality criteria
       if (handles_in_region.size() < min_segment_count) {
         regions.erase(regions.end()-1);
+        adjacencies.erase(cur_region_id);
         for (auto handle: handles_in_region)
           region_ids[handle] = 0;
         return false;
