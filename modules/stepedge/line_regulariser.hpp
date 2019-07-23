@@ -37,7 +37,6 @@ namespace linereg {
 
     void add_segments(size_t priority, const Polygon_2& polygon, double offset) {
       size_t i=0;
-      segments[priority] = vec_ek_seg();
       auto orientation = polygon.orientation();
       for(auto edge = polygon.edges_begin(); edge != polygon.edges_end(); ++edge) {
         auto source = edge->source();
@@ -60,8 +59,8 @@ namespace linereg {
     }
 
     void add_segments(size_t priority, geoflow::SegmentCollection& segs) {
+      if (segs.size()==0) return;
       size_t i=0;
-      segments[priority] = vec_ek_seg();
       for(auto& edge : segs) {
         auto source = EK::Point_2(edge[0][0], edge[0][1]);
         auto target = EK::Point_2(edge[1][0], edge[1][1]);
@@ -277,6 +276,7 @@ namespace linereg {
 
         for(auto& i : cluster.idx) {
           auto pri = std::get<3>(lines[i]);
+          if (pri==2) continue; //HACK!
           auto j = std::get<4>(lines[i]);
           auto& edge = segments[pri][j];
           auto s_new = ref_line.projection(edge.source());

@@ -161,12 +161,13 @@ void AlphaShapeNode::process(){
                 as::FT(thres_alpha),
                 as::Alpha_shape_2::GENERAL);
     
+    double optimal_alpha = thres_alpha;
     if (optimal_alpha && optimal_only_if_needed) {
-      thres_alpha = std::max(float(*A.find_optimal_alpha(1)), thres_alpha);
+      optimal_alpha = std::max(float(*A.find_optimal_alpha(1)), thres_alpha);
     } else if (optimal_alpha) {
-      thres_alpha = *A.find_optimal_alpha(1);
+      optimal_alpha = *A.find_optimal_alpha(1);
     }
-    A.set_alpha(as::FT(thres_alpha));
+    A.set_alpha(as::FT(optimal_alpha));
 
     for (auto it = A.alpha_shape_vertices_begin(); it!=A.alpha_shape_vertices_end(); it++) {
       auto p = (*it)->point();
@@ -2020,6 +2021,7 @@ void chain(Segment& a, Segment& b, LinearRing& ring, const float& snap_threshold
 void RegulariseRingsNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto edges = input("edge_segments").get<SegmentCollection>();
+  auto ints_segments = input("ints_segments").get<SegmentCollection>();
   auto ring_idx = input("ring_idx").get<std::unordered_map<size_t,std::vector<size_t>>>();
   auto footprint = input("footprint").get<LinearRing>();
   // auto ring_id = input("ring_id").get<vec1i>();
@@ -2049,6 +2051,7 @@ void RegulariseRingsNode::process(){
   auto LR = linereg::LineRegulariser();
   LR.add_segments(0,edges);
   LR.add_segments(1,ek_footprint, (double) fp_offset);
+  LR.add_segments(2,ints_segments);
   LR.dist_threshold = dist_threshold;
   LR.angle_threshold = angle_threshold;
   LR.cluster(weighted_avg, angle_per_distcluster);
@@ -2155,52 +2158,56 @@ void PlaneIntersectNode::process() {
   auto plane_adj = input("plane_adj").get<std::map<size_t, std::map<size_t, size_t>>>();
   auto alpha_rings = input("alpha_rings").get<LinearRingCollection>();
 
+  float min_dist_to_line_sq = min_dist_to_line*min_dist_to_line;
+
   SegmentCollection lines;
   size_t ring_cntr=0;
-  // std::cerr << "\n#ar's=" << alpha_rings.size() << "\n";
-  std::cerr << "\n#adfjs=" << plane_adj.size() << "\n";
   for(auto& [id_hi, ids_lo] : plane_adj) {
-    std::cerr << id_hi << " - ";
     auto& plane_hi = pts_per_roofplane[id_hi].first;
     auto& plane_pts = pts_per_roofplane[id_hi].second;
     // auto& alpha_ring = alpha_rings[ring_cntr++];
     for (auto& [id_lo, cnt] : ids_lo) {
-      std::cerr << id_lo << " ";
+      // skip plain pairs with  low number of neighbouring points
+      if (cnt < min_neighb_pts) continue;
       auto& plane_lo = pts_per_roofplane[id_lo].first;
       auto result = CGAL::intersection(plane_hi, plane_lo);
       if (result) {
-        // bound the line to projection of alpha shape
+        // bound the line to extend of one plane's inliers
         if (auto l = boost::get<typename Kernel::Line_3>(&*result)) {
-          std::cerr << " (i) ";
-          // auto lp = l->point();
-          // auto lv = l->to_vector();
-          // lv = lv / CGAL::sqrt(lv.squared_length());
-          // double dmin, dmax;
-          // Point pmin, pmax;
-          // bool setminmax=false;
-          // // std::cerr << "\nar len=" << alpha_ring.size() << "\n";
-          // for (auto& p : plane_pts) {
-          //   std::cerr << " [" << p[0] << ", "<< p[1] << ", " << p[2] << "] ";
-          //   auto av = p-lp;
-          //   auto d = av*lv;
-          //   if (!setminmax) {
-          //     setminmax=true;
-          //     dmin=dmax=d;
-          //     pmin=pmax=p;
-          //   }
-          //   if (d < dmin){
-          //     dmin = d;
-          //     pmin = p;
-          //   }
-          //   if (d > dmax) {
-          //     dmax = d;
-          //     pmax = p;
-          //   }
-          // }
-          // auto ppmin = l->projection(pmin);
-          // auto ppmax = l->projection(pmax);
-          auto ppmin = l->projection(Point(-100,-100,-100));
-          auto ppmax = l->projection(Point(100,100,100));
+          auto lp = l->point();
+          auto lv = l->to_vector();
+          lv = lv / CGAL::sqrt(lv.squared_length());
+          double dmin, dmax;
+          Point pmin, pmax;
+          bool setminmax=false;
+          double sqd_min = 1 + min_dist_to_line_sq;
+          for (auto p : plane_pts) {
+            auto av = p-lp;
+            auto d = av*lv;
+            if (!setminmax) {
+              setminmax=true;
+              dmin=dmax=d;
+              pmin=pmax=p;
+            }
+            if (d < dmin){
+              dmin = d;
+              pmin = p;
+            }
+            if (d > dmax) {
+              dmax = d;
+              pmax = p;
+            }
+            sqd_min = std::min(sqd_min, CGAL::squared_distance(*l, p));
+          }
+          // skip this line if it is too far away any of the plane_pts
+          if(sqd_min > min_dist_to_line_sq)
+            continue;
+
+          auto ppmin = l->projection(pmin);
+          auto ppmax = l->projection(pmax);
+          
+          // auto ppmin = l->projection(Point(-100,-100,-100));
+          // auto ppmax = l->projection(Point(100,100,100));
           arr3f source = {
             float(CGAL::to_double(ppmin.x())),
             float(CGAL::to_double(ppmin.y())),
@@ -2215,7 +2222,6 @@ void PlaneIntersectNode::process() {
         }
       }
     }
-    std::cerr << "\n";
   }
 
   output("lines").set(lines);

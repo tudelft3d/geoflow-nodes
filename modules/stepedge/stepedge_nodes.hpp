@@ -8,7 +8,7 @@
 namespace geoflow::nodes::stepedge {
 
   class AlphaShapeNode:public Node {
-    float thres_alpha = 0.15;
+    float thres_alpha = 0.25;
     bool optimal_alpha = true;
     bool optimal_only_if_needed = true;
     public:
@@ -297,8 +297,8 @@ namespace geoflow::nodes::stepedge {
   class DetectPlanesNode:public Node {
     bool only_horizontal = true;
     float horiz_min_count = 0.95;
-    int metrics_normal_k = 10;
-    int metrics_plane_k = 10;
+    int metrics_normal_k = 5;
+    int metrics_plane_k = 15;
     int metrics_plane_min_points = 20;
     float metrics_plane_epsilon = 0.2;
     float metrics_plane_normal_threshold = 0.75;
@@ -428,6 +428,7 @@ namespace geoflow::nodes::stepedge {
     using Node::Node;
     void init() {
       add_input("edge_segments", typeid(SegmentCollection));
+      add_input("ints_segments", typeid(SegmentCollection));
       add_input("ring_idx", typeid(std::unordered_map<size_t,std::vector<size_t>>));
       // add_input("ring_id", typeid(vec1i));
       // add_input("ring_order", typeid(vec1i));
@@ -470,6 +471,8 @@ namespace geoflow::nodes::stepedge {
 
 
   class PlaneIntersectNode:public Node {
+    int min_neighb_pts = 5;
+    float min_dist_to_line = 1.0;
     public:
     using Node::Node;
     void init() {
@@ -481,6 +484,9 @@ namespace geoflow::nodes::stepedge {
         {typeid(LinearRingCollection)});
 
       add_output("lines", typeid(SegmentCollection));
+
+      add_param("min_neighb_pts", ParamInt(min_neighb_pts, "Minimum number of neighbouring points"));
+      add_param("min_dist_to_line", ParamFloat(min_dist_to_line, "Minimum number of neighbouring points"));
     }
     void process();
   };
