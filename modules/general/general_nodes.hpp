@@ -1,4 +1,4 @@
-#include <geoflow/core/geoflow.hpp>
+#include <geoflow/geoflow.hpp>
 
 namespace geoflow::nodes::general {
   class MergeGeometriesNode:public Node {
@@ -31,16 +31,26 @@ namespace geoflow::nodes::general {
   };
 
   class LineStringFilterNode:public Node {
+    float filter_length = 0.0;
   public:
     using Node::Node;
     void init() {
       add_input("line_strings", {typeid(LineStringCollection)});
       add_output("line_strings", typeid(LineStringCollection));
 
-      add_param("filter_length", (float)0.0);
+      add_param("filter_length", ParamFloat(filter_length, "Filter length"));
     }
-    void gui() {
-      ImGui::DragFloat("Length filter ", &param<float>("filter_length"), 10.0);
+    void process();
+  };
+
+  class OBJwriterNode:public Node {
+    std::string filepath;
+  public:
+    using Node::Node;
+    void init() {
+      add_input("triangles", {typeid(TriangleCollection)});
+
+      add_param("filepath", ParamPath(filepath, "File path"));
     }
     void process();
   };

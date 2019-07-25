@@ -1,5 +1,11 @@
 #include "general_nodes.hpp"
 
+#include <fstream>
+#include <sstream>
+#include <set>
+#include <vector>
+#include <map>
+
 namespace geoflow::nodes::general {
   void MergeGeometriesNode::process() {
     auto geometries1 = input("geometries1");
@@ -60,8 +66,6 @@ namespace geoflow::nodes::general {
   void LineStringFilterNode::process() {
     auto line_strings = input("line_strings").get<geoflow::LineStringCollection>();
 
-    auto filter_length = param<float>("filter_length");
-
     std::cout << "Filtering " << line_strings.size() << " lines\n";
     LineStringCollection out_line_strings;
     if (filter_length > 0.0) {
@@ -84,5 +88,40 @@ namespace geoflow::nodes::general {
     std::cout << "Filtered " << line_strings.size() - out_line_strings.size() << " lines\n";
 
     output("line_strings").set(out_line_strings);
+  }
+
+  void OBJwriterNode::process() {
+
+    auto& triangles = input("triangles").get<TriangleCollection&>();
+
+    std::map<arr3f, size_t> vertex_map;
+    std::vector<arr3f> vertex_vec;
+    // std::vector<std::tuple<size_t,size_t,size_t>> face_indices;
+    {
+      size_t v_cntr=1;
+      std::set<arr3f> vertex_set;
+      for (auto& triangle : triangles) {
+        for (auto& vertex : triangle) {
+          auto [it, did_insert] = vertex_set.insert(vertex);
+          if (did_insert) {
+            vertex_map[vertex] = v_cntr++;
+            vertex_vec.push_back(vertex);
+          }
+        }
+      }
+    }
+    std::ofstream ofs;
+    ofs.open(filepath);
+    // ofs << mtllib << std::endl;
+    ofs << std::fixed << std::setprecision(3);
+    for (auto& v : vertex_vec) {
+        ofs << "v " << v[0] << " " << v[1] << " " << v[2] << std::endl;
+    }
+    // ofs << "o " << uuid << std::endl;
+    // ofs << material << std::endl;
+    for (auto& triangle : triangles) {
+      ofs << "f " << vertex_map[triangle[0]] << " " << vertex_map[triangle[1]] << " " << vertex_map[triangle[2]] << std::endl;
+    }
+    ofs.close();
   }
 }
