@@ -60,7 +60,7 @@ void CDTNode::process(){
 
   CDT cdt;
 
-  if (geom_term.connected_type == typeid(PointCollection)) {
+  if (geom_term.connected_type(typeid(PointCollection))) {
     auto points = geom_term.get<geoflow::PointCollection>();
     
     std::cout << "Adding points to CDT\n";
@@ -68,7 +68,7 @@ void CDTNode::process(){
       cdt.insert(Point(p[0], p[1], p[2]));
     }
   }
-  else if (geom_term.connected_type == typeid(LineStringCollection)) {
+  else if (geom_term.connected_type(typeid(LineStringCollection))) {
     auto lines = geom_term.get<geoflow::LineStringCollection>();
 
     std::cout << "Adding lines to CDT\n";
@@ -342,7 +342,7 @@ LineStringCollection densify_linestrings(LineStringCollection line_strings, floa
 void DensifyNode::process(){
   auto geom_term = input("geometries");
 
-  if (geom_term.connected_type == typeid(LineStringCollection)) {
+  if (geom_term.connected_type(typeid(LineStringCollection))) {
     auto lines = geom_term.get<geoflow::LineStringCollection>();
     output("dense_linestrings").set(densify_linestrings(lines, interval));
   }
@@ -397,12 +397,12 @@ void TinSimpNode::process(){
   tinsimp::CDT cdt;
 
   std::cout << "Adding points to CDT\n";
-  if (geom_term.connected_type == typeid(PointCollection)) {
+  if (geom_term.connected_type(typeid(PointCollection))) {
     auto points = geom_term.get<geoflow::PointCollection>();
     build_initial_tin(cdt, points.box());
     tinsimp::greedy_insert(cdt, points, double(thres_error));
     delete_initial_tin(cdt, points.box());
-  } else if (geom_term.connected_type == typeid(LineStringCollection)) {
+  } else if (geom_term.connected_type(typeid(LineStringCollection))) {
     auto lines = geom_term.get<geoflow::LineStringCollection>();
     build_initial_tin(cdt, lines.box());
     std::vector<size_t> line_counts, selected_line_counts;

@@ -1124,7 +1124,7 @@ void BuildArrFromRingsExactNode::process() {
 
   auto fp_in = input("footprint");
   linereg::Polygon_2 footprint;
-  if (fp_in.connected_type == typeid(linereg::Polygon_2))
+  if (fp_in.connected_type(typeid(linereg::Polygon_2)))
     footprint = fp_in.get<linereg::Polygon_2>();
   else {
     auto& lr = fp_in.get<LinearRing&>();
@@ -1188,6 +1188,24 @@ void BuildArrFromRingsExactNode::process() {
   auto nosegid_area = arr_measure_nosegid(arr_base);
   
   arr_process(arr_base);
+
+  // compute vertical errors roof points wrt arrangement
+  typedef CGAL::Arr_walk_along_line_point_location<Arrangement_2> Point_location;
+  Point_location pl(arr_base);
+  for (auto& [plane_id, plane_pts] : points_per_plane) {
+    if (plane_id<1) continue;
+    for (auto& p : plane_pts.second) {
+      auto obj = pl.locate( Point_2(p.x(), p.y()) );
+      if (auto f = boost::get<Face_const_handle>(&obj)) {
+        auto fh = arr_base.non_const_handle(*f);
+        if (fh->data().segid!=0 && fh->data().in_footprint) {
+          double d = CGAL::squared_distance(fh->data().plane, p);
+          std::cerr << d << "\n";
+          fh->data().rms_error_to_avg += d;
+        }
+      }
+    }
+  }
   
   arr_is_valid = arr_base.is_valid();
   vcount = arr_base.number_of_vertices();
@@ -1471,7 +1489,7 @@ void DetectLinesNode::process(){
   vec1i ring_order, ring_id, is_start;
   std::unordered_map<size_t,std::vector<size_t>> ring_idx;
   // fit lines in all input points
-  if (input_geom.connected_type == typeid(PointCollection)) {
+  if (input_geom.connected_type(typeid(PointCollection))) {
     std::vector<linedect::Point> cgal_pts;
     auto points = input_geom.get<PointCollection>();
     for( auto& p : points ) {
@@ -1482,7 +1500,7 @@ void DetectLinesNode::process(){
     LD.get_bounded_edges(edge_segments);
 
   // fit lines per ring
-  } else if (input_geom.connected_type == typeid(LinearRingCollection)) {
+  } else if (input_geom.connected_type(typeid(LinearRingCollection))) {
     auto rings = input_geom.get<LinearRingCollection>();
     auto roofplane_ids = input("roofplane_ids").get<vec1i>();
     int n = k;
@@ -2232,12 +2250,12 @@ void SimplifyPolygonNode::process(){
 
   auto geom_term = input("polygons");
 
-  if (geom_term.connected_type==typeid(LinearRing)) {
+  if (geom_term.connected_type(typeid(LinearRing))) {
     auto& polygon = geom_term.get<LinearRing&>();
     output("polygon_simp").set(
       simplify_footprint(polygon, threshold_stop_cost)
     );
-  } else if (geom_term.connected_type==typeid(LinearRingCollection)) {
+  } else if (geom_term.connected_type(typeid(LinearRingCollection))) {
     auto& polygons = geom_term.get<LinearRingCollection&>();
     LinearRingCollection polygons_out;
     for (auto& polygon : polygons) {

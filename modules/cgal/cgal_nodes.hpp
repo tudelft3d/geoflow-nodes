@@ -118,7 +118,7 @@ namespace geoflow::nodes::cgal {
       add_param("create_triangles", ParamBool(create_triangles, "Create triangles"));
     }
     void before_gui() {
-      bool is_linestring = input("geometries").connected_type == typeid(LineStringCollection);
+      bool is_linestring = input("geometries").connected_type(typeid(LineStringCollection));
       auto param = std::get<ParamFloat>(parameters.at("densify_interval"));
       param.set_visible(is_linestring);
     }

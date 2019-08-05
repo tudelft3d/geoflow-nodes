@@ -11,11 +11,8 @@ namespace geoflow::nodes::general {
     auto geometries1 = input("geometries1");
     auto geometries2 = input("geometries2");
 
-    if (geometries1.connected_type != geometries2.connected_type) {
-      throw new Exception("Geometry inputs must be of same type\n");
-    }
 
-    if (geometries1.connected_type == typeid(PointCollection)) {
+    if (geometries1.connected_type(typeid(PointCollection))) {
       auto mergedGeometries = geometries1.get<geoflow::PointCollection>();
       auto points2 = geometries2.get<geoflow::PointCollection>();
       for (auto& p : points2) {
@@ -23,7 +20,7 @@ namespace geoflow::nodes::general {
       }
       output("geometries").set(mergedGeometries);
     }
-    else if (geometries1.connected_type == typeid(SegmentCollection)) {
+    else if (geometries1.connected_type(typeid(SegmentCollection))) {
       auto mergedGeometries = geometries1.get<geoflow::SegmentCollection>();
       auto segments2 = geometries2.get<geoflow::SegmentCollection>();
       for (auto& s : segments2) {
@@ -31,7 +28,7 @@ namespace geoflow::nodes::general {
       }
       output("geometries").set(mergedGeometries);
     }
-    else if (geometries1.connected_type == typeid(LineStringCollection)) {
+    else if (geometries1.connected_type(typeid(LineStringCollection))) {
       auto mergedGeometries = geometries1.get<geoflow::LineStringCollection>();
       auto lines2 = geometries2.get<geoflow::LineStringCollection>();
       for (auto& l : lines2) {
@@ -39,13 +36,15 @@ namespace geoflow::nodes::general {
       }
       output("geometries").set(mergedGeometries);
     }
-    else if (geometries1.connected_type == typeid(LinearRingCollection)) {
+    else if (geometries1.connected_type(typeid(LinearRingCollection))) {
       auto mergedGeometries = geometries1.get<geoflow::LinearRingCollection>();
       auto rings2 = geometries2.get<geoflow::LinearRingCollection>();
       for (auto& r : rings2) {
         mergedGeometries.push_back(r);
       }
       output("geometries").set(mergedGeometries);
+    } else {
+      throw new gfException("Geometry inputs must be of same type\n");
     }
   }
   

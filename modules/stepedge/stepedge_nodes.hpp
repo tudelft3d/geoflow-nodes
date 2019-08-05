@@ -367,7 +367,7 @@ namespace geoflow::nodes::stepedge {
 
       add_param("building_id", ParamBoundedInt(building_id, 0, polygon_count-1, "building_id"));
     }
-    void on_connect_input(InputTerminal& it) {
+    void on_connect_input(gfInputTerminal& it) {
       if (it.get_name() == "polygons") {
         auto& polygons = input("polygons").get<LinearRingCollection&>();
         polygon_count = polygons.size();

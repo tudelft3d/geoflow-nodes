@@ -141,11 +141,11 @@ void LASWriterNode::process(){
 
   auto input_geom = input("point_clouds");
 
-  if (input_geom.connected_type == typeid(PointCollection)) {
+  if (input_geom.connected_type(typeid(PointCollection))) {
     auto point_cloud = input_geom.get<PointCollection>();
     write_point_cloud_collection(point_cloud, filepath);
 
-  } else if (input_geom.connected_type == typeid(std::vector<PointCollection>)) {
+  } else if (input_geom.connected_type(typeid(std::vector<PointCollection>))) {
     auto point_clouds = input_geom.get< std::vector<PointCollection> >();
 
     int i=0;

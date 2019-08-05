@@ -15,13 +15,13 @@ namespace geoflow::nodes::gdal {
     
     void push_attributes(OGRFeature& poFeature);
 
-  public:
+    public:
     using Node::Node;
     void init() {
       add_output("line_strings", typeid(LineStringCollection));
       add_output("linear_rings", typeid(LinearRingCollection));
 
-      add_output_group("attributes", {typeid(vec1b), typeid(vec1i), typeid(vec1f), typeid(vec1s)});
+      add_poly_output("attributes", {typeid(vec1b), typeid(vec1i), typeid(vec1f), typeid(vec1s)});
 
       add_param("filepath", ParamPath(filepath, "File path"));
       add_param("layer_id", ParamInt(layer_id, "Layer ID"));
@@ -34,27 +34,14 @@ namespace geoflow::nodes::gdal {
   class OGRWriterNode:public Node {
     int epsg = 7415;
     std::string filepath = "out";
-  public:
-
+    
+    public:
     using Node::Node;
     void init() {
       add_input("geometries", { typeid(LineStringCollection), typeid(LinearRingCollection) });
 
-      add_input_group("attributes", {typeid(vec1b), typeid(vec1i), typeid(vec1f), typeid(vec1s)});
+      add_poly_input("attributes", {typeid(vec1b), typeid(vec1i), typeid(vec1f), typeid(vec1s)}, true);
 
-      add_param("filepath", ParamPath(filepath, "File path"));
-    }
-    void process();
-  };
-
-  class OGRWriterNoAttributesNode:public Node {
-  public:
-    int epsg = 7415;
-    std::string filepath = "out";
-    using Node::Node;
-    void init() {
-      add_input("geometries", { typeid(LineStringCollection), typeid(LinearRingCollection) });
-      
       add_param("filepath", ParamPath(filepath, "File path"));
     }
     void process();
