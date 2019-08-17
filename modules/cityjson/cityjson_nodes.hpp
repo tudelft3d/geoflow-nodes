@@ -1,5 +1,5 @@
 #include <fstream>
-#include <geoflow/core/geoflow.hpp>
+#include <geoflow/geoflow.hpp>
 #include <nlohmann/json.hpp>
 
 namespace geoflow::nodes::cityjson {

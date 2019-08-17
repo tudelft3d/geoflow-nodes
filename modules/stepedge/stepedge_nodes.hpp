@@ -79,7 +79,7 @@ namespace geoflow::nodes::stepedge {
     using Node::Node;
     void init() {
       add_input("arrangement", typeid(Arrangement_2));
-      add_output("linear_rings", typeid(LinearRingCollection));
+      add_output("linear_rings", typeid(LinearRingCollection), true);
       add_output("attributes", typeid(AttributeMap));
       add_param("only_in_footprint", ParamBool(only_in_footprint, "Only in footprint"));
     }
@@ -101,8 +101,8 @@ namespace geoflow::nodes::stepedge {
       add_output("max_errors", typeid(vec1f));
       add_output("elevations", typeid(vec1f));
       add_output("segment_coverages", typeid(vec1f));
-      add_output("triangles", typeid(TriangleCollection));
-      add_output("normals_vec3f", typeid(vec3f));
+      add_output("triangles", typeid(TriangleCollection), true);
+      add_output("normals_vec3f", typeid(vec3f), true);
       add_output("labels_vec1i", typeid(vec1i)); // 0==ground, 1==roof, 2==outerwall, 3==innerwall
 
       add_param("do_walls", ParamBool(do_walls, "Do walls"));
@@ -347,8 +347,8 @@ namespace geoflow::nodes::stepedge {
     public:
     using Node::Node;
     void init() {
-      add_input("polygons", typeid(LinearRingCollection));
-      add_output("point_clouds", typeid(std::vector<PointCollection>));
+      add_vector_input("polygons", typeid(LinearRing));
+      add_vector_output("point_clouds", typeid(PointCollection));
 
       add_param("las_filepath", ParamPath(filepath, "LAS filepath"));
     }
@@ -360,17 +360,16 @@ namespace geoflow::nodes::stepedge {
     int building_id=0, polygon_count=0;
     using Node::Node;
     void init() {
-      add_input("point_clouds", typeid(std::vector<PointCollection>));
-      add_input("polygons", typeid(LinearRingCollection));
+      add_vector_input("point_clouds", typeid(PointCollection));
+      add_vector_input("polygons", typeid(LinearRing));
       add_output("point_cloud", typeid(PointCollection));
       add_output("polygon", typeid(LinearRing));
 
       add_param("building_id", ParamBoundedInt(building_id, 0, polygon_count-1, "building_id"));
     }
-    void on_connect_input(gfInputTerminal& it) {
+    void on_receive(gfInputTerminal& it) {
       if (it.get_name() == "polygons") {
-        auto& polygons = input("polygons").get<LinearRingCollection&>();
-        polygon_count = polygons.size();
+        polygon_count = vector_input("polygons").size();
         auto param = std::get<ParamBoundedInt>(parameters.at("building_id"));
         param.set_bounds(0, polygon_count-1);
       }
@@ -497,17 +496,17 @@ namespace geoflow::nodes::stepedge {
     public:
     using Node::Node;
     void init() {
-      add_input("polygons", {typeid(LinearRingCollection), typeid(LinearRing)});
-      add_output("polygons_simp", typeid(LinearRingCollection));
-      add_output("polygon_simp", typeid(LinearRing));
+      add_vector_input("polygons", typeid(LinearRing));
+      add_vector_output("polygons_simp", typeid(LinearRing));
+      // add_output("polygon_simp", typeid(LinearRing));
 
       add_param("threshold_stop_cost", ParamBoundedFloat(threshold_stop_cost, 0, 1000, "threshold_stop_cost"));
     }
-    void on_change_parameter(std::string name, ParameterVariant& param){
-      if (name == "threshold_stop_cost") {
-        manager.run(*this);
-      }
-    }
+    // void on_change_parameter(std::string name, ParameterVariant& param){
+    //   if (name == "threshold_stop_cost") {
+    //     manager.run(*this);
+    //   }
+    // }
     void process();
   };
 

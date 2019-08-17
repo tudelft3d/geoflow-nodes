@@ -18,8 +18,8 @@ namespace geoflow::nodes::gdal {
     public:
     using Node::Node;
     void init() {
-      add_output("line_strings", typeid(LineStringCollection));
-      add_output("linear_rings", typeid(LinearRingCollection));
+      add_vector_output("line_strings", typeid(LineString));
+      add_vector_output("linear_rings", typeid(LinearRing));
 
       add_poly_output("attributes", {typeid(vec1b), typeid(vec1i), typeid(vec1f), typeid(vec1s)});
 
@@ -38,7 +38,7 @@ namespace geoflow::nodes::gdal {
     public:
     using Node::Node;
     void init() {
-      add_input("geometries", { typeid(LineStringCollection), typeid(LinearRingCollection) });
+      add_vector_input("geometries", { typeid(LineStringCollection), typeid(LinearRingCollection) });
 
       add_poly_input("attributes", {typeid(vec1b), typeid(vec1i), typeid(vec1f), typeid(vec1s)}, true);
 

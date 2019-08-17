@@ -1124,7 +1124,7 @@ void BuildArrFromRingsExactNode::process() {
 
   auto fp_in = input("footprint");
   linereg::Polygon_2 footprint;
-  if (fp_in.connected_type(typeid(linereg::Polygon_2)))
+  if (fp_in.is_connected_type(typeid(linereg::Polygon_2)))
     footprint = fp_in.get<linereg::Polygon_2>();
   else {
     auto& lr = fp_in.get<LinearRing&>();
@@ -1489,7 +1489,7 @@ void DetectLinesNode::process(){
   vec1i ring_order, ring_id, is_start;
   std::unordered_map<size_t,std::vector<size_t>> ring_idx;
   // fit lines in all input points
-  if (input_geom.connected_type(typeid(PointCollection))) {
+  if (input_geom.is_connected_type(typeid(PointCollection))) {
     std::vector<linedect::Point> cgal_pts;
     auto points = input_geom.get<PointCollection>();
     for( auto& p : points ) {
@@ -1500,7 +1500,7 @@ void DetectLinesNode::process(){
     LD.get_bounded_edges(edge_segments);
 
   // fit lines per ring
-  } else if (input_geom.connected_type(typeid(LinearRingCollection))) {
+  } else if (input_geom.is_connected_type(typeid(LinearRingCollection))) {
     auto rings = input_geom.get<LinearRingCollection>();
     auto roofplane_ids = input("roofplane_ids").get<vec1i>();
     int n = k;
@@ -1722,7 +1722,7 @@ void DetectPlanesNode::process() {
   output("plane_adj").set(R.adjacencies);
 }
 
-pGridSet build_grid(vec3f& ring) {
+pGridSet build_grid(const vec3f& ring) {
   int Grid_Resolution = 20;
 
   int size = ring.size();
@@ -1740,13 +1740,14 @@ pGridSet build_grid(vec3f& ring) {
 }
 
 void LASInPolygonsNode::process() {
-  auto polygons = input("polygons").get<LinearRingCollection>();
-  std::vector<PointCollection> point_clouds(polygons.size());
+  auto& polygons = vector_input("polygons");
+  auto& point_clouds = vector_output("point_clouds");
+  point_clouds.resize<PointCollection>(polygons.size());
 
   std::vector<pGridSet> poly_grids;
           
-  for (auto& ring : polygons) {
-    poly_grids.push_back(build_grid(ring));
+  for (size_t i=0; i<polygons.size(); ++i) {
+    poly_grids.push_back(build_grid(polygons.get<LinearRing>(i)));
   }
 
   LASreadOpener lasreadopener;
@@ -1760,7 +1761,7 @@ void LASInPolygonsNode::process() {
       
       for (auto& poly_grid:poly_grids) {
         if (GridTest(poly_grid, point)) {
-          point_clouds[i].push_back({
+          point_clouds.get<PointCollection&>(i).push_back({
             float(lasreader->point.get_x()-(*manager.data_offset)[0]), 
             float(lasreader->point.get_y()-(*manager.data_offset)[1]),
             float(lasreader->point.get_z()-(*manager.data_offset)[2])
@@ -1779,14 +1780,14 @@ void LASInPolygonsNode::process() {
   lasreader->close();
   delete lasreader;
 
-  output("point_clouds").set(point_clouds);
+  // output("point_clouds").set(point_clouds);
 }
 
 void BuildingSelectorNode::process() {
-  auto& point_clouds = input("point_clouds").get<std::vector<PointCollection>&>();
-  auto& polygons = input("polygons").get<LinearRingCollection&>();
-  output("point_cloud").set(point_clouds[building_id]);
-  output("polygon").set(polygons[building_id]);
+  auto& point_cloud = vector_input("point_clouds").get<PointCollection&>(building_id);
+  auto& polygon = vector_input("polygons").get<LinearRing&>(building_id);
+  output("point_cloud").set(point_cloud);
+  output("polygon").set(polygon);
 };
 
 void RegulariseLinesNode::process(){
@@ -2130,7 +2131,7 @@ void RegulariseRingsNode::process(){
   // output("footprint_out").set(new_fp);
 }
 
-LinearRing simplify_footprint(LinearRing& polygon, float& threshold_stop_cost) {
+LinearRing simplify_footprint(const LinearRing& polygon, float& threshold_stop_cost) {
   namespace PS = CGAL::Polyline_simplification_2;
   typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
   typedef K::Point_2 Point_2;
@@ -2248,24 +2249,16 @@ void PlaneIntersectNode::process() {
 void SimplifyPolygonNode::process(){
   // Set up vertex data (and buffer(s)) and attribute pointers
 
-  auto geom_term = input("polygons");
+  auto& geom_in = vector_input("polygons");
+  auto& geom_out = vector_output("polygons_simp");
 
-  if (geom_term.connected_type(typeid(LinearRing))) {
-    auto& polygon = geom_term.get<LinearRing&>();
-    output("polygon_simp").set(
+  LinearRingCollection polygons_out;
+  for (size_t i=0; i< geom_in.size(); ++i) {
+    auto& polygon = geom_in.get<LinearRing&>(i);
+    geom_out.push_back(
       simplify_footprint(polygon, threshold_stop_cost)
     );
-  } else if (geom_term.connected_type(typeid(LinearRingCollection))) {
-    auto& polygons = geom_term.get<LinearRingCollection&>();
-    LinearRingCollection polygons_out;
-    for (auto& polygon : polygons) {
-      polygons_out.push_back(
-        simplify_footprint(polygon, threshold_stop_cost)
-      );
-    }
-    output("polygons_simp").set(polygons_out);
   }
-  
   
 }
 

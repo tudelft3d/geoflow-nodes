@@ -43,8 +43,10 @@ namespace geoflow::nodes::gdal {
     layer_id = 0;
 
     // Set up vertex data (and buffer(s)) and attribute pointers
-    LineStringCollection line_strings;
-    LinearRingCollection linear_rings;
+    // LineStringCollection line_strings;
+    // LinearRingCollection linear_rings;
+    auto& linear_rings =  vector_output("linear_rings");
+    auto& line_strings =  vector_output("line_strings");
 
     OGRLayer  *poLayer;
     poLayer = poDS->GetLayer( layer_id );
@@ -144,11 +146,11 @@ namespace geoflow::nodes::gdal {
     }
     // if (geometry_type == wkbLineString25D || geometry_type == wkbLineStringZM) {
     if (line_strings.size() > 0) {
-      output("line_strings").set(line_strings);
+      // output("line_strings").set(line_strings);
       std::cout << "pushed " << line_strings.size() << " line_string features...\n";
     // } else if (geometry_type == wkbPolygon || geometry_type == wkbPolygon25D || geometry_type == wkbPolygonZM || geometry_type == wkbPolygonM) {
     } else if (linear_rings.size() > 0) {
-      output("linear_rings").set(linear_rings);
+      // output("linear_rings").set(linear_rings);
       std::cout << "pushed " << linear_rings.size() << " linear_ring features...\n";
     }
     
@@ -201,11 +203,11 @@ void OGRWriterNode::process() {
     OGRwkbGeometryType wkbType;
     std::variant<LineStringCollection,LinearRingCollection> geometry_collection;
     size_t geom_count;
-    if (geom_term.connected_type(typeid(LinearRingCollection))) {
+    if (geom_term.is_connected_type(typeid(LinearRingCollection))) {
       wkbType = wkbPolygon;
       geometry_collection = geom_term.get<LinearRingCollection>();
       geom_count = std::get<LinearRingCollection>(geometry_collection).size();
-    } else if (geom_term.connected_type(typeid(LineStringCollection))) {
+    } else if (geom_term.is_connected_type(typeid(LineStringCollection))) {
       wkbType = wkbLineString25D;
       geometry_collection = geom_term.get<LineStringCollection>();
       geom_count = std::get<LineStringCollection>(geometry_collection).size();
@@ -267,7 +269,7 @@ void OGRWriterNode::process() {
           }
         }
       
-        if (geom_term.connected_type(typeid(LinearRingCollection))) {
+        if (geom_term.is_connected_type(typeid(LinearRingCollection))) {
           OGRLinearRing ogrring;
           LinearRingCollection& lr = std::get<LinearRingCollection>(geometry_collection);
           for (auto const& g: lr[i]) {
@@ -278,7 +280,7 @@ void OGRWriterNode::process() {
           bouwpoly.addRing( &ogrring );
           poFeature->SetGeometry( &bouwpoly );
         }
-        if (geom_term.connected_type(typeid(LineStringCollection))) {
+        if (geom_term.is_connected_type(typeid(LineStringCollection))) {
           OGRLineString ogrlinestring;
           LineStringCollection& ls = std::get<LineStringCollection>(geometry_collection);
           for (auto const& g: ls[i]) {
