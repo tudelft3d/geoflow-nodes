@@ -97,7 +97,7 @@ namespace geoflow::nodes::stepedge {
       add_input("arrangement", typeid(Arrangement_2));
       add_output("cell_id_vec1i", typeid(vec1i));
       add_output("plane_id", typeid(vec1i));
-      add_output("rms_errors", typeid(vec1f));
+      add_output("rms_errors", typeid(vec1f), true);
       add_output("max_errors", typeid(vec1f));
       add_output("elevations", typeid(vec1f));
       add_output("segment_coverages", typeid(vec1f));
@@ -309,7 +309,7 @@ namespace geoflow::nodes::stepedge {
     using Node::Node;
     void init() {
       add_input("points", typeid(PointCollection));
-      add_output("plane_id", typeid(vec1i));
+      add_output("plane_id", typeid(vec1i), true);
       add_output("is_wall", typeid(vec1i));
       add_output("is_horizontal", typeid(vec1i));
       

@@ -295,7 +295,7 @@ void PolygonExtruderNode::process() {
     rings_3d.push_back(rings[i]);
     surf_type.push_back(0);
     //roof
-    LinearRing r = rings[i];
+    vec3f r = rings[i];
     for (auto& p : r) p[2] = h;
     rings_3d.push_back(r);
     surf_type.push_back(2);
@@ -440,13 +440,20 @@ void ExtruderNode::process(){
       }
       if (do_roofs) {
         // roof triangles
+        auto& plane = face->data().plane;
+        arr3f roof_normal = {0,0,1};
+        if (LoD2) {
+          auto n_ = plane.orthogonal_vector();
+          if(n_*Vector(0.0f,0.0f,1.0f) <0) n_*=-1;
+          n_ = n_/CGAL::sqrt(n_.squared_length());
+          roof_normal = {float(n_.x()), float(n_.y()), float(n_.z())};
+        }
         for (size_t i=0; i<indices.size()/3; ++i) {
           Triangle triangle;
           for (size_t j=0; j<3; ++j) {
             auto& px = vertices[i*3+j][0];
             auto& py = vertices[i*3+j][1];
             float h;
-            auto& plane = face->data().plane;
             if (LoD2) {
               h = (plane.a()*px + plane.b()*py + plane.d()) / (-plane.c());
             } else {
@@ -454,7 +461,7 @@ void ExtruderNode::process(){
             }
             triangle[j] = {px, py, h};
             labels.push_back(1);
-            normals.push_back({0,0,1});
+            normals.push_back(roof_normal);
             cell_id_vec1i.push_back(cell_id);
             plane_id.push_back(pid);
             // rms_errors.push_back(rms_error);
@@ -1200,7 +1207,7 @@ void BuildArrFromRingsExactNode::process() {
         auto fh = arr_base.non_const_handle(*f);
         if (fh->data().segid!=0 && fh->data().in_footprint) {
           double d = CGAL::squared_distance(fh->data().plane, p);
-          std::cerr << d << "\n";
+          // std::cerr << d << "\n";
           fh->data().rms_error_to_avg += d;
         }
       }

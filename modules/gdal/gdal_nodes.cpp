@@ -92,7 +92,7 @@ namespace geoflow::nodes::gdal {
           poGeometry->getGeometryType() == wkbLineString) {
           OGRLineString *poLineString = poGeometry->toLineString();
           
-          vec3f line_string;
+          LineString line_string;
           for(auto& poPoint : poLineString){
             if (!found_offset) {
               manager.data_offset = {poPoint.getX(), poPoint.getY(), 0};
@@ -112,7 +112,7 @@ namespace geoflow::nodes::gdal {
         } else if (poGeometry->getGeometryType() == wkbPolygon25D || poGeometry->getGeometryType() == wkbPolygon || poGeometry->getGeometryType() == wkbPolygonZM || poGeometry->getGeometryType() == wkbPolygonM ) {
           OGRPolygon *poPolygon = poGeometry->toPolygon();
     
-          vec3f ring;
+          LinearRing ring;
           // for(auto& poPoint : poPolygon->getExteriorRing()) {
           OGRPoint poPoint;
           for(size_t i=0; i<poPolygon->getExteriorRing()->getNumPoints()-1; ++i) {
