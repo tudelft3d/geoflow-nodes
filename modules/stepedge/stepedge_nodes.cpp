@@ -21,6 +21,11 @@
 #include "plane_detect.hpp"
 #include "ptinpoly.h"
 
+// graph cut
+#include <CGAL/boost/graph/alpha_expansion_graphcut.h>
+#include <CGAL/graph_traits_dual_arrangement_2.h>
+#include <CGAL/Arr_face_index_map.h>
+
 // #include <filesystem>
 // namespace fs=std::filesystem;
 
@@ -1229,81 +1234,56 @@ void BuildArrFromRingsExactNode::process() {
   output("arrangement").set(arr_base);
 }
 
-// void BuildArrFromRingsNode::process() {
-//   // Set up vertex data (and buffer(s)) and attribute pointers
-//   auto footprint = input("footprint").get<LinearRing>();
-//   auto rings = input("rings").get<LinearRingCollection>();
-//   // auto plane_idx = input("plane_idx").get<vec1i>();
-//   auto points_per_plane = input("pts_per_roofplane").get<std::unordered_map<int, std::vector<Point>>>();
+void BuildArrFromLinesNode::process() {
+  
+  auto fp_term = input("footprint");
+  linereg::Polygon_2 footprint;
+  if (fp_term.is_connected_type(typeid(linereg::Polygon_2)))
+    footprint = fp_term.get<linereg::Polygon_2>();
+  else {
+    auto& lr = fp_term.get<LinearRing&>();
+    for (auto& p : lr) {
+      footprint.push_back(linereg::EK::Point_2(p[0], p[1]));
+    }
+  }
 
+  Arrangement_2 arr_base;
+  Face_split_observer obs (arr_base);
+  {
+    insert(arr_base, footprint.edges_begin(), footprint.edges_end());
+    // arr_insert_polygon(arr_base, footprint);
+    // insert_non_intersecting_curves(arr_base, footprint.edges_begin(), footprint.edges_end());
+    if (!footprint.is_simple()) {
+      arr_filter_biggest_face(arr_base, rel_area_thres);
+    }
+  }
 
-//   Arrangement_2 arr_base;
-//   Polygon_2 cgal_footprint = ring_to_cgal_polygon(footprint);
-//   if (cgal_footprint.is_simple()) {
-      
-//     // std::cout << "fp size=" <<footprint_pts.size() << "; " << footprint_pts[0].x() <<","<<footprint_pts[0].y()<<"\n";
-//     {
-//       Face_index_observer obs (arr_base, true, 0, 0);
-//       // insert(arr_base, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
-//       insert_non_intersecting_curves(arr_base, cgal_footprint.edges_begin(), cgal_footprint.edges_end());
-//     }
-//     // insert step-edge lines
-//     {
-//       Arrangement_2 arr_overlay;
-//       size_t i=0;
-//       // NOTE: rings and points_per_plane must be aligned!! (matching length and order)
-//       for (auto& kv : points_per_plane) {
-//         auto& ring = rings[i++];
-//         if (ring.size()>2) {
-//           auto polygon = ring_to_cgal_polygon(ring);
-//           if (polygon.is_simple()) {
-//             auto plane_id = kv.first;
-//             auto& points = kv.second;
-//             std::sort(points.begin(), points.end(), [](linedect::Point& p1, linedect::Point& p2) {
-//               return p1.z() < p2.z();
-//             });
-//             auto elevation_id = int(param<float>("z_percentile")*float(points.size()));
+  auto& lines_term = vector_input("lines");
+  {
+    std::vector<X_monotone_curve_2> lines;
+    for(size_t i=0; i<lines_term.size(); ++i) {
+      auto& s = lines_term.get<Segment>(i);
+      const Point_2 a(s[0][0],s[0][1]);
+      const Point_2 b(s[1][0],s[1][1]);
+      lines.push_back(Line_2(a, b));
+    }
+    insert(arr_base, lines.begin(), lines.end());
+  }
+  output("arrangement").set(arr_base);
+}
 
-//             // wall_planes.push_back(std::make_pair(Plane(s.first, s.second, s.first+Vector(0,0,1)),0));
-//             Arrangement_2 arr;
-//             Face_index_observer obs (arr, false, plane_id, points[elevation_id].z());
-//             insert(arr, polygon.edges_begin(), polygon.edges_end());
+void OptimiseArrangmentNode::process() {
+  // typedef CGAL::Dual<Arrangement_2> Dual_arrangement;
+  // typedef CGAL::Arr_face_index_map<Ex_arrangement> Face_index_map;
+  // typedef Extended_face_property_map<Ex_arrangement,unsigned int> Face_property_map;
 
-//             Overlay_traits overlay_traits;
-//             arr_overlay.clear();
-//             overlay(arr_base, arr, arr_overlay, overlay_traits);
-//             arr_base = arr_overlay;
-//           } else std::cout << "This alpha ring is no longer simple after regularisation!\n";
-//           // std::cout << "overlay success\n";
-//           // std::cout << "facecount: " << arr_base.number_of_faces() << "\n\n";
-//         }
-//       }
-//     }
-//   } else {
-//     std::cout << "This polygon is no longer simple after regularisation!\n";
-//   }
-//   // fix unsegmented face: 1) sort segments on elevation, from low to high, 2) starting with lowest segment grow into unsegmented neighbours
-//   arr_process(arr_base);
+  // auto& arr = input("arrangement");
 
-//   LineStringCollection segments;
-//   for (auto& face: arr_base.face_handles()){
-//     if (face->data().in_footprint)
-//       arr2segments(face, segments);
-//   }
-//   output("arr_segments").set(segments);
-//   output("arrangement").set(arr_base);
-// }
+  // Face_index_map index_map(arr);
+  // Face_property_map vertex_label_cost_map(arr);
 
-// inline int circindex(int i, size_t& N) {
-//   // https://codereview.stackexchange.com/questions/57923/index-into-array-as-if-it-is-circular
-//   bool wasNegative = false;
-//   if (i < 0) {
-//       wasNegative = true;
-//       i = -i; //there's definitely a bithack for this.
-//   }
-//   int offset = i % N;
-//   return (wasNegative) ? (N - offset) : (offset);
-// }
+  // double result = CGAL::alpha_expansion_graphcut();
+}
 
 inline void DetectLinesNode::detect_lines_ring_m1(linedect::LineDetector& LD, SegmentCollection& segments_out) {
   LD.dist_thres = dist_thres * dist_thres;
@@ -2119,13 +2099,14 @@ void RegulariseRingsNode::process(){
   output("rings_out").set(lrc);
   output("plane_id").set(plane_ids);
 
-  SegmentCollection new_segments;
+  auto& new_segments = vector_output("edges_out");
   vec1i priorities;
   for(auto& kv : LR.segments) {
     for(auto& ekseg : kv.second) {
-      new_segments.push_back(Segment());
-      new_segments.back()[0] = {float(CGAL::to_double(ekseg.source().x())), float(CGAL::to_double(ekseg.source().y())), 0};
-      new_segments.back()[1] = {float(CGAL::to_double(ekseg.target().x())), float(CGAL::to_double(ekseg.target().y())), 0};
+      auto new_seg = Segment();
+      new_seg[0] = {float(CGAL::to_double(ekseg.source().x())), float(CGAL::to_double(ekseg.source().y())), 0};
+      new_seg[1] = {float(CGAL::to_double(ekseg.target().x())), float(CGAL::to_double(ekseg.target().y())), 0};
+      new_segments.push_back(new_seg);
       priorities.push_back(kv.first);
       priorities.push_back(kv.first);
     }
@@ -2133,7 +2114,7 @@ void RegulariseRingsNode::process(){
 
 
   output("priorities").set(priorities);
-  output("edges_out").set(new_segments);
+  // output("edges_out").set(new_segments);
   // output("rings_out").set(new_rings);
   // output("footprint_out").set(new_fp);
 }

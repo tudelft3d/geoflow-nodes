@@ -9,6 +9,7 @@ void register_nodes(geoflow::NodeRegister& node_register) {
     node_register.register_node<ExtruderNode>("Extruder");
     node_register.register_node<LinearRingtoRingsNode>("LinearRingtoRings");
     node_register.register_node<BuildArrFromRingsExactNode>("BuildArrFromRings");
+    node_register.register_node<BuildArrFromLinesNode>("BuildArrFromLines");
     node_register.register_node<DetectLinesNode>("DetectLines");
     node_register.register_node<DetectPlanesNode>("DetectPlanes");
     node_register.register_node<LASInPolygonsNode>("LASInPolygons");

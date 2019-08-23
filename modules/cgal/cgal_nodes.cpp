@@ -33,6 +33,7 @@
 // PLY writing
 #include <CGAL/property_map.h>
 #include <CGAL/IO/write_ply_points.h>
+#include <CGAL/IO/read_ply_points.h>
 
 // iso lines
 #include <CGAL/Polygon_mesh_slicer.h>

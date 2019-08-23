@@ -185,36 +185,36 @@ namespace geoflow::nodes::stepedge {
     void process();
   };
 
-  // class BuildArrFromRingsNode:public Node {
+  class BuildArrFromLinesNode:public Node {
+    float rel_area_thres = 0.1;
+    public:
 
-  //   public:
-  //   // bool remove_unsupported=false;
-  //   bool arr_is_valid=false;
+    using Node::Node;
+    void init() {
+      add_vector_input("lines", typeid(Segment));
+      add_input("footprint", {typeid(linereg::Polygon_2), typeid(LinearRing)});
+      add_output("arrangement", typeid(Arrangement_2));
 
-  //   using Node::Node;
-  //   void init() {
-  //     add_input("rings", typeid(LinearRingCollection));
-  //     add_input("pts_per_roofplane", TT_any);
-  //     add_input("footprint", typeid(LinearRing));
-  //     add_output("arrangement", typeid(Arrangement_2));
-  //     add_output("arr_segments", typeid(LineStringCollection));
+      add_param("rel_area_thres", ParamBoundedFloat(rel_area_thres, 0.01, 1, "Preserve split ring area"));
+    }
+    void process();
+  };
 
-  //     add_param("z_percentile", (float) 0.9);
-  //     add_param("flood_to_unsegmented", (bool) true);
-  //     add_param("dissolve_edges", (bool) true);
-  //     add_param("dissolve_stepedges", (bool) true);
-  //     add_param("step_height_threshold", (float) 1.0);
-  //   }
-  //   void gui() {
-  //     ImGui::SliderFloat("Elevation percentile", &param<float>("z_percentile"), 0, 1);
-  //     ImGui::Checkbox("Flood to unsegmented", &param<bool>("flood_to_unsegmented"));
-  //     ImGui::Checkbox("Dissolve edges", &param<bool>("dissolve_edges"));
-  //     ImGui::Checkbox("Dissolve stepedges", &param<bool>("dissolve_stepedges"));
-  //     ImGui::SliderFloat("step_height_threshold", &param<float>("step_height_threshold"), 0, 100);
-  //     ImGui::Text("Arrangement is valid? %d", arr_is_valid);
-  //   }
-  //   void process(){};
-  // };
+  class OptimiseArrangmentNode:public Node {
+    // float rel_area_thres = 0.1;
+    public:
+
+    using Node::Node;
+    void init() {
+      add_input("arrangement", typeid(Arrangement_2));
+      add_input("pts_per_roofplane", typeid(std::unordered_map<int, std::pair<Plane, std::vector<Point>>> ));
+      add_output("arrangement", typeid(Arrangement_2));
+
+      // add_param("rel_area_thres", ParamBoundedFloat(rel_area_thres, 0.01, 1, "Preserve split ring area"));
+    }
+    void process();
+  };
+
   class LinearRingtoRingsNode:public Node {
     public:
     using Node::Node;
@@ -433,7 +433,7 @@ namespace geoflow::nodes::stepedge {
       // add_input("ring_order", typeid(vec1i));
       // add_input("edge_segments", typeid(SegmentCollection));
       add_input("footprint", typeid(LinearRing));
-      add_output("edges_out", typeid(SegmentCollection));
+      add_vector_output("edges_out", typeid(Segment));
       add_output("priorities", typeid(vec1i));
       // add_output("rings_out", typeid(LinearRingCollection));
       // add_output("footprint_out", typeid(LinearRing));

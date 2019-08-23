@@ -1,10 +1,11 @@
+#include <string.h>
+#include <geoflow/gfSharedHeadersHash.h>
 #include "register.hpp"
 
 #define WIN_DECLSPEC
 #ifdef WIN32
 	#define WIN_DECLSPEC __declspec (dllexport)
 #endif
-
 
 extern "C"
 {
@@ -18,5 +19,10 @@ extern "C"
 	WIN_DECLSPEC void deleter(geoflow::NodeRegister *ptr)
 	{
 		delete ptr;
+	}
+
+	WIN_DECLSPEC void get_shared_headers_hash(char *hash)
+	{
+		strcpy(hash, GF_SHARED_HEADERS_HASH);
 	}
 }

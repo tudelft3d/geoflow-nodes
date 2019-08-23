@@ -199,7 +199,7 @@ public:
     n_faces (0)
   {
     CGAL_precondition (arr.is_empty());
-    arr.unbounded_face()->data().is_finite=false;
+    arr.unbounded_face()->data().in_footprint=false;
     n_faces++;
   }
   virtual void after_split_face (Face_handle old_face,
@@ -207,11 +207,11 @@ public:
   {
     // Assign index to the new face.
     if(n_faces == 1)
-      new_face->data().is_finite = true;
-    else if(old_face->data().is_finite)
-      new_face->data().is_finite = true;
+      new_face->data().in_footprint = true;
+    else if(old_face->data().in_footprint)
+      new_face->data().in_footprint = true;
     else
-      new_face->data().is_finite = false;
+      new_face->data().in_footprint = false;
     n_faces++;
   }
 };
