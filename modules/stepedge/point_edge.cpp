@@ -29,3 +29,18 @@ void arrangementface_to_polygon(Face_handle face, vec2f& polygons){
   // }
   }
 }
+
+// helper functions
+void arr_dissolve_edges(Arrangement_2& arr)
+{
+  std::vector<Halfedge_handle> to_remove;
+  for (auto he : arr.edge_handles()) {
+    auto d1 = he->face()->data();
+    auto d2 = he->twin()->face()->data();
+    if ((d1.segid == d2.segid ) && (d1.in_footprint && d2.in_footprint) && d1.segid != 0)
+      to_remove.push_back(he);
+  }
+  for (auto he : to_remove) {
+    arr.remove_edge(he);
+  }
+}

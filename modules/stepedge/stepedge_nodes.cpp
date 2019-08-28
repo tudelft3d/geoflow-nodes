@@ -936,6 +936,8 @@ void BuildArrFromRingsExactNode::arr_snapclean(Arrangement_2& arr) {
   output("snap_to_e").set(snap_to_e);
 }
 
+
+
 void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
 
   if (flood_to_unsegmented) {
@@ -998,16 +1000,7 @@ void BuildArrFromRingsExactNode::arr_process(Arrangement_2& arr) {
   }
   //remove edges that have the same segid on both sides
   if (dissolve_edges) {
-    std::vector<Halfedge_handle> to_remove;
-    for (auto he : arr.edge_handles()) {
-      auto d1 = he->face()->data();
-      auto d2 = he->twin()->face()->data();
-      if ((d1.segid == d2.segid ) && (d1.in_footprint && d2.in_footprint) && d1.segid != 0)
-        to_remove.push_back(he);
-    }
-    for (auto he : to_remove) {
-      arr.remove_edge(he);
-    }
+    arr_dissolve_edges(arr);
   }
 
   // if (remove_low_holes) {

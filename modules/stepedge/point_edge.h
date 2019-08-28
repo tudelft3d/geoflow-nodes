@@ -111,6 +111,7 @@ struct FaceInfo {
 
   // graph-cut optimisation
   size_t label=0;
+  size_t v_index;
   std::vector<double> vertex_label_cost;
 };
 struct EdgeInfo {
@@ -304,3 +305,5 @@ typedef std::vector<std::array<float,2>> vec2f;
 Polygon_2 ring_to_cgal_polygon(geoflow::LinearRing& ring);
 
 void arrangementface_to_polygon(Face_handle face, vec2f& polygons);
+
+void arr_dissolve_edges(Arrangement_2& arr);

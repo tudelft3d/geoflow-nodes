@@ -204,6 +204,7 @@ namespace geoflow::nodes::stepedge {
 
   class OptimiseArrangmentNode:public Node {
     float data_multiplier = 1.0;
+    bool preset_labels = false;
     public:
 
     using Node::Node;
@@ -213,6 +214,7 @@ namespace geoflow::nodes::stepedge {
       add_output("arrangement", typeid(Arrangement_2));
 
       add_param("data_multiplier", ParamBoundedFloat(data_multiplier, 0.001, 500, "Multiplier on data term"));
+      add_param("preset_labels", ParamBool(preset_labels, "Preset face labels"));
     }
     void process();
   };

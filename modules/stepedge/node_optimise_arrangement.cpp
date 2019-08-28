@@ -1,11 +1,56 @@
 
 #include "stepedge_nodes.hpp"
-
 // graph cut
-#include <CGAL/boost/graph/alpha_expansion_graphcut.h>
+#include "alpha_expansion_graphcut.h"
+// #include <CGAL/boost/graph/alpha_expansion_graphcut.h>
 #include <CGAL/graph_traits_dual_arrangement_2.h>
 #include <CGAL/Arr_face_index_map.h>
 #include <CGAL/boost/graph/Alpha_expansion_MaxFlow_tag.h>
+
+class FootprintGraph {
+  public:
+  typedef typename Arrangement_2::Face_handle vertex_descriptor;
+  typedef typename Arrangement_2::Halfedge_handle edge_descriptor;
+  typedef std::vector<vertex_descriptor> vertex_container;
+  typedef std::vector<edge_descriptor> edge_container;
+  typedef vertex_container::const_iterator vertex_iterator;
+  typedef edge_container::const_iterator edge_iterator;
+
+  private:
+  vertex_container vertices_;
+  edge_container edges_;
+
+  public:
+  FootprintGraph(vertex_container& vc, edge_container& ec)
+    : vertices_(vc), edges_(ec) {}
+
+  friend vertex_descriptor source(edge_descriptor& e, const FootprintGraph& g) {
+    return e->face();
+  };
+  friend vertex_descriptor target(edge_descriptor& e, const FootprintGraph& g) {
+    return e->twin()->face();
+  };
+  friend size_t num_vertices(const FootprintGraph& g) {
+    return g.vertices_.size();
+  };
+  friend std::pair<vertex_iterator, vertex_iterator> vertices(const FootprintGraph& g) {
+    return std::make_pair(g.vertices_.begin(), g.vertices_.end());
+  };
+  friend std::pair<edge_iterator, edge_iterator> edges(const FootprintGraph& g) {
+    return std::make_pair(g.edges_.begin(), g.edges_.end());
+  };
+};
+
+namespace boost {
+  template<> struct graph_traits<FootprintGraph> {
+    typedef typename Arrangement_2::Face_handle vertex_descriptor;
+    typedef typename Arrangement_2::Halfedge_handle edge_descriptor;
+    typedef boost::disallow_parallel_edge_tag edge_parallel_category;
+    typedef boost::edge_list_graph_tag traversal_category;
+    typedef boost::undirected_tag directed_category;
+  };
+}
+
 
 namespace geoflow::nodes::stepedge {
 
@@ -46,6 +91,20 @@ public:
   { key->data().label=val; }
 };
 // A property map that reads/writes the information to/from the extended 
+// face.
+class Vertex_index_map {
+public:
+  typedef typename Arrangement_2::Face_handle     Face_handle;
+  // Boost property type definitions.
+  typedef boost::readable_property_map_tag        category;
+  typedef size_t                                  value_type;
+  typedef value_type&                             reference;
+  typedef Face_handle                             key_type;
+  // The get function is required by the property map concept.
+  friend reference get(const Vertex_index_map&, key_type key)
+  { return key->data().v_index; }
+};
+// A property map that reads/writes the information to/from the extended 
 // edge.
 class Edge_weight_property_map {
 public:
@@ -83,7 +142,6 @@ inline double rmse_plane_points(Plane& plane, std::vector<Point>& points) {
   return CGAL::sqrt(dist_sum/points.size());
 }
 
-
 struct InFootprintFaceFilter {
   InFootprintFaceFilter() {}
 
@@ -104,8 +162,6 @@ struct InFootprintEdgeFilter {
 };
 
 void OptimiseArrangmentNode::process() {
-  typedef CGAL::Dual<Arrangement_2> Dual_arrangement;
-  typedef CGAL::Arr_face_index_map<Arrangement_2> Face_index_map;
 
   auto arr = input("arrangement").get<Arrangement_2>();
   auto& planes = input("pts_per_roofplane").get<IndexedPlanesWithPoints>();
@@ -130,7 +186,8 @@ void OptimiseArrangmentNode::process() {
         auto fh = arr.non_const_handle(*f);
         if (fh->data().in_footprint) {
           fh->data().points.push_back(p);
-          fh->data().label = label; //assign an initial label
+          if(preset_labels)
+            fh->data().label = label; //assign an initial label
         }
       }
     }
@@ -139,6 +196,8 @@ void OptimiseArrangmentNode::process() {
 
   // 2 compute for each face the error to each plane
   double max_cost = 0;
+  size_t face_i=0;
+  std::vector<Face_handle> faces;
   for (auto face: arr.face_handles()) {
     if(face->data().in_footprint) {
       for (auto& [plane, pts, plane_id] : points_per_plane) {
@@ -146,49 +205,52 @@ void OptimiseArrangmentNode::process() {
         face->data().vertex_label_cost.push_back(d);
         max_cost = std::max(max_cost, d);
       }
+      face->data().v_index = face_i++;
+      faces.push_back(face);
     }
   }
   // normalise
-  for (auto face: arr.face_handles()) {
-    if(face->data().in_footprint) {
-      for (auto& c : face->data().vertex_label_cost) {
-        c = data_multiplier * (c/max_cost);
-      }
+  for (auto face : faces) {
+    for (auto& c : face->data().vertex_label_cost) {
+      c = data_multiplier * (c/max_cost);
     }
   }
 
   // compute edge_weights (smoothness term)
   double max_weight = 0;
+  std::vector<Halfedge_handle> edges;
   for (auto edge : arr.edge_handles()) {
     bool fp_u = edge->twin()->face()->data().in_footprint;
     bool fp_l = edge->face()->data().in_footprint;
-    if (fp_u || fp_l) {
+    if (fp_u && fp_l) { // only edges with both neighbour faces inside the footprint
       edge->data().edge_weight = edge_length(edge);
       max_weight = std::max(max_weight, edge->data().edge_weight);
+      edges.push_back(edge);
     }
   }
   // normalise
-  for (auto edge : arr.edge_handles()) {
-    bool fp_u = edge->twin()->face()->data().in_footprint;
+  for (auto edge : edges) {
     bool fp_l = edge->face()->data().in_footprint;
-    if (fp_u || fp_l) {
-      edge->data().edge_weight = edge->data().edge_weight/max_weight;
-    }
+    double n_w =  edge->data().edge_weight/max_weight;
+    edge->data().edge_weight = n_w;
+    edge->twin()->data().edge_weight = n_w;
   }
+
+  FootprintGraph graph(faces, edges);
   
   // assign initial labels?
-  auto graph = Dual_arrangement(arr);
-  InFootprintFaceFilter face_filter;
-  InFootprintEdgeFilter edge_filter;
-  boost::filtered_graph<Dual_arrangement, InFootprintEdgeFilter, InFootprintFaceFilter >
-    filtered_graph(graph, edge_filter, face_filter);
+  // auto graph = Dual_arrangement(arr);
+  // InFootprintFaceFilter face_filter;
+  // InFootprintEdgeFilter edge_filter;
+  // boost::filtered_graph<Dual_arrangement, InFootprintEdgeFilter, InFootprintFaceFilter >
+  //   filtered_graph(graph, edge_filter, face_filter);
 
   // boost::adjacency_list<> g(N);
 
   double result = CGAL::alpha_expansion_graphcut(
-    filtered_graph, 
+    graph, 
     Edge_weight_property_map(),
-    Face_index_map(arr),
+    Vertex_index_map(),
     Vertex_label_cost_property_map(),
     Vertex_label_property_map(),
     CGAL::Alpha_expansion_boost_adjacency_list_tag()
@@ -205,8 +267,9 @@ void OptimiseArrangmentNode::process() {
     }
   }
 
-  output("arrangement").set(arr);
+  arr_dissolve_edges(arr);
 
+  output("arrangement").set(arr);
 }
 
 }
