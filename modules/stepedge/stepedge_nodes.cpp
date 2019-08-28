@@ -21,11 +21,6 @@
 #include "plane_detect.hpp"
 #include "ptinpoly.h"
 
-// graph cut
-#include <CGAL/boost/graph/alpha_expansion_graphcut.h>
-#include <CGAL/graph_traits_dual_arrangement_2.h>
-#include <CGAL/Arr_face_index_map.h>
-
 // #include <filesystem>
 // namespace fs=std::filesystem;
 
@@ -150,7 +145,7 @@ namespace as {
 namespace geoflow::nodes::stepedge {
 
 void AlphaShapeNode::process(){
-  auto points_per_segment = input("pts_per_roofplane").get<std::unordered_map<int, std::pair<Plane, std::vector<Point>>>>();
+  auto points_per_segment = input("pts_per_roofplane").get<IndexedPlanesWithPoints>();
 
   PointCollection edge_points, boundary_points;
   LineStringCollection alpha_edges;
@@ -412,7 +407,7 @@ void ExtruderNode::process(){
   
   size_t cell_id=0, pid;
   float rms_error, max_error, segment_coverage;
-  for (auto face: arr.face_handles()){
+  for (auto face: arr.face_handles()) {
     // bool extract = param<bool>("in_footprint") ? face->data().in_footprint : face->data().is_finite;
     bool extract = face->data().in_footprint;
     if(extract) {
@@ -1132,7 +1127,7 @@ void BuildArrFromRingsExactNode::process() {
   // Set up vertex data (and buffer(s)) and attribute pointers
   auto rings = input("rings").get<std::unordered_map<size_t, linereg::Polygon_2>>();
   // auto plane_idx = input("plane_idx").get<vec1i>();
-  auto points_per_plane = input("pts_per_roofplane").get<std::unordered_map<int, std::pair<Plane, std::vector<Point>>>>();
+  auto points_per_plane = input("pts_per_roofplane").get<IndexedPlanesWithPoints>();
 
   auto fp_in = input("footprint");
   linereg::Polygon_2 footprint;
@@ -1214,8 +1209,15 @@ void BuildArrFromRingsExactNode::process() {
           double d = CGAL::squared_distance(fh->data().plane, p);
           // std::cerr << d << "\n";
           fh->data().rms_error_to_avg += d;
+          ++fh->data().inlier_count;
         }
       }
+    }
+  }
+  for (auto& fh : arr_base.face_handles()) {
+    if (fh->data().segid!=0 && fh->data().in_footprint) {
+      if (fh->data().inlier_count)
+        fh->data().rms_error_to_avg = CGAL::sqrt(fh->data().rms_error_to_avg/fh->data().inlier_count);
     }
   }
   
@@ -1270,19 +1272,6 @@ void BuildArrFromLinesNode::process() {
     insert(arr_base, lines.begin(), lines.end());
   }
   output("arrangement").set(arr_base);
-}
-
-void OptimiseArrangmentNode::process() {
-  // typedef CGAL::Dual<Arrangement_2> Dual_arrangement;
-  // typedef CGAL::Arr_face_index_map<Ex_arrangement> Face_index_map;
-  // typedef Extended_face_property_map<Ex_arrangement,unsigned int> Face_property_map;
-
-  // auto& arr = input("arrangement");
-
-  // Face_index_map index_map(arr);
-  // Face_property_map vertex_label_cost_map(arr);
-
-  // double result = CGAL::alpha_expansion_graphcut();
 }
 
 inline void DetectLinesNode::detect_lines_ring_m1(linedect::LineDetector& LD, SegmentCollection& segments_out) {
@@ -1632,7 +1621,7 @@ void DetectPlanesNode::process() {
 
 
   // classify horizontal/vertical planes using plane normals
-  std::unordered_map<int, std::pair<Plane, std::vector<Point>>> pts_per_roofplane;
+  IndexedPlanesWithPoints pts_per_roofplane;
   size_t horiz_roofplane_cnt=0;
   size_t slant_roofplane_cnt=0;
   if (only_horizontal) pts_per_roofplane[-1].second = std::vector<Point>();
@@ -2161,7 +2150,7 @@ LinearRing simplify_footprint(const LinearRing& polygon, float& threshold_stop_c
 }
 
 void PlaneIntersectNode::process() {
-  auto pts_per_roofplane = input("pts_per_roofplane").get<std::unordered_map<int, std::pair<Plane, std::vector<Point>>>>();
+  auto pts_per_roofplane = input("pts_per_roofplane").get<IndexedPlanesWithPoints>();
   auto plane_adj = input("plane_adj").get<std::map<size_t, std::map<size_t, size_t>>>();
   auto alpha_rings = input("alpha_rings").get<LinearRingCollection>();
 

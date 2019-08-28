@@ -7,6 +7,8 @@
 
 namespace geoflow::nodes::stepedge {
 
+  typedef std::unordered_map<int, std::pair<Plane, std::vector<Point>>> IndexedPlanesWithPoints;
+
   class AlphaShapeNode:public Node {
     float thres_alpha = 0.25;
     bool optimal_alpha = true;
@@ -15,7 +17,7 @@ namespace geoflow::nodes::stepedge {
     using Node::Node;
     void init() {
       // add_input("points", TT_any);
-      add_input("pts_per_roofplane", typeid(std::unordered_map<int, std::pair<Plane, std::vector<Point>>> ));
+      add_input("pts_per_roofplane", typeid(IndexedPlanesWithPoints ));
       add_output("alpha_rings", typeid(LinearRingCollection));
       add_output("edge_points", typeid(PointCollection));
       add_output("alpha_edges", typeid(LineStringCollection));
@@ -148,7 +150,7 @@ namespace geoflow::nodes::stepedge {
     using Node::Node;
     void init() {
       add_input("rings", typeid(std::unordered_map<size_t, linereg::Polygon_2>));
-      add_input("pts_per_roofplane", typeid(std::unordered_map<int, std::pair<Plane, std::vector<Point>>> ));
+      add_input("pts_per_roofplane", typeid(IndexedPlanesWithPoints ));
       add_input("footprint", {typeid(linereg::Polygon_2), typeid(LinearRing)});
       add_output("noseg_area_a", typeid(float));
       add_output("noseg_area_r", typeid(float));
@@ -201,16 +203,16 @@ namespace geoflow::nodes::stepedge {
   };
 
   class OptimiseArrangmentNode:public Node {
-    // float rel_area_thres = 0.1;
+    float data_multiplier = 1.0;
     public:
 
     using Node::Node;
     void init() {
       add_input("arrangement", typeid(Arrangement_2));
-      add_input("pts_per_roofplane", typeid(std::unordered_map<int, std::pair<Plane, std::vector<Point>>> ));
+      add_input("pts_per_roofplane", typeid(IndexedPlanesWithPoints ));
       add_output("arrangement", typeid(Arrangement_2));
 
-      // add_param("rel_area_thres", ParamBoundedFloat(rel_area_thres, 0.01, 1, "Preserve split ring area"));
+      add_param("data_multiplier", ParamBoundedFloat(data_multiplier, 0.001, 500, "Multiplier on data term"));
     }
     void process();
   };
@@ -313,7 +315,7 @@ namespace geoflow::nodes::stepedge {
       add_output("is_wall", typeid(vec1i));
       add_output("is_horizontal", typeid(vec1i));
       
-      add_output("pts_per_roofplane", typeid(std::unordered_map<int, std::pair<Plane, std::vector<Point>>> ));
+      add_output("pts_per_roofplane", typeid(IndexedPlanesWithPoints ));
 
       add_output("roof_pt_cnt", typeid(int));
       add_output("class", typeid(int));
@@ -476,7 +478,7 @@ namespace geoflow::nodes::stepedge {
     using Node::Node;
     void init() {
       add_input("pts_per_roofplane", 
-        {typeid(std::unordered_map<int, std::pair<Plane, std::vector<Point>>>)});
+        {typeid(IndexedPlanesWithPoints)});
       add_input("plane_adj", 
         {typeid(std::map<size_t, std::map<size_t, size_t>>)});
       add_input("alpha_rings", 

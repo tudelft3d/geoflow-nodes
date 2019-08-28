@@ -23,6 +23,7 @@ void register_nodes(geoflow::NodeRegister& node_register) {
     node_register.register_node<PrintResultNode>("PrintResult");
     node_register.register_node<PolygonGrowerNode>("PolygonGrower");
     node_register.register_node<PlaneIntersectNode>("PlaneIntersect");
+    node_register.register_node<OptimiseArrangmentNode>("OptimiseArrangment");
 }
 
 namespace geoflow::nodes::las {

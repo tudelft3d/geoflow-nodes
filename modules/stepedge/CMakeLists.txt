@@ -28,6 +28,7 @@ endif()
 add_library(gfp_stepedge MODULE
   plugin.cpp
   stepedge_nodes.cpp
+  node_optimise_arrangement.cpp
   point_edge.cpp
   region_growing.cpp
 )

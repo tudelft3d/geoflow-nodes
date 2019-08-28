@@ -102,14 +102,22 @@ struct FaceInfo {
   int segid=0;
   float segid_coverage;
   float segid_count;
-  PNL_vector points;
+  std::vector<Point> points;
   float rms_error_to_avg=0;
+  size_t inlier_count=0;
   float max_error=0;
   float total_count;
   Plane plane;
+
+  // graph-cut optimisation
+  size_t label=0;
+  std::vector<double> vertex_label_cost;
 };
 struct EdgeInfo {
   bool blocks = false;
+  
+  // graph-cut optimisation
+  double edge_weight;
 };
 typedef CGAL::Arr_extended_dcel<Traits_2, bool, EdgeInfo, FaceInfo>   Dcel;
 typedef CGAL::Arrangement_2<Traits_2, Dcel>           Arrangement_2;
