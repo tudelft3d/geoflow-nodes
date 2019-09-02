@@ -1,2 +1,0 @@
-add_executable(rg_test test_regiongrower.cpp)
-target_link_libraries( rg_test point_edge_lib)
