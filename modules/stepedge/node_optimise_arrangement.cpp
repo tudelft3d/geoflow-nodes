@@ -47,7 +47,7 @@ namespace boost {
     typedef typename Arrangement_2::Halfedge_handle edge_descriptor;
     typedef boost::disallow_parallel_edge_tag edge_parallel_category;
     typedef boost::edge_list_graph_tag traversal_category;
-    typedef boost::undirected_tag directed_category;
+    typedef boost::directed_tag directed_category;
   };
 }
 
@@ -223,9 +223,12 @@ void OptimiseArrangmentNode::process() {
     bool fp_u = edge->twin()->face()->data().in_footprint;
     bool fp_l = edge->face()->data().in_footprint;
     if (fp_u && fp_l) { // only edges with both neighbour faces inside the footprint
-      edge->data().edge_weight = edge_length(edge);
-      max_weight = std::max(max_weight, edge->data().edge_weight);
+      double l = smoothness_multiplier * edge_length(edge);
+      edge->data().edge_weight = l;
+      edge->twin()->data().edge_weight = l;
+      max_weight = std::max(max_weight, l);
       edges.push_back(edge);
+      edges.push_back(edge->twin());
     }
   }
   // normalise
@@ -233,7 +236,6 @@ void OptimiseArrangmentNode::process() {
     bool fp_l = edge->face()->data().in_footprint;
     double n_w =  edge->data().edge_weight/max_weight;
     edge->data().edge_weight = n_w;
-    edge->twin()->data().edge_weight = n_w;
   }
 
   FootprintGraph graph(faces, edges);
@@ -247,27 +249,50 @@ void OptimiseArrangmentNode::process() {
 
   // boost::adjacency_list<> g(N);
 
-  double result = CGAL::alpha_expansion_graphcut(
-    graph, 
-    Edge_weight_property_map(),
-    Vertex_index_map(),
-    Vertex_label_cost_property_map(),
-    Vertex_label_property_map(),
-    CGAL::Alpha_expansion_boost_adjacency_list_tag()
-    // CGAL::Alpha_expansion_boost_compressed_sparse_row_tag()
-    // CGAL::Alpha_expansion_MaxFlow_tag()
-  );
+  double result;
 
-  //  assign planes from label map to arrangement faces
-  for (auto& face: arr.face_handles()) {
-    if (face->data().in_footprint) {
-      size_t i = face->data().label;
-      face->data().plane = std::get<0>(points_per_plane[i]);
-      face->data().segid = std::get<2>(points_per_plane[i]);
-    }
+  if (graph_cut_impl==0) {
+    result = CGAL::alpha_expansion_graphcut(
+      graph, 
+      Edge_weight_property_map(),
+      Vertex_index_map(),
+      Vertex_label_cost_property_map(),
+      Vertex_label_property_map(),
+      CGAL::Alpha_expansion_boost_adjacency_list_tag(),
+      n_iterations
+    );
+  } else if (graph_cut_impl==1) {
+    result = CGAL::alpha_expansion_graphcut(
+      graph, 
+      Edge_weight_property_map(),
+      Vertex_index_map(),
+      Vertex_label_cost_property_map(),
+      Vertex_label_property_map(),
+      CGAL::Alpha_expansion_boost_compressed_sparse_row_tag(),
+      n_iterations
+    );
+  } else if (graph_cut_impl==2) {
+    result = CGAL::alpha_expansion_graphcut(
+      graph, 
+      Edge_weight_property_map(),
+      Vertex_index_map(),
+      Vertex_label_cost_property_map(),
+      Vertex_label_property_map(),
+      CGAL::Alpha_expansion_MaxFlow_tag(),
+      n_iterations
+    );
   }
 
-  arr_dissolve_edges(arr);
+  //  assign planes from label map to arrangement faces
+  for (auto& face : faces) {
+    size_t i = face->data().label;
+    face->data().plane = std::get<0>(points_per_plane[i]);
+    face->data().segid = std::get<2>(points_per_plane[i]);
+    face->data().rms_error_to_avg = face->data().vertex_label_cost[i];
+  }
+
+  if(dissolve_edges)
+    arr_dissolve_edges(arr);
 
   output("arrangement").set(arr);
 }

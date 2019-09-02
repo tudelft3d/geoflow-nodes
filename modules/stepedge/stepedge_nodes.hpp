@@ -203,18 +203,26 @@ namespace geoflow::nodes::stepedge {
   };
 
   class OptimiseArrangmentNode:public Node {
-    float data_multiplier = 1.0;
+    float data_multiplier = 50.0;
+    float smoothness_multiplier = 1.0;
     bool preset_labels = false;
-    public:
+    bool dissolve_edges = false;
+    int n_iterations = 3;
+    int graph_cut_impl = 2;
 
+    public:
     using Node::Node;
     void init() {
       add_input("arrangement", typeid(Arrangement_2));
       add_input("pts_per_roofplane", typeid(IndexedPlanesWithPoints ));
       add_output("arrangement", typeid(Arrangement_2));
 
-      add_param("data_multiplier", ParamBoundedFloat(data_multiplier, 0.001, 500, "Multiplier on data term"));
+      add_param("graph_cut_impl", ParamBoundedInt(graph_cut_impl, 0, 2, "Graph cut implementation"));
+      add_param("n_iterations", ParamBoundedInt(n_iterations, 0, 100, "Number of iterations"));
+      add_param("data_multiplier", ParamBoundedFloat(data_multiplier, 0.001, 100, "Multiplier on data term"));
+      add_param("smoothness_multiplier", ParamBoundedFloat(smoothness_multiplier, 0.001, 100, "Multiplier on smoothness term"));
       add_param("preset_labels", ParamBool(preset_labels, "Preset face labels"));
+      add_param("dissolve_edges", ParamBool(dissolve_edges, "Dissolve edges"));
     }
     void process();
   };

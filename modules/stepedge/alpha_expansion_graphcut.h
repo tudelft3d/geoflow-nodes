@@ -547,7 +547,8 @@ double alpha_expansion_graphcut (const InputGraph& input_graph,
                                  VertexIndexMap vertex_index_map,
                                  VertexLabelCostMap vertex_label_cost_map,
                                  VertexLabelMap vertex_label_map,
-                                 const AlphaExpansionImplementationTag&)
+                                 const AlphaExpansionImplementationTag&,
+                                 size_t n_iterations=5)
 {
   typedef boost::graph_traits<InputGraph> GT;
   typedef typename GT::edge_descriptor input_edge_descriptor;
@@ -674,7 +675,7 @@ double alpha_expansion_graphcut (const InputGraph& input_graph,
       }
     }
   // } while(success);
-  } while(++iteration < 10);
+  } while(++iteration < n_iterations);
 
 #ifdef CGAL_SEGMENTATION_BENCH_GRAPHCUT
   CGAL_TRACE_STREAM << "vertex creation time: " << vertex_creation_time <<
